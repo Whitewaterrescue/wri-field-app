@@ -1,0 +1,658 @@
+{
+  "exbVersion": "1.20.0",
+  "mainSizeMode": "LARGE",
+  "mainLocale": "en",
+  "theme": "themes/dark/",
+  "utilities": {},
+  "customTheme": {},
+  "customThemeOptions": {},
+  "forBuilderAttributes": {},
+  "template": "chronology",
+  "useAutoSortInFixedLayout": false,
+  "dataSources": {
+    "dataSource_1": {
+      "id": "dataSource_1",
+      "type": "WEB_MAP",
+      "sourceLabel": "BNSF Drills and Responses 2607missouri",
+      "itemId": "0df4387f8b7145659b96e7ed3df81880",
+      "portalUrl": "https://wrienviro.maps.arcgis.com",
+      "isHidden": false
+    }
+  },
+  "pages": {
+    "page_1": {
+      "id": "page_1",
+      "label": "Home",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_home",
+        "MEDIUM": "layout_home",
+        "SMALL": "layout_home"
+      },
+      "isVisible": true,
+      "isDefault": true,
+      "header": true,
+      "footer": false
+    },
+    "page_2": {
+      "id": "page_2",
+      "label": "Map",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_map",
+        "MEDIUM": "layout_map",
+        "SMALL": "layout_map"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_3": {
+      "id": "page_3",
+      "label": "Forms",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_forms",
+        "MEDIUM": "layout_forms",
+        "SMALL": "layout_forms"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_4": {
+      "id": "page_4",
+      "label": "HASP",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_hasp",
+        "MEDIUM": "layout_hasp",
+        "SMALL": "layout_hasp"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_5": {
+      "id": "page_5",
+      "label": "Sit Stat",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_sitstat",
+        "MEDIUM": "layout_sitstat",
+        "SMALL": "layout_sitstat"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    }
+  },
+  "pageStructure": [
+    {
+      "page_1": []
+    },
+    {
+      "page_2": []
+    },
+    {
+      "page_3": []
+    },
+    {
+      "page_4": []
+    },
+    {
+      "page_5": []
+    }
+  ],
+  "layouts": {
+    "layout_home": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_5",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_map": {
+      "type": "FIXED",
+      "order": [
+        "0",
+        "1"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_1",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        },
+        "1": {
+          "type": "WIDGET",
+          "widgetId": "widget_4",
+          "bbox": {
+            "left": "0px",
+            "right": "10px",
+            "top": "10px",
+            "bottom": "0px",
+            "width": "300px",
+            "height": "48px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": false,
+              "bottom": true,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_forms": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_6",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_hasp": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_7",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_sitstat": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_8",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_ctrl": {
+      "type": "FIXED",
+      "order": [
+        "0",
+        "1"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_3",
+          "bbox": {},
+          "setting": {}
+        },
+        "1": {
+          "type": "WIDGET",
+          "widgetId": "widget_2",
+          "bbox": {},
+          "setting": {}
+        }
+      },
+      "label": "Controller layout"
+    },
+    "layout_hdr": {
+      "type": "FIXED",
+      "order": [
+        "0",
+        "1",
+        "2"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_11",
+          "bbox": {
+            "left": "0px",
+            "right": "12px",
+            "top": "12px",
+            "bottom": "12px",
+            "width": "48px",
+            "height": "40px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "STRETCH"
+            },
+            "vCenter": true,
+            "hCenter": false
+          },
+          "isPending": false
+        },
+        "1": {
+          "type": "WIDGET",
+          "widgetId": "widget_10",
+          "bbox": {
+            "left": "60px",
+            "right": "385px",
+            "top": "12px",
+            "bottom": "9px",
+            "width": "624px",
+            "height": "68.3%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": true,
+              "top": false,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        },
+        "2": {
+          "type": "WIDGET",
+          "widgetId": "widget_9",
+          "bbox": {
+            "left": "801px",
+            "right": "36px",
+            "top": "2px",
+            "bottom": "0px",
+            "width": "187px",
+            "height": "64px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    }
+  },
+  "sections": {},
+  "views": {},
+  "dialogs": {},
+  "messageConfigs": {},
+  "widgets": {
+    "widget_1": {
+      "id": "widget_1",
+      "uri": "widgets/arcgis/arcgis-map/",
+      "version": "1.20.0",
+      "label": "Incident Map",
+      "config": {
+        "initialMapDataSourceID": "dataSource_1",
+        "toolConfig": {
+          "canZoom": true,
+          "canHome": true,
+          "canSearch": true,
+          "canNavigation": true,
+          "canLocate": true,
+          "canLayers": false,
+          "canBaseMap": true,
+          "canScaleBar": true,
+          "canFullScreen": true
+        },
+        "isUseCustomMapState": false
+      },
+      "useDataSources": [
+        {
+          "dataSourceId": "dataSource_1",
+          "mainDataSourceId": "dataSource_1"
+        }
+      ],
+      "useDataSourcesEnabled": true
+    },
+    "widget_2": {
+      "id": "widget_2",
+      "uri": "widgets/arcgis/legend/",
+      "version": "1.20.0",
+      "label": "Legend",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_1"
+      ]
+    },
+    "widget_3": {
+      "id": "widget_3",
+      "uri": "widgets/arcgis/map-layers/",
+      "version": "1.20.0",
+      "label": "Layers",
+      "config": {
+        "useMapWidget": true,
+        "goto": true,
+        "label": false,
+        "popup": true,
+        "opacity": true,
+        "visibilityRange": false,
+        "showTables": false,
+        "searchLayers": true,
+        "enableLegend": false,
+        "showAllLegend": true,
+        "useTickBoxes": true,
+        "information": false
+      },
+      "useMapWidgetIds": [
+        "widget_1"
+      ]
+    },
+    "widget_4": {
+      "id": "widget_4",
+      "uri": "widgets/common/controller/",
+      "version": "1.20.0",
+      "label": "Map Tools",
+      "config": {
+        "behavior": {
+          "onlyOpenOne": true,
+          "openStarts": [],
+          "displayType": "SIDEBYSIDE",
+          "vertical": false,
+          "size": {
+            "widget_2": {
+              "width": 320,
+              "height": 440
+            },
+            "widget_3": {
+              "width": 340,
+              "height": 480
+            }
+          },
+          "arrangement": "floating"
+        },
+        "appearance": {
+          "space": 4,
+          "advanced": false,
+          "card": {
+            "showLabel": true,
+            "labelGrowth": 30,
+            "avatar": {
+              "type": "primary",
+              "size": "sm",
+              "shape": "rectangle",
+              "buttonSize": null,
+              "iconSize": null
+            }
+          }
+        }
+      },
+      "layouts": {
+        "controller": {
+          "LARGE": "layout_ctrl",
+          "MEDIUM": "layout_ctrl",
+          "SMALL": "layout_ctrl"
+        }
+      }
+    },
+    "widget_5": {
+      "id": "widget_5",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Tasks Panel",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/tasks/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_6": {
+      "id": "widget_6",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Forms Panel",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/forms/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_7": {
+      "id": "widget_7",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "HASP",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://script.google.com/macros/s/AKfycbwr9Wsw4ODXLIFJA9sTNzjqau-5576zxXxLe1oXHstbW0Qp3AlXjQ_BbxMm9cuYDtN3/exec</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_8": {
+      "id": "widget_8",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Sit Stat",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://script.google.com/macros/s/AKfycbzsxpfqbV7di4yTHRiTr7bg-RwojLuesrLhPoaFVM8foedbzhxMMyC-lPcBPPyLtjtm/exec?role=sitstat</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_9": {
+      "id": "widget_9",
+      "uri": "widgets/common/image/",
+      "version": "1.20.0",
+      "label": "WRI Logo",
+      "config": {
+        "functionConfig": {
+          "altText": "WRI Environmental",
+          "toolTip": "",
+          "linkParam": {},
+          "scale": "Fit",
+          "imageParam": {
+            "url": "${appResourceUrl}/images/wri_logo.png",
+            "fileName": "wri_logo.png",
+            "type": "IMAGE"
+          },
+          "imageFillMode": "FIT",
+          "imageDisplayQualityMode": "ORIGINAL"
+        },
+        "styleConfig": {}
+      }
+    },
+    "widget_10": {
+      "id": "widget_10",
+      "uri": "widgets/common/text/",
+      "version": "1.20.0",
+      "label": "App Title",
+      "config": {
+        "text": "<p style=\"margin: 0px;\"><strong style=\"color: rgb(255, 255, 255); font-size: 22px;\">WRI Field App</strong></p>",
+        "placeholder": "",
+        "style": {
+          "verticalAlign": "center",
+          "wrap": false,
+          "overflow": "hidden",
+          "padding": "p-0"
+        }
+      }
+    },
+    "widget_11": {
+      "id": "widget_11",
+      "uri": "widgets/common/menu/",
+      "version": "1.20.0",
+      "label": "Menu",
+      "config": {
+        "type": "drawer",
+        "menuStyle": "default",
+        "vertical": true,
+        "standard": {}
+      }
+    }
+  },
+  "widgetsManifest": {},
+  "attributes": {
+    "portalUrl": "https://wrienviro.maps.arcgis.com",
+    "isWebTier": false,
+    "clientId": "zXmBr5FFTyHWfh24",
+    "express": false,
+    "title": "WRI Field App",
+    "description": "",
+    "type": "Web Experience",
+    "thumbnail": null
+  },
+  "header": {
+    "layout": {
+      "LARGE": "layout_hdr",
+      "MEDIUM": "layout_hdr",
+      "SMALL": "layout_hdr"
+    },
+    "height": {
+      "LARGE": 67,
+      "SMALL": 56
+    },
+    "backgroundColor": "#1f1f1f",
+    "textColor": "#fff"
+  },
+  "sharedThemeVariables": {},
+  "timestamp": 1784418917180
+}
