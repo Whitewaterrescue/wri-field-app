@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>WRI Tasks</title>
+<link rel="icon" href="data:,">
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   :root{
@@ -176,12 +177,19 @@
     render();
   }
 
+  // A task's phase cell may hold several comma-separated phases ("Initial,Daily")
+  function taskPhases(t) {
+    var list = (t.phase || '').toLowerCase().split(',')
+      .map(function (p) { return p.trim(); })
+      .filter(Boolean);
+    return list.length ? list : ['general'];
+  }
+
   function phasesFor(role) {
     var seen = {};
     (role.sections || []).forEach(function (sec) {
       (sec.tasks || []).forEach(function (t) {
-        var p = (t.phase || '').trim().toLowerCase();
-        seen[p || 'general'] = 1;
+        taskPhases(t).forEach(function (p) { seen[p] = 1; });
       });
     });
     var list = Object.keys(seen);
@@ -231,8 +239,7 @@
     var total = 0, checked = 0, body = '';
     (role.sections || []).forEach(function (sec) {
       var tasks = (sec.tasks || []).filter(function (t) {
-        var p = (t.phase || '').trim().toLowerCase() || 'general';
-        return p === currentPhase;
+        return taskPhases(t).indexOf(currentPhase) !== -1;
       });
       if (!tasks.length) return;
       if (sec.title) body += '<div class="section-title">' + esc(sec.title) + '</div>';
