@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WRI Forms</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#0a0c10;--surface:#111827;--surface-alt:#1a2234;
+    --accent:#cc0000;
+    --text:#e5e7eb;--text-dim:#9ca3af;--text-muted:#6b7280;
+    --border:#2a2f3a;--warning:#f59e0b;
+    --font:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  }
+  html,body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;min-height:100vh}
+  .search-bar{
+    position:sticky;top:0;z-index:10;background:var(--bg);
+    padding:12px 14px 10px;border-bottom:1px solid var(--border);
+  }
+  .search-bar input{
+    width:100%;padding:13px 16px;font-size:16px;color:var(--text);
+    background:var(--surface);border:1px solid var(--border);border-radius:10px;outline:none;
+  }
+  .search-bar input:focus{border-color:var(--accent)}
+  .offline-banner{
+    display:none;padding:8px 14px;background:#3b2a08;color:var(--warning);
+    font-size:13px;text-align:center;
+  }
+  .offline-banner.show{display:block}
+  #content{padding:12px 14px 40px;max-width:640px;margin:0 auto}
+  .section-title{
+    font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+    color:var(--text-dim);margin:20px 0 10px 2px;
+  }
+  .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .app-btn{
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    min-height:56px;padding:12px 14px;border-radius:10px;border:none;
+    font-size:15px;font-weight:600;line-height:1.3;color:#fff;
+    text-decoration:none;cursor:pointer;width:100%;font-family:var(--font);
+  }
+  .app-btn:active{transform:scale(0.97);opacity:0.85}
+  .app-btn.full{grid-column:1 / -1}
+  .app-btn.green{background:#3d5a3e}
+  .app-btn.red{background:#cc0000}
+  .app-btn.blue{background:#2563eb}
+  .app-btn.amber,.app-btn.orange{background:#b45309}
+  .app-btn.dark{background:#1e293b}
+  .app-btn.slate{background:#334155}
+  .app-btn.white{background:#e5e7eb;color:#1a1a2e}
+  .app-btn.teal{background:#0d9488}
+  .group{grid-column:1 / -1}
+  .group.half{grid-column:auto}
+  .group .app-btn .caret{margin-left:8px;font-size:11px;opacity:0.7;transition:transform .15s}
+  .group.open .app-btn .caret{transform:rotate(180deg)}
+  .submenu{
+    display:none;flex-wrap:wrap;gap:6px;padding:8px;margin-top:6px;
+    background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  }
+  .group.open .submenu{display:flex}
+  .submenu-link{
+    flex:1;min-width:130px;padding:13px 10px;border-radius:8px;
+    background:var(--surface-alt);color:var(--text);text-align:center;
+    font-size:14px;font-weight:600;text-decoration:none;border:1px solid var(--border);
+  }
+  .submenu-link:active{opacity:0.8}
+  .submenu-link.dead{opacity:0.4;pointer-events:none}
+  .empty,.loading{color:var(--text-muted);text-align:center;padding:40px 20px;font-size:14px}
+  .spin{
+    width:26px;height:26px;margin:0 auto 12px;border-radius:50%;
+    border:3px solid var(--border);border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+  <div class="search-bar">
+    <input id="search" type="search" placeholder="Search forms &amp; apps&hellip;" autocomplete="off">
+  </div>
+  <div id="offline" class="offline-banner">Offline &mdash; showing last saved list</div>
+  <div id="content"><div class="loading"><div class="spin"></div>Loading forms&hellip;</div></div>
+
+<script>
+  var API = 'https://script.google.com/macros/s/AKfycbzfQnJ9AKRTJU3yVpVfHF8bxAZZBmWeKYdL5XbQgZr09bUYB3IgQZVomPxrLAXck_D9/exec';
+  var CACHE_KEY = 'wri_forms_cache';
+  var allApps = [];
+
+  function loadCache() {
+    try {
+      var c = JSON.parse(localStorage.getItem(CACHE_KEY));
+      if (c && c.apps) return c.apps;
+    } catch (e) {}
+    return null;
+  }
+
+  function saveCache(apps) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), apps: apps })); } catch (e) {}
+  }
+
+  function init() {
+    var cached = loadCache();
+    if (cached) { allApps = cached; render(); }
+    fetch(API + '?api=apps')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok && d.apps) {
+          allApps = d.apps;
+          saveCache(d.apps);
+          document.getElementById('offline').classList.remove('show');
+          render();
+        } else if (!cached) {
+          showError();
+        }
+      })
+      .catch(function () {
+        if (cached) document.getElementById('offline').classList.add('show');
+        else showError();
+      });
+  }
+
+  function showError() {
+    document.getElementById('content').innerHTML =
+      '<div class="empty">Could not load the forms list.<br>Check your connection and pull to refresh.</div>';
+  }
+
+  function matches(app, q) {
+    if (!q) return true;
+    if (app.name.toLowerCase().indexOf(q) !== -1) return true;
+    if ((app.section || '').toLowerCase().indexOf(q) !== -1) return true;
+    return (app.subLinks || []).some(function (s) { return s.name.toLowerCase().indexOf(q) !== -1; });
+  }
+
+  function render() {
+    var q = document.getElementById('search').value.trim().toLowerCase();
+    // table-type rows are Mission-Hub-internal editors; no launchable URL
+    var apps = allApps.filter(function (a) { return a.type !== 'table' && matches(a, q); });
+
+    if (!apps.length) {
+      document.getElementById('content').innerHTML = '<div class="empty">No matching forms.</div>';
+      return;
+    }
+
+    // Group by section, preserving sheet order; blank sections last as "More Tools"
+    var sections = [], byName = {};
+    apps.forEach(function (a) {
+      var key = a.section || '';
+      if (!(key in byName)) { byName[key] = []; sections.push(key); }
+      byName[key].push(a);
+    });
+    sections.sort(function (a, b) { return (a === '') - (b === ''); });
+
+    var html = '';
+    sections.forEach(function (sec) {
+      html += '<div class="section-title">' + esc(sec || 'More Tools') + '</div><div class="btn-grid">';
+      byName[sec].forEach(function (a) { html += renderApp(a, q); });
+      html += '</div>';
+    });
+    document.getElementById('content').innerHTML = html;
+  }
+
+  function renderApp(a, q) {
+    var color = (a.color || 'slate').toLowerCase();
+    var width = (a.width || 'full').toLowerCase() === 'half' ? 'half' : 'full';
+    var subs = a.subLinks || [];
+    if (subs.length) {
+      // Auto-expand groups when the search matched a sublink
+      var open = q && subs.some(function (s) { return s.name.toLowerCase().indexOf(q) !== -1; });
+      var h = '<div class="group ' + width + (open ? ' open' : '') + '">' +
+        '<button class="app-btn ' + color + ' full" onclick="this.parentNode.classList.toggle(\'open\')">' +
+        esc(a.name) + '<span class="caret">&#9660;</span></button><div class="submenu">';
+      subs.forEach(function (s) {
+        h += s.url
+          ? '<a class="submenu-link" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.name) + '</a>'
+          : '<span class="submenu-link dead">' + esc(s.name) + '</span>';
+      });
+      return h + '</div></div>';
+    }
+    if (!a.url) return '';
+    return '<a class="app-btn ' + color + ' ' + width + '" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name) + '</a>';
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  init();
+</script>
+</body>
+</html>
