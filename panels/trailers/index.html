@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WRI Trailer Inspections</title>
+<link rel="icon" href="data:,">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#0a0c10;--surface:#111827;--surface-alt:#1a2234;
+    --accent:#cc0000;
+    --text:#e5e7eb;--text-dim:#9ca3af;--text-muted:#6b7280;
+    --border:#2a2f3a;
+    --font:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  }
+  html,body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;min-height:100vh}
+  .wrap{max-width:520px;margin:0 auto;padding:24px 16px;display:flex;flex-direction:column;justify-content:center;min-height:100vh}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:14px;
+    padding:24px 20px;text-align:center;
+  }
+  .icon{font-size:44px;margin-bottom:12px}
+  h1{font-size:20px;font-weight:700;margin-bottom:8px}
+  p{font-size:14px;color:var(--text-dim);line-height:1.5;margin-bottom:20px}
+  .btn{
+    display:flex;align-items:center;justify-content:center;min-height:58px;
+    padding:14px;border-radius:12px;font-size:16px;font-weight:700;color:#fff;
+    background:var(--accent);text-decoration:none;
+  }
+  .btn:active{transform:scale(0.97);opacity:0.85}
+  .note{font-size:12px;color:var(--text-muted);margin-top:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <div class="icon">&#128667;</div>
+    <h1>BNSF Trailer Inspections</h1>
+    <p>Asset readiness viewer &mdash; response trailers, equipment inventory,
+       compliance clocks, and inspection surveys with asset prefill.</p>
+    <a class="btn" href="https://whitewaterrescue.github.io/wri-bnsf-assets/" target="_blank" rel="noopener">
+      Open Asset Viewer
+    </a>
+    <div class="note">Opens in a new tab and uses its own ArcGIS sign-in.
+      Launch DOT/condition and issue surveys from inside the viewer so the
+      asset details prefill.</div>
+  </div>
+</div>
+</body>
+</html>
