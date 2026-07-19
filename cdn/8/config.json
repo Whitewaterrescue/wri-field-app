@@ -1443,7 +1443,7 @@
       "label": "Trailer Inspections",
       "config": {
         "embedType": "url",
-        "expression": "<p>https://whitewaterrescue.github.io/wri-bnsf-assets/</p>",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/trailers/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
@@ -1475,5 +1475,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1784422523075
+  "timestamp": 1784422889398
 }
