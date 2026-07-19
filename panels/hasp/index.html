@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>WRI HASP</title>
+<link rel="icon" href="data:,">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#0a0c10;--surface:#111827;--surface-alt:#1a2234;
+    --accent:#cc0000;
+    --text:#e5e7eb;--text-dim:#9ca3af;--text-muted:#6b7280;
+    --border:#2a2f3a;--warning:#f59e0b;
+    --font:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  }
+  html,body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;min-height:100vh}
+  .wrap{max-width:640px;margin:0 auto;padding:14px;display:flex;flex-direction:column;min-height:100vh}
+  .offline-banner{
+    display:none;padding:8px 14px;background:#3b2a08;color:var(--warning);
+    font-size:13px;text-align:center;border-radius:8px;margin-bottom:10px;
+  }
+  .offline-banner.show{display:block}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:16px;margin-bottom:12px;
+  }
+  .card h2{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:10px}
+  .proj{font-size:20px;font-weight:700;margin-bottom:2px}
+  .meta{font-size:13px;color:var(--text-dim);line-height:1.6}
+  .meta b{color:var(--text);font-weight:600}
+  .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+  .btn{
+    display:flex;align-items:center;justify-content:center;min-height:52px;
+    padding:12px;border-radius:10px;font-size:15px;font-weight:700;color:#fff;
+    text-decoration:none;text-align:center;line-height:1.3;
+  }
+  .btn:active{transform:scale(0.97);opacity:0.85}
+  .btn.ack{background:var(--accent);grid-column:1 / -1;min-height:58px;font-size:16px}
+  .btn.view{background:#2563eb}
+  .btn.pdf{background:#334155}
+  .full-link{
+    display:block;text-align:center;margin:2px 0 12px;font-size:13px;
+    color:var(--text-muted);text-decoration:underline;
+  }
+  .preview{
+    flex:1;min-height:420px;border:1px solid var(--border);border-radius:12px;
+    overflow:hidden;background:#fff;
+  }
+  .preview iframe{width:100%;height:100%;min-height:420px;border:none}
+  .empty,.loading{color:var(--text-muted);text-align:center;padding:40px 20px;font-size:14px}
+  .spin{
+    width:26px;height:26px;margin:0 auto 12px;border-radius:50%;
+    border:3px solid var(--border);border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="offline" class="offline-banner">Offline &mdash; showing last saved HASP info</div>
+  <div id="content"><div class="loading"><div class="spin"></div>Loading current HASP&hellip;</div></div>
+</div>
+
+<script>
+  var API = 'https://script.google.com/macros/s/AKfycbzcg-yD3_ALkdGYVEOuGY3VR8NrlsPRoxL6k-4LKX3SqEI6NlaKkpprKCtez2xo9C2u/exec';
+  var CACHE_KEY = 'wri_hasp_cache';
+
+  function loadCache() {
+    try {
+      var c = JSON.parse(localStorage.getItem(CACHE_KEY));
+      if (c && c.data) return c.data;
+    } catch (e) {}
+    return null;
+  }
+
+  function init() {
+    var cached = loadCache();
+    if (cached) render(cached);
+    fetch(API + '?api=hasp')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok && d.hasp && !d.hasp.error) {
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: d })); } catch (e) {}
+          document.getElementById('offline').classList.remove('show');
+          render(d);
+        } else if (!cached) {
+          document.getElementById('content').innerHTML =
+            '<div class="empty">No HASP found' +
+            (d && d.hasp && d.hasp.error ? '<br><small>' + esc(d.hasp.error) + '</small>' : '') +
+            (d && d.haspUrl ? '<br><br><a class="full-link" href="' + esc(d.haspUrl) + '" target="_blank" rel="noopener">Open the HASP app to create one</a>' : '') +
+            '</div>';
+        }
+      })
+      .catch(function () {
+        if (cached) document.getElementById('offline').classList.add('show');
+        else document.getElementById('content').innerHTML =
+          '<div class="empty">Could not load HASP info.<br>Check your connection and reload.</div>';
+      });
+  }
+
+  function fmtDate(raw) {
+    var d = new Date(raw);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) +
+      ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }
+
+  function render(d) {
+    var h = d.hasp;
+    var html =
+      '<div class="card">' +
+        '<h2>Current Health &amp; Safety Plan</h2>' +
+        '<div class="proj">' + esc(h.projectName || 'HASP') + '</div>' +
+        '<div class="meta">' +
+          (h.client ? '<b>' + esc(h.client.toUpperCase()) + '</b> &middot; ' : '') +
+          (h.location ? esc(h.location.trim()) + '<br>' : '') +
+          (h.creator ? 'By ' + esc(h.creator.replace(/_/g, ' ')) + ' &middot; ' : '') +
+          (h.timestamp ? esc(fmtDate(h.timestamp)) : '') +
+        '</div>' +
+        '<div class="btn-row">' +
+          (h.ackUrl ? '<a class="btn ack" href="' + esc(h.ackUrl) + '" target="_blank" rel="noopener">Acknowledge HASP</a>' : '') +
+          (h.docUrl ? '<a class="btn view" href="' + esc(h.docUrl) + '" target="_blank" rel="noopener">Open Doc</a>' : '') +
+          (h.pdfUrl ? '<a class="btn pdf" href="' + esc(h.pdfUrl) + '" target="_blank" rel="noopener">Download PDF</a>' : '') +
+        '</div>' +
+      '</div>' +
+      (d.haspUrl ? '<a class="full-link" href="' + esc(d.haspUrl) + '" target="_blank" rel="noopener">Open full HASP app (create / edit plans)</a>' : '') +
+      (h.previewUrl ? '<div class="preview"><iframe src="' + esc(h.previewUrl) + '" title="HASP preview"></iframe></div>' : '');
+    document.getElementById('content').innerHTML = html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  init();
+</script>
+</body>
+</html>
