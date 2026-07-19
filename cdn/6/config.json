@@ -1018,7 +1018,7 @@
       "id": "widget_14",
       "uri": "widgets/arcgis/legend/",
       "version": "1.20.0",
-      "label": "FRP Map Legend",
+      "label": "Legend",
       "config": {},
       "useMapWidgetIds": [
         "widget_13"
@@ -1028,7 +1028,7 @@
       "id": "widget_15",
       "uri": "widgets/arcgis/map-layers/",
       "version": "1.20.0",
-      "label": "FRP Map Layers",
+      "label": "Layers",
       "config": {
         "useMapWidget": true,
         "goto": true,
@@ -1126,7 +1126,7 @@
       "id": "widget_18",
       "uri": "widgets/arcgis/legend/",
       "version": "1.20.0",
-      "label": "Wildfire Map Legend",
+      "label": "Legend",
       "config": {},
       "useMapWidgetIds": [
         "widget_17"
@@ -1136,7 +1136,7 @@
       "id": "widget_19",
       "uri": "widgets/arcgis/map-layers/",
       "version": "1.20.0",
-      "label": "Wildfire Map Layers",
+      "label": "Layers",
       "config": {
         "useMapWidget": true,
         "goto": true,
@@ -1274,5 +1274,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1784421205259
+  "timestamp": 1784421820448
 }
