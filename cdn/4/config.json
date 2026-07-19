@@ -17,6 +17,22 @@
       "itemId": "0df4387f8b7145659b96e7ed3df81880",
       "portalUrl": "https://wrienviro.maps.arcgis.com",
       "isHidden": false
+    },
+    "dataSource_2": {
+      "id": "dataSource_2",
+      "type": "WEB_MAP",
+      "sourceLabel": "BNSF FRP View Map",
+      "itemId": "2c197d5dd11645f9b976a9b83fa7a126",
+      "portalUrl": "https://wrienviro.maps.arcgis.com",
+      "isHidden": false
+    },
+    "dataSource_3": {
+      "id": "dataSource_3",
+      "type": "WEB_MAP",
+      "sourceLabel": "BNSF Wildfire View Map",
+      "itemId": "0d2a87ccd3f94e45b2f6e2aa5eec53aa",
+      "portalUrl": "https://wrienviro.maps.arcgis.com",
+      "isHidden": false
     }
   },
   "pages": {
@@ -37,7 +53,7 @@
     },
     "page_2": {
       "id": "page_2",
-      "label": "Map",
+      "label": "Incident Map",
       "type": "NORMAL",
       "mode": "FIT_WINDOW",
       "layout": {
@@ -94,6 +110,36 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_6": {
+      "id": "page_6",
+      "label": "FRP Map",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_frp",
+        "MEDIUM": "layout_frp",
+        "SMALL": "layout_frp"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_7": {
+      "id": "page_7",
+      "label": "Wildfire Map",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_fire",
+        "MEDIUM": "layout_fire",
+        "SMALL": "layout_fire"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -102,6 +148,12 @@
     },
     {
       "page_2": []
+    },
+    {
+      "page_6": []
+    },
+    {
+      "page_7": []
     },
     {
       "page_3": []
@@ -328,6 +380,175 @@
         "2": {
           "type": "WIDGET",
           "widgetId": "widget_12",
+          "bbox": {},
+          "setting": {}
+        }
+      },
+      "label": "Controller layout"
+    },
+    "layout_frp": {
+      "type": "FIXED",
+      "order": [
+        "0",
+        "1"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_13",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        },
+        "1": {
+          "type": "WIDGET",
+          "widgetId": "widget_16",
+          "bbox": {
+            "left": "0px",
+            "right": "10px",
+            "top": "10px",
+            "bottom": "0px",
+            "width": "300px",
+            "height": "48px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": false,
+              "bottom": true,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_ctrl_frp": {
+      "type": "FIXED",
+      "order": [
+        "0",
+        "1"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_15",
+          "bbox": {},
+          "setting": {}
+        },
+        "1": {
+          "type": "WIDGET",
+          "widgetId": "widget_14",
+          "bbox": {},
+          "setting": {}
+        }
+      },
+      "label": "Controller layout"
+    },
+    "layout_fire": {
+      "type": "FIXED",
+      "order": [
+        "0",
+        "1"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_17",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        },
+        "1": {
+          "type": "WIDGET",
+          "widgetId": "widget_20",
+          "bbox": {
+            "left": "0px",
+            "right": "10px",
+            "top": "10px",
+            "bottom": "0px",
+            "width": "300px",
+            "height": "48px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": false,
+              "bottom": true,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_ctrl_fire": {
+      "type": "FIXED",
+      "order": [
+        "0",
+        "1",
+        "2"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_19",
+          "bbox": {},
+          "setting": {}
+        },
+        "1": {
+          "type": "WIDGET",
+          "widgetId": "widget_18",
+          "bbox": {},
+          "setting": {}
+        },
+        "2": {
+          "type": "WIDGET",
+          "widgetId": "widget_21",
           "bbox": {},
           "setting": {}
         }
@@ -764,6 +985,268 @@
       "useMapWidgetIds": [
         "widget_1"
       ]
+    },
+    "widget_13": {
+      "id": "widget_13",
+      "uri": "widgets/arcgis/arcgis-map/",
+      "version": "1.20.0",
+      "label": "FRP Map",
+      "config": {
+        "initialMapDataSourceID": "dataSource_2",
+        "toolConfig": {
+          "canZoom": true,
+          "canHome": true,
+          "canSearch": true,
+          "canNavigation": true,
+          "canLocate": true,
+          "canLayers": false,
+          "canBaseMap": true,
+          "canScaleBar": true,
+          "canFullScreen": true
+        },
+        "isUseCustomMapState": false
+      },
+      "useDataSources": [
+        {
+          "dataSourceId": "dataSource_2",
+          "mainDataSourceId": "dataSource_2"
+        }
+      ],
+      "useDataSourcesEnabled": true
+    },
+    "widget_14": {
+      "id": "widget_14",
+      "uri": "widgets/arcgis/legend/",
+      "version": "1.20.0",
+      "label": "FRP Map Legend",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_13"
+      ]
+    },
+    "widget_15": {
+      "id": "widget_15",
+      "uri": "widgets/arcgis/map-layers/",
+      "version": "1.20.0",
+      "label": "FRP Map Layers",
+      "config": {
+        "useMapWidget": true,
+        "goto": true,
+        "label": false,
+        "popup": true,
+        "opacity": true,
+        "visibilityRange": false,
+        "showTables": false,
+        "searchLayers": true,
+        "enableLegend": false,
+        "showAllLegend": true,
+        "useTickBoxes": true,
+        "information": false
+      },
+      "useMapWidgetIds": [
+        "widget_13"
+      ]
+    },
+    "widget_16": {
+      "id": "widget_16",
+      "uri": "widgets/common/controller/",
+      "version": "1.20.0",
+      "label": "FRP Map Tools",
+      "config": {
+        "behavior": {
+          "onlyOpenOne": true,
+          "openStarts": [],
+          "displayType": "SIDEBYSIDE",
+          "vertical": false,
+          "size": {
+            "widget_14": {
+              "width": 320,
+              "height": 440
+            },
+            "widget_15": {
+              "width": 340,
+              "height": 480
+            }
+          },
+          "arrangement": "floating"
+        },
+        "appearance": {
+          "space": 4,
+          "advanced": false,
+          "card": {
+            "showLabel": true,
+            "labelGrowth": 30,
+            "avatar": {
+              "type": "primary",
+              "size": "sm",
+              "shape": "rectangle",
+              "buttonSize": null,
+              "iconSize": null
+            }
+          }
+        }
+      },
+      "layouts": {
+        "controller": {
+          "LARGE": "layout_ctrl_frp",
+          "MEDIUM": "layout_ctrl_frp",
+          "SMALL": "layout_ctrl_frp"
+        }
+      }
+    },
+    "widget_17": {
+      "id": "widget_17",
+      "uri": "widgets/arcgis/arcgis-map/",
+      "version": "1.20.0",
+      "label": "Wildfire Map",
+      "config": {
+        "initialMapDataSourceID": "dataSource_3",
+        "toolConfig": {
+          "canZoom": true,
+          "canHome": true,
+          "canSearch": true,
+          "canNavigation": true,
+          "canLocate": true,
+          "canLayers": false,
+          "canBaseMap": true,
+          "canScaleBar": true,
+          "canFullScreen": true
+        },
+        "isUseCustomMapState": false
+      },
+      "useDataSources": [
+        {
+          "dataSourceId": "dataSource_3",
+          "mainDataSourceId": "dataSource_3"
+        }
+      ],
+      "useDataSourcesEnabled": true
+    },
+    "widget_18": {
+      "id": "widget_18",
+      "uri": "widgets/arcgis/legend/",
+      "version": "1.20.0",
+      "label": "Wildfire Map Legend",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_17"
+      ]
+    },
+    "widget_19": {
+      "id": "widget_19",
+      "uri": "widgets/arcgis/map-layers/",
+      "version": "1.20.0",
+      "label": "Wildfire Map Layers",
+      "config": {
+        "useMapWidget": true,
+        "goto": true,
+        "label": false,
+        "popup": true,
+        "opacity": true,
+        "visibilityRange": false,
+        "showTables": false,
+        "searchLayers": true,
+        "enableLegend": false,
+        "showAllLegend": true,
+        "useTickBoxes": true,
+        "information": false
+      },
+      "useMapWidgetIds": [
+        "widget_17"
+      ]
+    },
+    "widget_20": {
+      "id": "widget_20",
+      "uri": "widgets/common/controller/",
+      "version": "1.20.0",
+      "label": "Wildfire Map Tools",
+      "config": {
+        "behavior": {
+          "onlyOpenOne": true,
+          "openStarts": [],
+          "displayType": "SIDEBYSIDE",
+          "vertical": false,
+          "size": {
+            "widget_18": {
+              "width": 320,
+              "height": 440
+            },
+            "widget_19": {
+              "width": 340,
+              "height": 480
+            },
+            "widget_21": {
+              "width": 430,
+              "height": 620
+            }
+          },
+          "arrangement": "floating"
+        },
+        "appearance": {
+          "space": 4,
+          "advanced": false,
+          "card": {
+            "showLabel": true,
+            "labelGrowth": 30,
+            "avatar": {
+              "type": "primary",
+              "size": "sm",
+              "shape": "rectangle",
+              "buttonSize": null,
+              "iconSize": null
+            }
+          }
+        }
+      },
+      "layouts": {
+        "controller": {
+          "LARGE": "layout_ctrl_fire",
+          "MEDIUM": "layout_ctrl_fire",
+          "SMALL": "layout_ctrl_fire"
+        }
+      }
+    },
+    "widget_21": {
+      "id": "widget_21",
+      "uri": "widgets/fire-cone/",
+      "version": "0.1.0",
+      "label": "Fire Threat Cone",
+      "config": {
+        "maxHours": 24,
+        "isochroneHours": [
+          1,
+          3,
+          6,
+          12,
+          24
+        ],
+        "maxRadiusKm": 30,
+        "bearings": 24,
+        "stepM": 500,
+        "assetLayers": [
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_Tunnels_with_Wildfire_Strategy/FeatureServer/0",
+            "nameField": "Tunnel_Name",
+            "extraFields": [
+              "Subdivision",
+              "Milepost",
+              "Overall_Risk_Classification"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_Infrastructure_with_Wildfire_Strategy/FeatureServer/1",
+            "nameField": "Descriptio",
+            "extraFields": [
+              "Subdivisio",
+              "Milepost",
+              "Overall__1"
+            ]
+          }
+        ]
+      },
+      "useMapWidgetIds": [
+        "widget_17"
+      ]
     }
   },
   "widgetsManifest": {},
@@ -791,5 +1274,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1784420687620
+  "timestamp": 1784421205259
 }
