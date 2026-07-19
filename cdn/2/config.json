@@ -337,14 +337,14 @@
       "content": {
         "0": {
           "type": "WIDGET",
-          "widgetId": "widget_11",
+          "widgetId": "widget_9",
           "bbox": {
-            "left": "0px",
-            "right": "12px",
-            "top": "12px",
-            "bottom": "12px",
-            "width": "48px",
-            "height": "40px"
+            "left": "801px",
+            "right": "36px",
+            "top": "2px",
+            "bottom": "0px",
+            "width": "187px",
+            "height": "64px"
           },
           "setting": {
             "autoProps": {
@@ -355,7 +355,7 @@
               "width": "CUSTOM",
               "height": "STRETCH"
             },
-            "vCenter": true,
+            "vCenter": false,
             "hCenter": false
           },
           "isPending": false
@@ -364,7 +364,7 @@
           "type": "WIDGET",
           "widgetId": "widget_10",
           "bbox": {
-            "left": "60px",
+            "left": "15px",
             "right": "385px",
             "top": "12px",
             "bottom": "9px",
@@ -387,14 +387,14 @@
         },
         "2": {
           "type": "WIDGET",
-          "widgetId": "widget_9",
+          "widgetId": "widget_11",
           "bbox": {
-            "left": "801px",
-            "right": "36px",
-            "top": "2px",
-            "bottom": "0px",
-            "width": "187px",
-            "height": "64px"
+            "left": "0px",
+            "right": "12px",
+            "top": "12px",
+            "bottom": "12px",
+            "width": "48px",
+            "height": "40px"
           },
           "setting": {
             "autoProps": {
@@ -405,7 +405,7 @@
               "width": "CUSTOM",
               "height": "STRETCH"
             },
-            "vCenter": false,
+            "vCenter": true,
             "hCenter": false
           },
           "isPending": false
@@ -654,5 +654,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1784418917180
+  "timestamp": 1784419317036
 }
