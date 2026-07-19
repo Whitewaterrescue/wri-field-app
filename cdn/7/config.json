@@ -140,6 +140,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_8": {
+      "id": "page_8",
+      "label": "Trailer Inspections",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_trailers",
+        "MEDIUM": "layout_trailers",
+        "SMALL": "layout_trailers"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -163,6 +178,9 @@
     },
     {
       "page_5": []
+    },
+    {
+      "page_8": []
     }
   ],
   "layouts": {
@@ -449,7 +467,8 @@
       "type": "FIXED",
       "order": [
         "0",
-        "1"
+        "1",
+        "2"
       ],
       "content": {
         "0": {
@@ -461,6 +480,12 @@
         "1": {
           "type": "WIDGET",
           "widgetId": "widget_14",
+          "bbox": {},
+          "setting": {}
+        },
+        "2": {
+          "type": "WIDGET",
+          "widgetId": "widget_22",
           "bbox": {},
           "setting": {}
         }
@@ -554,6 +579,39 @@
         }
       },
       "label": "Controller layout"
+    },
+    "layout_trailers": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_23",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
     },
     "layout_hdr": {
       "type": "FIXED",
@@ -1066,6 +1124,10 @@
             "widget_15": {
               "width": 340,
               "height": 480
+            },
+            "widget_22": {
+              "width": 430,
+              "height": 620
             }
           },
           "arrangement": "floating"
@@ -1247,6 +1309,145 @@
       "useMapWidgetIds": [
         "widget_17"
       ]
+    },
+    "widget_22": {
+      "id": "widget_22",
+      "uri": "widgets/spill-trace/",
+      "version": "1.0.0",
+      "label": "Spill Trajectory",
+      "config": {
+        "safetyFactor": 1.5,
+        "minStreamOrder": 4,
+        "maxHours": 24,
+        "maxDistanceKm": 300,
+        "siteLayers": [
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Snake_River_GRP_Test_v2/FeatureServer/1",
+            "nameField": "site_name",
+            "bufferM": 500,
+            "where": "status <> 'rejected'",
+            "extraFields": [
+              "river_mile",
+              "strategy_type",
+              "GlobalID"
+            ],
+            "boomLayer": {
+              "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Snake_River_GRP_Test_v2/FeatureServer/0",
+              "siteKeyField": "site_globalid"
+            }
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Clarkfork_River_GRP_Points_2025/FeatureServer/0",
+            "nameField": "Site_Name",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type",
+              "Site_Rank"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Missouri_River_GRP_Points_2025/FeatureServer/0",
+            "nameField": "Location_Description",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type",
+              "Site_Rank"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Upper_Colorado_GRP_Points_2025/FeatureServer/0",
+            "nameField": "Site_Name",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Yellowstone_River_GRP_Points_2025_5/FeatureServer/0",
+            "nameField": "Site_Name",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type",
+              "Site_Rank"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Lochsa_River_GRP_Points_2025/FeatureServer/0",
+            "nameField": "Location_Description",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Kootenai_River_GRP_Points_2025/FeatureServer/0",
+            "nameField": "Site_Name",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Upper_Kootenai_River_GRP_Points_2025/FeatureServer/0",
+            "nameField": "Location_Description",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/MF_Flathead_GRP_Points_2025_WFL1/FeatureServer/0",
+            "nameField": "Site_Name",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Jocko_River_GRP_Points_2025/FeatureServer/0",
+            "nameField": "Site_Name",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type",
+              "Site_Rank"
+            ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_FRPs_2025/FeatureServer/1",
+            "nameField": "Site_Name",
+            "bufferM": 500,
+            "extraFields": [
+              "Site_Type",
+              "Adjacent_Receiving_Waterbody",
+              "Site_Contact"
+            ]
+          }
+        ],
+        "receptorLayers": [],
+        "equipment": {
+          "enabled": true,
+          "entrainmentMs": 0.35,
+          "anchorSpacingFt": 100,
+          "reservePct": 20
+        },
+        "timingModel": "jobson"
+      },
+      "useMapWidgetIds": [
+        "widget_13"
+      ]
+    },
+    "widget_23": {
+      "id": "widget_23",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Trailer Inspections",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-bnsf-assets/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
     }
   },
   "widgetsManifest": {},
@@ -1274,5 +1475,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1784421820448
+  "timestamp": 1784422523075
 }
