@@ -254,23 +254,23 @@
           "widgetId": "widget_4",
           "bbox": {
             "left": "0px",
-            "right": "10px",
+            "right": "0px",
             "top": "0px",
             "bottom": "24px",
-            "width": "300px",
+            "width": "360px",
             "height": "48px"
           },
           "setting": {
             "autoProps": {
               "left": true,
-              "right": false,
+              "right": true,
               "top": true,
               "bottom": false,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
             "vCenter": false,
-            "hCenter": false
+            "hCenter": true
           },
           "isPending": false
         }
@@ -441,23 +441,23 @@
           "widgetId": "widget_16",
           "bbox": {
             "left": "0px",
-            "right": "10px",
+            "right": "0px",
             "top": "0px",
             "bottom": "24px",
-            "width": "300px",
+            "width": "360px",
             "height": "48px"
           },
           "setting": {
             "autoProps": {
               "left": true,
-              "right": false,
+              "right": true,
               "top": true,
               "bottom": false,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
             "vCenter": false,
-            "hCenter": false
+            "hCenter": true
           },
           "isPending": false
         }
@@ -529,23 +529,23 @@
           "widgetId": "widget_20",
           "bbox": {
             "left": "0px",
-            "right": "10px",
+            "right": "0px",
             "top": "0px",
             "bottom": "24px",
-            "width": "300px",
+            "width": "360px",
             "height": "48px"
           },
           "setting": {
             "autoProps": {
               "left": true,
-              "right": false,
+              "right": true,
               "top": true,
               "bottom": false,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
             "vCenter": false,
-            "hCenter": false
+            "hCenter": true
           },
           "isPending": false
         }
