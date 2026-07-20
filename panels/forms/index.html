@@ -74,6 +74,34 @@
     animation:spin .8s linear infinite;
   }
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* In-panel form overlay — forms open here instead of a new tab */
+  .overlay{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg)}
+  .overlay[hidden]{display:none}
+  .overlay-bar{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;
+    background:var(--surface);border-bottom:1px solid var(--border);min-height:48px;
+  }
+  .ov-back{
+    display:flex;align-items:center;gap:4px;padding:9px 14px;border-radius:8px;border:none;
+    background:var(--accent);color:#fff;font-size:14px;font-weight:700;
+    cursor:pointer;font-family:var(--font);white-space:nowrap;
+  }
+  .ov-back:active{opacity:0.85}
+  .ov-title{
+    flex:1;font-size:14px;font-weight:600;color:var(--text);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .ov-newtab{
+    padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap;
+    color:var(--text-dim);text-decoration:none;border:1px solid var(--border);
+  }
+  .ov-newtab:active{opacity:0.8}
+  .ov-frame-wrap{position:relative;flex:1;background:#fff}
+  .ov-frame-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+  .ov-loading{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);pointer-events:none;
+  }
 </style>
 </head>
 <body>
@@ -83,10 +111,63 @@
   <div id="offline" class="offline-banner">Offline &mdash; showing last saved list</div>
   <div id="content"><div class="loading"><div class="spin"></div>Loading forms&hellip;</div></div>
 
+  <div id="overlay" class="overlay" hidden>
+    <div class="overlay-bar">
+      <button class="ov-back" onclick="closeOverlay()">&#8249; Back</button>
+      <div class="ov-title" id="ovTitle"></div>
+      <a class="ov-newtab" id="ovNewTab" href="#" target="_blank" rel="noopener">Open in tab &#8599;</a>
+    </div>
+    <div class="ov-frame-wrap">
+      <div class="ov-loading" id="ovLoading"><div class="spin"></div></div>
+      <iframe id="ovFrame" title="Form" allow="geolocation" allowfullscreen></iframe>
+    </div>
+  </div>
+
 <script>
   var API = 'https://script.google.com/macros/s/AKfycbzcg-yD3_ALkdGYVEOuGY3VR8NrlsPRoxL6k-4LKX3SqEI6NlaKkpprKCtez2xo9C2u/exec';
   var CACHE_KEY = 'wri_forms_cache';
   var allApps = [];
+
+  // Hosts that refuse to render in an iframe (X-Frame-Options / CSP / login
+  // redirects) no matter what the sheet says. Everything else defaults to
+  // embeddable unless its Embed flag says no.
+  var NEVER_EMBED = ['docs.google.com', 'accounts.google.com', 'app.mapnova.com',
+                     'dashboard.pexcard.com', 'experience.arcgis.com', 'arcg.is'];
+
+  function canEmbed(url, flag) {
+    if (flag === false || flag === '0') return false;
+    var host;
+    try { host = new URL(url).hostname; } catch (e) { return false; }
+    return !NEVER_EMBED.some(function (b) { return host === b || host.slice(-(b.length + 1)) === '.' + b; });
+  }
+
+  function openOverlay(url, name) {
+    var frame = document.getElementById('ovFrame');
+    document.getElementById('ovTitle').textContent = name || '';
+    document.getElementById('ovNewTab').href = url;
+    document.getElementById('ovLoading').style.display = '';
+    frame.onload = function () { document.getElementById('ovLoading').style.display = 'none'; };
+    frame.src = url;
+    document.getElementById('overlay').hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeOverlay() {
+    document.getElementById('ovFrame').src = 'about:blank';
+    document.getElementById('overlay').hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  // Delegated click: [data-open] anchors open in the overlay when embeddable,
+  // otherwise fall through to their normal target=_blank behavior.
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest ? ev.target.closest('a[data-open]') : null;
+    if (!a) return;
+    if (canEmbed(a.href, a.getAttribute('data-embed') !== '0')) {
+      ev.preventDefault();
+      openOverlay(a.href, a.getAttribute('data-name') || a.textContent);
+    }
+  });
 
   function loadCache() {
     try {
@@ -173,13 +254,15 @@
         esc(a.name) + '<span class="caret">&#9660;</span></button><div class="submenu">';
       subs.forEach(function (s) {
         h += s.url
-          ? '<a class="submenu-link" href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.name) + '</a>'
+          ? '<a class="submenu-link" href="' + esc(s.url) + '" target="_blank" rel="noopener" data-open' +
+            ' data-embed="' + (s.embed === false ? '0' : '1') + '" data-name="' + esc(s.name) + '">' + esc(s.name) + '</a>'
           : '<span class="submenu-link dead">' + esc(s.name) + '</span>';
       });
       return h + '</div></div>';
     }
     if (!a.url) return '';
-    return '<a class="app-btn ' + color + ' ' + width + '" href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.name) + '</a>';
+    return '<a class="app-btn ' + color + ' ' + width + '" href="' + esc(a.url) + '" target="_blank" rel="noopener" data-open' +
+      ' data-embed="' + (a.embed === false ? '0' : '1') + '" data-name="' + esc(a.name) + '">' + esc(a.name) + '</a>';
   }
 
   function esc(s) {
