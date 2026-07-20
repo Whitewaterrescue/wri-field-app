@@ -253,7 +253,7 @@
           "type": "WIDGET",
           "widgetId": "widget_4",
           "bbox": {
-            "left": "0px",
+            "left": "50%",
             "right": "0px",
             "top": "0px",
             "bottom": "24px",
@@ -440,7 +440,7 @@
           "type": "WIDGET",
           "widgetId": "widget_16",
           "bbox": {
-            "left": "0px",
+            "left": "50%",
             "right": "0px",
             "top": "0px",
             "bottom": "24px",
@@ -528,7 +528,7 @@
           "type": "WIDGET",
           "widgetId": "widget_20",
           "bbox": {
-            "left": "0px",
+            "left": "50%",
             "right": "0px",
             "top": "0px",
             "bottom": "24px",
