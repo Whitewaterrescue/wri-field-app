@@ -159,12 +159,23 @@
   var overlayOpen = false;
 
   function openOverlay(url, name) {
-    var frame = document.getElementById('ovFrame');
+    // A fresh iframe per open: an iframe's FIRST navigation adds no joint
+    // history entry, and removing the element (vs. navigating to about:blank)
+    // adds none either — so the pushState entry below stays adjacent and
+    // history.back() always pops the overlay, not an iframe navigation.
+    var oldFrame = document.getElementById('ovFrame');
+    if (oldFrame) oldFrame.remove();
+    var frame = document.createElement('iframe');
+    frame.id = 'ovFrame';
+    frame.title = 'Form';
+    frame.setAttribute('allow', 'geolocation');
+    frame.setAttribute('allowfullscreen', '');
+    frame.onload = function () { document.getElementById('ovLoading').style.display = 'none'; };
+    frame.src = url;
     document.getElementById('ovTitle').textContent = name || '';
     document.getElementById('ovNewTab').href = url;
     document.getElementById('ovLoading').style.display = '';
-    frame.onload = function () { document.getElementById('ovLoading').style.display = 'none'; };
-    frame.src = url;
+    document.querySelector('.ov-frame-wrap').appendChild(frame);
     document.getElementById('overlay').hidden = false;
     document.body.style.overflow = 'hidden';
     overlayOpen = true;
@@ -174,7 +185,8 @@
   }
 
   function dismissOverlay() {
-    document.getElementById('ovFrame').src = 'about:blank';
+    var frame = document.getElementById('ovFrame');
+    if (frame) frame.remove();
     document.getElementById('overlay').hidden = true;
     document.body.style.overflow = '';
     overlayOpen = false;
