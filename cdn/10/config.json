@@ -255,8 +255,8 @@
           "bbox": {
             "left": "0px",
             "right": "10px",
-            "top": "10px",
-            "bottom": "0px",
+            "top": "0px",
+            "bottom": "24px",
             "width": "300px",
             "height": "48px"
           },
@@ -264,8 +264,8 @@
             "autoProps": {
               "left": true,
               "right": false,
-              "top": false,
-              "bottom": true,
+              "top": true,
+              "bottom": false,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
@@ -442,8 +442,8 @@
           "bbox": {
             "left": "0px",
             "right": "10px",
-            "top": "10px",
-            "bottom": "0px",
+            "top": "0px",
+            "bottom": "24px",
             "width": "300px",
             "height": "48px"
           },
@@ -451,8 +451,8 @@
             "autoProps": {
               "left": true,
               "right": false,
-              "top": false,
-              "bottom": true,
+              "top": true,
+              "bottom": false,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
@@ -530,8 +530,8 @@
           "bbox": {
             "left": "0px",
             "right": "10px",
-            "top": "10px",
-            "bottom": "0px",
+            "top": "0px",
+            "bottom": "24px",
             "width": "300px",
             "height": "48px"
           },
@@ -539,8 +539,8 @@
             "autoProps": {
               "left": true,
               "right": false,
-              "top": false,
-              "bottom": true,
+              "top": true,
+              "bottom": false,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
