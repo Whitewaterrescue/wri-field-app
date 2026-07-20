@@ -141,6 +141,8 @@
     return !NEVER_EMBED.some(function (b) { return host === b || host.slice(-(b.length + 1)) === '.' + b; });
   }
 
+  var overlayOpen = false;
+
   function openOverlay(url, name) {
     var frame = document.getElementById('ovFrame');
     document.getElementById('ovTitle').textContent = name || '';
@@ -150,13 +152,30 @@
     frame.src = url;
     document.getElementById('overlay').hidden = false;
     document.body.style.overflow = 'hidden';
+    overlayOpen = true;
+    // History entry so the hardware/browser Back button closes the overlay
+    // instead of leaving the site (popstate handler below does the teardown).
+    try { history.pushState({ wriOverlay: 1 }, ''); } catch (e) {}
   }
 
-  function closeOverlay() {
+  function dismissOverlay() {
     document.getElementById('ovFrame').src = 'about:blank';
     document.getElementById('overlay').hidden = true;
     document.body.style.overflow = '';
+    overlayOpen = false;
   }
+
+  function closeOverlay() {
+    if (overlayOpen && history.state && history.state.wriOverlay) {
+      history.back(); // popstate → dismissOverlay, keeps history balanced
+    } else {
+      dismissOverlay();
+    }
+  }
+
+  window.addEventListener('popstate', function () {
+    if (overlayOpen) dismissOverlay();
+  });
 
   // Delegated click: [data-open] anchors open in the overlay when embeddable,
   // otherwise fall through to their normal target=_blank behavior.
