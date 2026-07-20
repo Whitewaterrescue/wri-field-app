@@ -4,7 +4,26 @@
   "mainLocale": "en",
   "theme": "themes/dark/",
   "utilities": {},
-  "customTheme": {},
+  "customTheme": {
+    "variables": {
+      "colors": {
+        "primary": "#EC2329",
+        "palette": {
+          "primary": {
+            "100": "#4a0b0d",
+            "200": "#7a1215",
+            "300": "#a3181c",
+            "400": "#c81d22",
+            "500": "#EC2329",
+            "600": "#ef4a4f",
+            "700": "#f37175",
+            "800": "#f7989b",
+            "900": "#fbc8ca"
+          }
+        }
+      }
+    }
+  },
   "customThemeOptions": {},
   "forBuilderAttributes": {},
   "template": "chronology",
