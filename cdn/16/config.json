@@ -172,6 +172,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_9": {
+      "id": "page_9",
+      "label": "Gateway QR",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_gateway",
+        "MEDIUM": "layout_gateway",
+        "SMALL": "layout_gateway"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -198,6 +213,9 @@
     },
     {
       "page_8": []
+    },
+    {
+      "page_9": []
     }
   ],
   "layouts": {
@@ -709,6 +727,39 @@
               "height": "STRETCH"
             },
             "vCenter": true,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_gateway": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_24",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
             "hCenter": false
           },
           "isPending": false
@@ -1461,6 +1512,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/trailers/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_24": {
+      "id": "widget_24",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Gateway QR",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/gateway/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
