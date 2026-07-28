@@ -1184,7 +1184,11 @@
           "anchorSpacingFt": 100,
           "reservePct": 20
         },
-        "timingModel": "jobson"
+        "timingModel": "jobson",
+        "corridors": [
+          "https://whitewaterrescue.github.io/wri-response-viewer/corridors/brunette-river.json",
+          "https://whitewaterrescue.github.io/wri-response-viewer/corridors/fraser-main-arm.json"
+        ]
       },
       "useMapWidgetIds": [
         "widget_1"
@@ -1576,7 +1580,11 @@
           "anchorSpacingFt": 100,
           "reservePct": 20
         },
-        "timingModel": "jobson"
+        "timingModel": "jobson",
+        "corridors": [
+          "https://whitewaterrescue.github.io/wri-response-viewer/corridors/brunette-river.json",
+          "https://whitewaterrescue.github.io/wri-response-viewer/corridors/fraser-main-arm.json"
+        ]
       },
       "useMapWidgetIds": [
         "widget_13"
