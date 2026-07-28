@@ -256,7 +256,8 @@
       "type": "FIXED",
       "order": [
         "0",
-        "1"
+        "1",
+        "2"
       ],
       "content": {
         "0": {
@@ -306,6 +307,31 @@
             },
             "vCenter": false,
             "hCenter": true
+          },
+          "isPending": false
+        },
+        "2": {
+          "type": "WIDGET",
+          "widgetId": "widget_25",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": true,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
+            "hCenter": false
           },
           "isPending": false
         }
@@ -443,7 +469,8 @@
       "type": "FIXED",
       "order": [
         "0",
-        "1"
+        "1",
+        "2"
       ],
       "content": {
         "0": {
@@ -495,6 +522,31 @@
             "hCenter": true
           },
           "isPending": false
+        },
+        "2": {
+          "type": "WIDGET",
+          "widgetId": "widget_26",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": true,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
         }
       }
     },
@@ -531,7 +583,8 @@
       "type": "FIXED",
       "order": [
         "0",
-        "1"
+        "1",
+        "2"
       ],
       "content": {
         "0": {
@@ -581,6 +634,31 @@
             },
             "vCenter": false,
             "hCenter": true
+          },
+          "isPending": false
+        },
+        "2": {
+          "type": "WIDGET",
+          "widgetId": "widget_27",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": true,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
+            "hCenter": false
           },
           "isPending": false
         }
@@ -1529,6 +1607,36 @@
       },
       "useDataSourcesEnabled": false,
       "useDataSources": []
+    },
+    "widget_25": {
+      "id": "widget_25",
+      "uri": "widgets/google-directions/",
+      "version": "1.0.0",
+      "label": "Directions",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_1"
+      ]
+    },
+    "widget_26": {
+      "id": "widget_26",
+      "uri": "widgets/google-directions/",
+      "version": "1.0.0",
+      "label": "Directions",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_13"
+      ]
+    },
+    "widget_27": {
+      "id": "widget_27",
+      "uri": "widgets/google-directions/",
+      "version": "1.0.0",
+      "label": "Directions",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_17"
+      ]
     }
   },
   "widgetsManifest": {},

@@ -1,0 +1,25 @@
+{
+  "name": "google-directions",
+  "label": "Google Directions",
+  "type": "widget",
+  "version": "1.0.0",
+  "exbVersion": "1.20.0",
+  "author": "Whitewater Rescue Institute",
+  "description": "Invisible map companion: adds a Directions action to the map popup that opens Google Maps driving directions to the selected feature. No API key — uses the public Maps URL scheme, which opens the native app on phones.",
+  "copyright": "WRI",
+  "license": "",
+  "properties": {
+    "hasConfig": false,
+    "hasSettingPage": false
+  },
+  "dependency": [
+    "jimu-arcgis"
+  ],
+  "translatedLocales": [
+    "en"
+  ],
+  "defaultSize": {
+    "width": 1,
+    "height": 1
+  }
+}
