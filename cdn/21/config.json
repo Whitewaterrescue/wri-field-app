@@ -64,7 +64,7 @@
         "SMALL": "layout_home"
       },
       "isVisible": true,
-      "isDefault": true,
+      "isDefault": false,
       "header": true,
       "footer": false
     },
@@ -187,9 +187,27 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_10": {
+      "id": "page_10",
+      "label": "Check In",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_checkin",
+        "MEDIUM": "layout_checkin",
+        "SMALL": "layout_checkin"
+      },
+      "isVisible": true,
+      "isDefault": true,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
+    {
+      "page_10": []
+    },
     {
       "page_1": []
     },
@@ -820,6 +838,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_24",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_checkin": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_28",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -1645,6 +1696,19 @@
       "useMapWidgetIds": [
         "widget_17"
       ]
+    },
+    "widget_28": {
+      "id": "widget_28",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Check In",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://script.google.com/macros/s/AKfycbyR4Jppf7ddQ4N1rtNkD-Hhrntm9iYmLuC16jWPwAiv9vulbDCTWquogksW_WSzhMHT/exec</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
     }
   },
   "widgetsManifest": {},
@@ -1672,5 +1736,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1784422889398
+  "timestamp": 1785451501858
 }
