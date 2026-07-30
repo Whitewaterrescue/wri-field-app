@@ -30,8 +30,8 @@
     "dataSource_1": {
       "id": "dataSource_1",
       "type": "WEB_MAP",
-      "sourceLabel": "BNSF Drills and Responses View Map",
-      "itemId": "5e30a96b8bcc4d6f981ce7b7435c61c0",
+      "sourceLabel": "MT/WY Coop Initial Response Map",
+      "itemId": "e6406c338b7c4e8598503d4e15cb9f62",
       "portalUrl": "https://wrienviro.maps.arcgis.com",
       "isHidden": false
     },
