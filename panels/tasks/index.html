@@ -137,7 +137,7 @@
     </div>
     <div class="ov-frame-wrap">
       <div class="ov-loading" id="ovLoading"><div class="spin"></div></div>
-      <iframe id="ovFrame" title="Form" allow="geolocation" allowfullscreen></iframe>
+      <iframe id="ovFrame" title="Form" allow="geolocation; camera; microphone" allowfullscreen></iframe>
     </div>
   </div>
 
@@ -170,7 +170,7 @@
     var frame = document.createElement('iframe');
     frame.id = 'ovFrame';
     frame.title = 'Form';
-    frame.setAttribute('allow', 'geolocation');
+    frame.setAttribute('allow', 'geolocation; camera; microphone');
     frame.setAttribute('allowfullscreen', '');
     frame.onload = function () { document.getElementById('ovLoading').style.display = 'none'; };
     frame.src = url;
