@@ -749,7 +749,8 @@
       "order": [
         "0",
         "1",
-        "2"
+        "2",
+        "3"
       ],
       "content": {
         "0": {
@@ -823,6 +824,31 @@
               "height": "STRETCH"
             },
             "vCenter": true,
+            "hCenter": false
+          },
+          "isPending": false
+        },
+        "3": {
+          "type": "WIDGET",
+          "widgetId": "widget_29",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": true,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
             "hCenter": false
           },
           "isPending": false
@@ -1709,6 +1735,17 @@
       },
       "useDataSourcesEnabled": false,
       "useDataSources": []
+    },
+    "widget_29": {
+      "id": "widget_29",
+      "uri": "widgets/checkin-status/",
+      "version": "1.0.0",
+      "label": "Check-In Status",
+      "config": {
+        "checkinUrl": "https://script.google.com/macros/s/AKfycbyR4Jppf7ddQ4N1rtNkD-Hhrntm9iYmLuC16jWPwAiv9vulbDCTWquogksW_WSzhMHT/exec",
+        "homePage": "page_1",
+        "checkinPage": "page_10"
+      }
     }
   },
   "widgetsManifest": {},
@@ -1736,5 +1773,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1785451501858
+  "timestamp": 1785513238124
 }

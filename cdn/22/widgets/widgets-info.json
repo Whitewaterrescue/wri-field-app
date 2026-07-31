@@ -12001,6 +12001,38 @@
     "group": 2
   },
   {
+    "name": "checkin-status",
+    "manifest": {
+      "name": "checkin-status",
+      "label": "Check-In Status",
+      "type": "widget",
+      "version": "1.0.0",
+      "exbVersion": "1.20.0",
+      "author": "Whitewater Rescue Institute",
+      "description": "Header pill that tracks site check-in state: listens for check-in/out messages from the embedded WRI check-in survey, shows who is on site and for how long, offers one-tap check-out via the check-in app's JSON API, and jumps to Home after a successful check-in.",
+      "copyright": "WRI",
+      "license": "",
+      "properties": {
+        "hasConfig": false,
+        "hasSettingPage": false
+      },
+      "dependency": [],
+      "translatedLocales": [
+        "en"
+      ],
+      "defaultSize": {
+        "width": 1,
+        "height": 1
+      }
+    },
+    "i18nLabel": {},
+    "i18nDescription": {},
+    "uri": "widgets/checkin-status/",
+    "icon": "widgets/checkin-status/icon.svg",
+    "order": 700,
+    "group": 7
+  },
+  {
     "name": "fire-cone",
     "manifest": {
       "name": "fire-cone",
