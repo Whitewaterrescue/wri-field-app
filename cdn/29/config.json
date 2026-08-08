@@ -30,8 +30,8 @@
     "dataSource_1": {
       "id": "dataSource_1",
       "type": "WEB_MAP",
-      "sourceLabel": "MT/WY Coop Initial Response Map",
-      "itemId": "e6406c338b7c4e8598503d4e15cb9f62",
+      "sourceLabel": "2026 WRI Initial Response",
+      "itemId": "373f7625cfc74c87a8523fbaf7ad9691",
       "portalUrl": "https://wrienviro.maps.arcgis.com",
       "isHidden": false
     },
