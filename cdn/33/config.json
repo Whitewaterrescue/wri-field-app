@@ -1265,7 +1265,19 @@
         "corridors": [
           "https://whitewaterrescue.github.io/wri-response-viewer/corridors/brunette-river.json",
           "https://whitewaterrescue.github.io/wri-response-viewer/corridors/fraser-main-arm.json"
-        ]
+        ],
+        "assetLayer": {
+          "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_BNSF_OilSpill_Assets/FeatureServer/0",
+          "nameField": "asset_name",
+          "idField": "equipment_id",
+          "boomFtField": "cap_boom_ft",
+          "skimmerEdrcField": "cap_skimmer_edrc",
+          "storageBblField": "cap_storage_bbl",
+          "statusField": "asset_status",
+          "locationField": "current_warehouse",
+          "where": "asset_status = 'available'",
+          "maxResults": 8
+        }
       },
       "useMapWidgetIds": [
         "widget_1"
@@ -1661,7 +1673,19 @@
         "corridors": [
           "https://whitewaterrescue.github.io/wri-response-viewer/corridors/brunette-river.json",
           "https://whitewaterrescue.github.io/wri-response-viewer/corridors/fraser-main-arm.json"
-        ]
+        ],
+        "assetLayer": {
+          "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_BNSF_OilSpill_Assets/FeatureServer/0",
+          "nameField": "asset_name",
+          "idField": "equipment_id",
+          "boomFtField": "cap_boom_ft",
+          "skimmerEdrcField": "cap_skimmer_edrc",
+          "storageBblField": "cap_storage_bbl",
+          "statusField": "asset_status",
+          "locationField": "current_warehouse",
+          "where": "asset_status = 'available'",
+          "maxResults": 8
+        }
       },
       "useMapWidgetIds": [
         "widget_13"
