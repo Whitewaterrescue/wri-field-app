@@ -19,8 +19,8 @@
  *  - Everything else same-scope: network-first (8s race) + cache fallback.
  *  - No skipWaiting: new versions activate when all tabs close.
  */
-var CDN = '34';
-var STAMP = '20260809-214803';
+var CDN = '35';
+var STAMP = '20260810-082001';
 var SHELL_CACHE = 'wri-fa-shell-' + CDN + '-' + STAMP;
 var CDN_CACHE = 'wri-fa-cdn-' + CDN;
 
@@ -108,5 +108,50 @@ self.addEventListener('fetch', function (event) {
     event.respondWith(cacheFirst(request));
   } else {
     event.respondWith(networkFirst(request));
+  }
+});
+
+/* ── Background warm of the FULL cdn build ──
+ * The page posts {type:'warm-cdn'} after registration settles. The SW pulls
+ * cdn-manifest.json (written at deploy) and fetches every not-yet-cached
+ * build file in small batches, so the ENTIRE app UI opens offline after one
+ * online visit — not just the pages the user happened to open. Failures are
+ * ignored (partial warm still helps; the next open retries the diff).
+ * Skipped when the browser reports Save-Data. ~25 MB once per build. */
+var warmRunning = false;
+function warmCdn() {
+  if (warmRunning) return Promise.resolve();
+  if (self.navigator && navigator.connection && navigator.connection.saveData) return Promise.resolve();
+  warmRunning = true;
+  return fetch(SCOPE_PATH + 'cdn-manifest.json', { cache: 'no-cache' })
+    .then(function (r) { return r.json(); })
+    .then(function (manifest) {
+      if (!manifest || manifest.cdn !== CDN || !manifest.files) return null;
+      return caches.open(CDN_CACHE).then(function (c) {
+        return c.keys().then(function (keys) {
+          var have = {};
+          keys.forEach(function (k) { have[new URL(k.url).pathname] = true; });
+          var missing = manifest.files.filter(function (f) { return !have[SCOPE_PATH + f]; });
+          function batch(i) {
+            if (i >= missing.length) return null;
+            var slice = missing.slice(i, i + 6);
+            return Promise.all(slice.map(function (f) {
+              return fetch(SCOPE_PATH + f).then(function (resp) {
+                if (resp && resp.ok) return c.put(SCOPE_PATH + f, resp);
+              }).catch(function () {});
+            })).then(function () { return batch(i + 6); });
+          }
+          return batch(0);
+        });
+      });
+    })
+    .catch(function () {})
+    .then(function () { warmRunning = false; });
+}
+
+self.addEventListener('message', function (event) {
+  if (event.data && event.data.type === 'warm-cdn') {
+    if (event.waitUntil) event.waitUntil(warmCdn());
+    else warmCdn();
   }
 });
