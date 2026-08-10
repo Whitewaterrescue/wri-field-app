@@ -1754,7 +1754,7 @@
       "label": "Check In",
       "config": {
         "embedType": "url",
-        "expression": "<p>https://script.google.com/macros/s/AKfycbyR4Jppf7ddQ4N1rtNkD-Hhrntm9iYmLuC16jWPwAiv9vulbDCTWquogksW_WSzhMHT/exec</p>",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-checkin/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
@@ -1766,7 +1766,7 @@
       "version": "1.0.0",
       "label": "Check-In Status",
       "config": {
-        "checkinUrl": "https://script.google.com/macros/s/AKfycbyR4Jppf7ddQ4N1rtNkD-Hhrntm9iYmLuC16jWPwAiv9vulbDCTWquogksW_WSzhMHT/exec",
+        "checkinUrl": "https://script.google.com/macros/s/AKfycbx7p4-A8F6G_VedgHsw3RDJgwJK1GKVAFcvSah1JdjIdG5g7PAcvXhHRKHk_ULIhdL0KA/exec",
         "homePage": "page_1",
         "checkinPage": "page_10"
       }
