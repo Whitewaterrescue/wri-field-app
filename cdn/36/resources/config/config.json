@@ -4,24 +4,7 @@
   "mainLocale": "en",
   "theme": "themes/dark/",
   "utilities": {},
-  "customTheme": {
-    "colors": {
-      "primary": "#EC2329",
-      "palette": {
-        "primary": {
-          "100": "#4a0b0d",
-          "200": "#7a1215",
-          "300": "#a3181c",
-          "400": "#c81d22",
-          "500": "#EC2329",
-          "600": "#ef4a4f",
-          "700": "#f37175",
-          "800": "#f7989b",
-          "900": "#fbc8ca"
-        }
-      }
-    }
-  },
+  "customTheme": {},
   "customThemeOptions": {},
   "forBuilderAttributes": {},
   "template": "chronology",
@@ -64,7 +47,7 @@
         "SMALL": "layout_home"
       },
       "isVisible": true,
-      "isDefault": false,
+      "isDefault": true,
       "header": true,
       "footer": false
     },
@@ -172,42 +155,9 @@
       "isDefault": false,
       "header": true,
       "footer": false
-    },
-    "page_9": {
-      "id": "page_9",
-      "label": "Gateway QR",
-      "type": "NORMAL",
-      "mode": "FIT_WINDOW",
-      "layout": {
-        "LARGE": "layout_gateway",
-        "MEDIUM": "layout_gateway",
-        "SMALL": "layout_gateway"
-      },
-      "isVisible": true,
-      "isDefault": false,
-      "header": true,
-      "footer": false
-    },
-    "page_10": {
-      "id": "page_10",
-      "label": "Check In",
-      "type": "NORMAL",
-      "mode": "FIT_WINDOW",
-      "layout": {
-        "LARGE": "layout_checkin",
-        "MEDIUM": "layout_checkin",
-        "SMALL": "layout_checkin"
-      },
-      "isVisible": true,
-      "isDefault": true,
-      "header": true,
-      "footer": false
     }
   },
   "pageStructure": [
-    {
-      "page_10": []
-    },
     {
       "page_1": []
     },
@@ -231,9 +181,6 @@
     },
     {
       "page_8": []
-    },
-    {
-      "page_9": []
     }
   ],
   "layouts": {
@@ -307,24 +254,24 @@
           "type": "WIDGET",
           "widgetId": "widget_4",
           "bbox": {
-            "left": "50%",
-            "right": "0px",
-            "top": "0px",
-            "bottom": "24px",
-            "width": "360px",
+            "left": "0px",
+            "right": "10px",
+            "top": "10px",
+            "bottom": "0px",
+            "width": "300px",
             "height": "48px"
           },
           "setting": {
             "autoProps": {
               "left": true,
-              "right": true,
-              "top": true,
-              "bottom": false,
+              "right": false,
+              "top": false,
+              "bottom": true,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
             "vCenter": false,
-            "hCenter": true
+            "hCenter": false
           },
           "isPending": false
         },
@@ -520,24 +467,24 @@
           "type": "WIDGET",
           "widgetId": "widget_16",
           "bbox": {
-            "left": "50%",
-            "right": "0px",
-            "top": "0px",
-            "bottom": "24px",
-            "width": "360px",
+            "left": "0px",
+            "right": "10px",
+            "top": "10px",
+            "bottom": "0px",
+            "width": "300px",
             "height": "48px"
           },
           "setting": {
             "autoProps": {
               "left": true,
-              "right": true,
-              "top": true,
-              "bottom": false,
+              "right": false,
+              "top": false,
+              "bottom": true,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
             "vCenter": false,
-            "hCenter": true
+            "hCenter": false
           },
           "isPending": false
         },
@@ -634,24 +581,24 @@
           "type": "WIDGET",
           "widgetId": "widget_20",
           "bbox": {
-            "left": "50%",
-            "right": "0px",
-            "top": "0px",
-            "bottom": "24px",
-            "width": "360px",
+            "left": "0px",
+            "right": "10px",
+            "top": "10px",
+            "bottom": "0px",
+            "width": "300px",
             "height": "48px"
           },
           "setting": {
             "autoProps": {
               "left": true,
-              "right": true,
-              "top": true,
-              "bottom": false,
+              "right": false,
+              "top": false,
+              "bottom": true,
               "width": "CUSTOM",
               "height": "CUSTOM"
             },
             "vCenter": false,
-            "hCenter": true
+            "hCenter": false
           },
           "isPending": false
         },
@@ -749,8 +696,7 @@
       "order": [
         "0",
         "1",
-        "2",
-        "3"
+        "2"
       ],
       "content": {
         "0": {
@@ -824,97 +770,6 @@
               "height": "STRETCH"
             },
             "vCenter": true,
-            "hCenter": false
-          },
-          "isPending": false
-        },
-        "3": {
-          "type": "WIDGET",
-          "widgetId": "widget_29",
-          "bbox": {
-            "left": "0px",
-            "right": "0px",
-            "top": "0px",
-            "bottom": "0px",
-            "width": "1px",
-            "height": "1px"
-          },
-          "setting": {
-            "autoProps": {
-              "left": true,
-              "right": false,
-              "top": true,
-              "bottom": false,
-              "width": "CUSTOM",
-              "height": "CUSTOM"
-            },
-            "vCenter": false,
-            "hCenter": false
-          },
-          "isPending": false
-        }
-      }
-    },
-    "layout_gateway": {
-      "type": "FIXED",
-      "order": [
-        "0"
-      ],
-      "content": {
-        "0": {
-          "type": "WIDGET",
-          "widgetId": "widget_24",
-          "bbox": {
-            "left": "0px",
-            "right": "0px",
-            "top": "0px",
-            "bottom": "0px",
-            "width": "100%",
-            "height": "100%"
-          },
-          "setting": {
-            "autoProps": {
-              "left": false,
-              "right": false,
-              "top": false,
-              "bottom": false,
-              "width": "STRETCH",
-              "height": "STRETCH"
-            },
-            "vCenter": false,
-            "hCenter": false
-          },
-          "isPending": false
-        }
-      }
-    },
-    "layout_checkin": {
-      "type": "FIXED",
-      "order": [
-        "0"
-      ],
-      "content": {
-        "0": {
-          "type": "WIDGET",
-          "widgetId": "widget_28",
-          "bbox": {
-            "left": "0px",
-            "right": "0px",
-            "top": "0px",
-            "bottom": "0px",
-            "width": "100%",
-            "height": "100%"
-          },
-          "setting": {
-            "autoProps": {
-              "left": false,
-              "right": false,
-              "top": false,
-              "bottom": false,
-              "width": "STRETCH",
-              "height": "STRETCH"
-            },
-            "vCenter": false,
             "hCenter": false
           },
           "isPending": false
@@ -1174,7 +1029,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Missouri_River_GRP_Points_2025/FeatureServer/0",
@@ -1183,7 +1045,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Upper_Colorado_GRP_Points_2025/FeatureServer/0",
@@ -1191,7 +1060,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Yellowstone_River_GRP_Points_2025_5/FeatureServer/0",
@@ -1200,7 +1076,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Lochsa_River_GRP_Points_2025/FeatureServer/0",
@@ -1208,7 +1091,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Kootenai_River_GRP_Points_2025/FeatureServer/0",
@@ -1216,7 +1106,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Upper_Kootenai_River_GRP_Points_2025/FeatureServer/0",
@@ -1224,7 +1121,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/MF_Flathead_GRP_Points_2025_WFL1/FeatureServer/0",
@@ -1232,7 +1136,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Jocko_River_GRP_Points_2025/FeatureServer/0",
@@ -1241,7 +1152,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_FRPs_2025/FeatureServer/1",
@@ -1251,7 +1169,28 @@
               "Site_Type",
               "Adjacent_Receiving_Waterbody",
               "Site_Contact"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
+          },
+          {
+            "url": "https://services2.arcgis.com/pOZUlCpCrXOga4Vx/arcgis/rest/services/WDOE_GRPs_Public_Release/FeatureServer/0",
+            "nameField": "ShortName",
+            "bufferM": 500,
+            "extraFields": [
+              "SOURCE_TYPE"
+            ],
+            "noEquipment": {
+              "field": "SOURCE_TYPE",
+              "values": [
+                "NOTIFICATION STRATEGY"
+              ]
+            }
           }
         ],
         "receptorLayers": [],
@@ -1582,7 +1521,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Missouri_River_GRP_Points_2025/FeatureServer/0",
@@ -1591,7 +1537,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Upper_Colorado_GRP_Points_2025/FeatureServer/0",
@@ -1599,7 +1552,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Yellowstone_River_GRP_Points_2025_5/FeatureServer/0",
@@ -1608,7 +1568,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Lochsa_River_GRP_Points_2025/FeatureServer/0",
@@ -1616,7 +1583,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Kootenai_River_GRP_Points_2025/FeatureServer/0",
@@ -1624,7 +1598,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Upper_Kootenai_River_GRP_Points_2025/FeatureServer/0",
@@ -1632,7 +1613,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/MF_Flathead_GRP_Points_2025_WFL1/FeatureServer/0",
@@ -1640,7 +1628,14 @@
             "bufferM": 500,
             "extraFields": [
               "Site_Type"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/Jocko_River_GRP_Points_2025/FeatureServer/0",
@@ -1649,7 +1644,14 @@
             "extraFields": [
               "Site_Type",
               "Site_Rank"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
           },
           {
             "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_FRPs_2025/FeatureServer/1",
@@ -1659,7 +1661,28 @@
               "Site_Type",
               "Adjacent_Receiving_Waterbody",
               "Site_Contact"
-            ]
+            ],
+            "noEquipment": {
+              "field": "Site_Type",
+              "values": [
+                "Notification Only",
+                "Notification"
+              ]
+            }
+          },
+          {
+            "url": "https://services2.arcgis.com/pOZUlCpCrXOga4Vx/arcgis/rest/services/WDOE_GRPs_Public_Release/FeatureServer/0",
+            "nameField": "ShortName",
+            "bufferM": 500,
+            "extraFields": [
+              "SOURCE_TYPE"
+            ],
+            "noEquipment": {
+              "field": "SOURCE_TYPE",
+              "values": [
+                "NOTIFICATION STRATEGY"
+              ]
+            }
           }
         ],
         "receptorLayers": [],
@@ -1704,19 +1727,6 @@
       "useDataSourcesEnabled": false,
       "useDataSources": []
     },
-    "widget_24": {
-      "id": "widget_24",
-      "uri": "widgets/common/embed/",
-      "version": "1.20.0",
-      "label": "Gateway QR",
-      "config": {
-        "embedType": "url",
-        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/gateway/</p>",
-        "enableLabel": false
-      },
-      "useDataSourcesEnabled": false,
-      "useDataSources": []
-    },
     "widget_25": {
       "id": "widget_25",
       "uri": "widgets/google-directions/",
@@ -1746,42 +1756,11 @@
       "useMapWidgetIds": [
         "widget_17"
       ]
-    },
-    "widget_28": {
-      "id": "widget_28",
-      "uri": "widgets/common/embed/",
-      "version": "1.20.0",
-      "label": "Check In",
-      "config": {
-        "embedType": "url",
-        "expression": "<p>https://whitewaterrescue.github.io/wri-checkin/</p>",
-        "enableLabel": false
-      },
-      "useDataSourcesEnabled": false,
-      "useDataSources": []
-    },
-    "widget_29": {
-      "id": "widget_29",
-      "uri": "widgets/checkin-status/",
-      "version": "1.0.0",
-      "label": "Check-In Status",
-      "config": {
-        "checkinUrl": "https://script.google.com/macros/s/AKfycbx7p4-A8F6G_VedgHsw3RDJgwJK1GKVAFcvSah1JdjIdG5g7PAcvXhHRKHk_ULIhdL0KA/exec",
-        "homePage": "page_1",
-        "checkinPage": "page_10"
-      }
     }
   },
   "widgetsManifest": {},
   "attributes": {
-    "portalUrl": "https://wrienviro.maps.arcgis.com",
-    "isWebTier": false,
-    "clientId": "zXmBr5FFTyHWfh24",
-    "express": false,
-    "title": "WRI Field App",
-    "description": "",
-    "type": "Web Experience",
-    "thumbnail": null
+    "portalUrl": "https://wrienviro.maps.arcgis.com"
   },
   "header": {
     "layout": {
@@ -1797,5 +1776,5 @@
     "textColor": "#fff"
   },
   "sharedThemeVariables": {},
-  "timestamp": 1785513238124
+  "timestamp": 1784422889398
 }
