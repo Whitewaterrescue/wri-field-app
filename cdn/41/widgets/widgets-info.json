@@ -12097,6 +12097,37 @@
     "group": 7
   },
   {
+    "name": "presentation-mode",
+    "manifest": {
+      "name": "presentation-mode",
+      "label": "Presentation Mode",
+      "type": "widget",
+      "version": "1.0.0",
+      "exbVersion": "1.20.0",
+      "author": "Whitewater Rescue Institute",
+      "description": "Touch-first briefing markup: draw lines, polygons and labels on the live map, capture a screenshot, and save the markup (image + re-editable sketch) to the WRI_Presentations layer.",
+      "copyright": "WRI",
+      "license": "",
+      "properties": {},
+      "dependency": [
+        "jimu-arcgis"
+      ],
+      "translatedLocales": [
+        "en"
+      ],
+      "defaultSize": {
+        "width": 380,
+        "height": 620
+      }
+    },
+    "i18nLabel": {},
+    "i18nDescription": {},
+    "uri": "widgets/presentation-mode/",
+    "icon": "widgets/presentation-mode/icon.svg",
+    "order": 700,
+    "group": 7
+  },
+  {
     "name": "simple",
     "manifest": {
       "name": "simple",
