@@ -1361,6 +1361,16 @@
                 "NOTIFICATION STRATEGY"
               ]
             }
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/MSU_Duluth_Strategies_ERMA/FeatureServer/0",
+            "nameField": "site_id",
+            "bufferM": 500,
+            "extraFields": [
+              "priority",
+              "min_boom_l",
+              "sector"
+            ]
           }
         ],
         "receptorLayers": [],
@@ -1861,6 +1871,16 @@
                 "NOTIFICATION STRATEGY"
               ]
             }
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/MSU_Duluth_Strategies_ERMA/FeatureServer/0",
+            "nameField": "site_id",
+            "bufferM": 500,
+            "extraFields": [
+              "priority",
+              "min_boom_l",
+              "sector"
+            ]
           }
         ],
         "receptorLayers": [],

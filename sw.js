@@ -19,8 +19,8 @@
  *  - Everything else same-scope: network-first (8s race) + cache fallback.
  *  - No skipWaiting: new versions activate when all tabs close.
  */
-var CDN = '45';
-var STAMP = '20260818-134223';
+var CDN = '46';
+var STAMP = '20260818-142714';
 var SHELL_CACHE = 'wri-fa-shell-' + CDN + '-' + STAMP;
 var CDN_CACHE = 'wri-fa-cdn-' + CDN;
 
