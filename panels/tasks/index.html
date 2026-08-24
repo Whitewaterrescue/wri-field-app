@@ -195,10 +195,16 @@
   }
 
   function closeOverlay() {
-    if (overlayOpen && history.state && history.state.wriOverlay) {
-      history.back(); // popstate → dismissOverlay, keeps history balanced
-    } else {
-      dismissOverlay();
+    // Dismiss FIRST, then rebalance history. Forms that navigate after load
+    // (multi-page flows, in-form links, SPA pushState — e.g. Survey123) stack
+    // joint-history entries above our wriOverlay marker, so a bare
+    // history.back() would un-navigate the form instead of closing — the
+    // button looks dead. Removing the iframe purges its joint entries, so
+    // the back() below lands on the marker's predecessor.
+    var hadMarker = overlayOpen && history.state && history.state.wriOverlay;
+    dismissOverlay();
+    if (hadMarker) {
+      try { history.back(); } catch (e) {} // popstate no-ops (overlayOpen=false)
     }
   }
 
