@@ -19,8 +19,8 @@
  *  - Everything else same-scope: network-first (8s race) + cache fallback.
  *  - No skipWaiting: new versions activate when all tabs close.
  */
-var CDN = '46';
-var STAMP = '20260818-142714';
+var CDN = '47';
+var STAMP = '20260824-095631';
 var SHELL_CACHE = 'wri-fa-shell-' + CDN + '-' + STAMP;
 var CDN_CACHE = 'wri-fa-cdn-' + CDN;
 
@@ -34,6 +34,7 @@ var PRECACHE = [
   './panels/hasp/index.html',
   './panels/trailers/index.html',
   './panels/gateway/index.html',
+  './panels/spokane-qr/index.html',
   './cdn/' + CDN + '/config.json',
   './cdn/' + CDN + '/jimu-core/init.js'
 ];
