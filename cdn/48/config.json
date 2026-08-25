@@ -38,8 +38,8 @@
     "dataSource_2": {
       "id": "dataSource_2",
       "type": "WEB_MAP",
-      "sourceLabel": "BNSF FRP View Map",
-      "itemId": "2c197d5dd11645f9b976a9b83fa7a126",
+      "sourceLabel": "BNSF FRP Map",
+      "itemId": "b39b3da54e4b4cc78530ef03ef1f21ab",
       "portalUrl": "https://wrienviro.maps.arcgis.com",
       "isHidden": false
     },
@@ -1397,6 +1397,10 @@
                 "Notification Only",
                 "Notification"
               ]
+            },
+            "boomLayer": {
+              "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_FRPs_2025/FeatureServer/13",
+              "siteKeyField": "site_globalid"
             }
           },
           {
@@ -1907,6 +1911,10 @@
                 "Notification Only",
                 "Notification"
               ]
+            },
+            "boomLayer": {
+              "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_FRPs_2025/FeatureServer/13",
+              "siteKeyField": "site_globalid"
             }
           },
           {
