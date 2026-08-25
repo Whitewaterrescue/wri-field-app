@@ -35,7 +35,14 @@
   .section-title{
     font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
     color:var(--text-dim);margin:20px 0 10px 2px;
+    cursor:pointer;user-select:none;-webkit-user-select:none;
   }
+  .section-title .sec-caret{
+    display:inline-block;margin-left:6px;font-size:10px;opacity:0.7;
+    transition:transform .15s;
+  }
+  .section-title.collapsed .sec-caret{transform:rotate(-90deg)}
+  .btn-grid.collapsed{display:none}
   .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .app-btn{
     display:flex;align-items:center;justify-content:center;text-align:center;
@@ -274,12 +281,28 @@
 
     var html = '';
     sections.forEach(function (sec) {
-      html += '<div class="section-title">' + esc(sec || 'More Tools') + '</div><div class="btn-grid">';
+      var title = sec || 'More Tools';
+      // Sections are collapsible; remember choices for the visit. Response
+      // Viewers starts collapsed (long list). Searching expands everything.
+      var collapsed = !q && (sectionState[title] !== undefined
+        ? sectionState[title]
+        : title === 'Response Viewers');
+      var cls = collapsed ? ' collapsed' : '';
+      html += '<div class="section-title' + cls + '" data-sec="' + esc(title) + '" onclick="toggleSection(this)">' +
+        esc(title) + '<span class="sec-caret">&#9660;</span></div><div class="btn-grid' + cls + '">';
       byName[sec].forEach(function (a) { html += renderApp(a, q); });
       html += '</div>';
     });
     document.getElementById('content').innerHTML = html;
   }
+
+  var sectionState = {};
+  window.toggleSection = function (el) {
+    var nowCollapsed = !el.classList.contains('collapsed');
+    el.classList.toggle('collapsed', nowCollapsed);
+    el.nextElementSibling.classList.toggle('collapsed', nowCollapsed);
+    sectionState[el.getAttribute('data-sec')] = nowCollapsed;
+  };
 
   function renderApp(a, q) {
     var color = (a.color || 'slate').toLowerCase();
