@@ -20,7 +20,7 @@
  *  - No skipWaiting: new versions activate when all tabs close.
  */
 var CDN = '48';
-var STAMP = '20260829-203430';
+var STAMP = '20260829-204933';
 var SHELL_CACHE = 'wri-fa-shell-' + CDN + '-' + STAMP;
 var CDN_CACHE = 'wri-fa-cdn-' + CDN;
 
