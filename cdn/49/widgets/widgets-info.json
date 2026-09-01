@@ -12032,6 +12032,37 @@
     "group": 7
   },
   {
+    "name": "downgradient",
+    "manifest": {
+      "name": "downgradient",
+      "label": "Downgradient Direction",
+      "type": "widget",
+      "version": "1.0.0",
+      "exbVersion": "1.20.0",
+      "author": "Whitewater Rescue Institute",
+      "description": "Click a release point on the ground: returns the downgradient direction and grade from the USGS 3DEP DEM, checked at three scales so ditches and ballast shoulders announce themselves instead of producing a confidently wrong arrow. Surface topography only — not hydro-enforced.",
+      "copyright": "WRI",
+      "license": "",
+      "properties": {},
+      "dependency": [
+        "jimu-arcgis"
+      ],
+      "translatedLocales": [
+        "en"
+      ],
+      "defaultSize": {
+        "width": 360,
+        "height": 560
+      }
+    },
+    "i18nLabel": {},
+    "i18nDescription": {},
+    "uri": "widgets/downgradient/",
+    "icon": "widgets/downgradient/icon.svg",
+    "order": 700,
+    "group": 7
+  },
+  {
     "name": "fire-cone",
     "manifest": {
       "name": "fire-cone",
@@ -12093,6 +12124,40 @@
     "i18nDescription": {},
     "uri": "widgets/google-directions/",
     "icon": "widgets/google-directions/icon.svg",
+    "order": 700,
+    "group": 7
+  },
+  {
+    "name": "ortho-trim",
+    "manifest": {
+      "name": "ortho-trim",
+      "label": "Ortho Trim (mobile)",
+      "type": "widget",
+      "version": "1.0.0",
+      "exbVersion": "1.20.0",
+      "author": "Whitewater Rescue Institute",
+      "description": "Invisible map companion: on phones, turns off orthomosaic layers (tiled-imagery/KML overflight layers and their Drone Overflights-style groups) after the webmap loads. Visibility is flipped client-side only, so the saved webmap and desktop users are untouched and a phone user can still re-enable a layer from the Layers list.",
+      "copyright": "WRI",
+      "license": "",
+      "properties": {
+        "hasConfig": false,
+        "hasSettingPage": false
+      },
+      "dependency": [
+        "jimu-arcgis"
+      ],
+      "translatedLocales": [
+        "en"
+      ],
+      "defaultSize": {
+        "width": 1,
+        "height": 1
+      }
+    },
+    "i18nLabel": {},
+    "i18nDescription": {},
+    "uri": "widgets/ortho-trim/",
+    "icon": "widgets/ortho-trim/icon.svg",
     "order": 700,
     "group": 7
   },

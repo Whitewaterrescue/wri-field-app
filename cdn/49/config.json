@@ -293,7 +293,8 @@
       "order": [
         "0",
         "1",
-        "2"
+        "2",
+        "3"
       ],
       "content": {
         "0": {
@@ -370,6 +371,19 @@
             "hCenter": false
           },
           "isPending": false
+        },
+        "3": {
+          "type": "WIDGET",
+          "widgetId": "widget_34",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {}
         }
       }
     },
@@ -513,7 +527,8 @@
       "order": [
         "0",
         "1",
-        "2"
+        "2",
+        "3"
       ],
       "content": {
         "0": {
@@ -590,6 +605,19 @@
             "hCenter": false
           },
           "isPending": false
+        },
+        "3": {
+          "type": "WIDGET",
+          "widgetId": "widget_35",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {}
         }
       }
     },
@@ -634,7 +662,8 @@
       "order": [
         "0",
         "1",
-        "2"
+        "2",
+        "3"
       ],
       "content": {
         "0": {
@@ -711,6 +740,19 @@
             "hCenter": false
           },
           "isPending": false
+        },
+        "3": {
+          "type": "WIDGET",
+          "widgetId": "widget_36",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {}
         }
       }
     },
@@ -2114,6 +2156,36 @@
       },
       "useDataSourcesEnabled": false,
       "useDataSources": []
+    },
+    "widget_34": {
+      "id": "widget_34",
+      "uri": "widgets/ortho-trim/",
+      "version": "1.0.0",
+      "label": "Ortho Trim",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_1"
+      ]
+    },
+    "widget_35": {
+      "id": "widget_35",
+      "uri": "widgets/ortho-trim/",
+      "version": "1.0.0",
+      "label": "Ortho Trim",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_13"
+      ]
+    },
+    "widget_36": {
+      "id": "widget_36",
+      "uri": "widgets/ortho-trim/",
+      "version": "1.0.0",
+      "label": "Ortho Trim",
+      "config": {},
+      "useMapWidgetIds": [
+        "widget_17"
+      ]
     }
   },
   "widgetsManifest": {},
