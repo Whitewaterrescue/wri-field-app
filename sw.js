@@ -20,9 +20,16 @@
  *  - No skipWaiting: new versions activate when all tabs close.
  */
 var CDN = '53';
-var STAMP = '20260909-142142';
+var STAMP = '20260909-161554';
+// The cdn cache is keyed to the BUILD, not the deploy stamp, so a config-only
+// redeploy reuses the ~25 MB a device already warmed. That also means patching
+// a file in place inside an already-published cdn/<N> is invisible to anyone
+// who warmed it — cdn/** is cache-first and activate() preserves this cache.
+// CDN_EPOCH is the deliberate lever for exactly that case: bump it in
+// deploy_field_app.py and every device re-warms the build once.
+var CDN_EPOCH = '2';
 var SHELL_CACHE = 'wri-fa-shell-' + CDN + '-' + STAMP;
-var CDN_CACHE = 'wri-fa-cdn-' + CDN;
+var CDN_CACHE = 'wri-fa-cdn-' + CDN + '-' + CDN_EPOCH;
 
 var SCOPE_PATH = new URL(self.registration.scope).pathname; // '/wri-field-app/'
 
