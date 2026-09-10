@@ -1497,7 +1497,16 @@
           "statusField": "asset_status",
           "locationField": "current_warehouse",
           "where": "asset_status = 'available'",
-          "maxResults": 8
+          "maxResults": 25,
+          "maxDistanceMi": 250
+        },
+        "wrrlLayer": {
+          "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_WRRL_Resources/FeatureServer/0",
+          "maxDistanceMi": 250,
+          "maxRows": 25,
+          "excludeOrgs": [
+            "BNSF"
+          ]
         }
       },
       "useMapWidgetIds": [
@@ -2011,7 +2020,16 @@
           "statusField": "asset_status",
           "locationField": "current_warehouse",
           "where": "asset_status = 'available'",
-          "maxResults": 8
+          "maxResults": 25,
+          "maxDistanceMi": 250
+        },
+        "wrrlLayer": {
+          "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_WRRL_Resources/FeatureServer/0",
+          "maxDistanceMi": 250,
+          "maxRows": 25,
+          "excludeOrgs": [
+            "BNSF"
+          ]
         }
       },
       "useMapWidgetIds": [
