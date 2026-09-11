@@ -12128,6 +12128,37 @@
     "group": 7
   },
   {
+    "name": "grp-picker",
+    "manifest": {
+      "name": "grp-picker",
+      "label": "GRP Picker",
+      "type": "widget",
+      "version": "1.0.0",
+      "exbVersion": "1.20.0",
+      "author": "Whitewater Rescue Institute",
+      "description": "Pick a Washington Geographic Response Plan: filters every GRP layer on the map to that plan, zooms to it, and lists its sectors as one-tap chips. Deep-links with ?grp=CODE.",
+      "copyright": "WRI",
+      "license": "",
+      "properties": {},
+      "dependency": [
+        "jimu-arcgis"
+      ],
+      "translatedLocales": [
+        "en"
+      ],
+      "defaultSize": {
+        "width": 380,
+        "height": 84
+      }
+    },
+    "i18nLabel": {},
+    "i18nDescription": {},
+    "uri": "widgets/grp-picker/",
+    "icon": "widgets/grp-picker/icon.svg",
+    "order": 700,
+    "group": 7
+  },
+  {
     "name": "ortho-trim",
     "manifest": {
       "name": "ortho-trim",
