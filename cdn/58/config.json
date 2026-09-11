@@ -30,8 +30,8 @@
     "dataSource_1": {
       "id": "dataSource_1",
       "type": "WEB_MAP",
-      "sourceLabel": "BNSF Drills and Responses View Map",
-      "itemId": "5e30a96b8bcc4d6f981ce7b7435c61c0",
+      "sourceLabel": "2026 WRI Initial Response",
+      "itemId": "373f7625cfc74c87a8523fbaf7ad9691",
       "portalUrl": "https://wrienviro.maps.arcgis.com",
       "isHidden": false
     },
