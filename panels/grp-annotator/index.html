@@ -147,6 +147,7 @@
         <button class="btn" id="btnDevOpen">Open a local photo</button>
       </div>
       <div class="banner err" id="authErr" hidden></div>
+      <p class="muted" id="authDiag" style="margin:12px 4px 0;font-size:12.5px;line-height:1.45"></p>
     </div>
   </section>
 
@@ -237,7 +238,8 @@
    ============================================================ */
 const LAYER_URL   = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_GRP_Universal_DEV/FeatureServer/0";
 const PORTAL      = "https://wrienviro.maps.arcgis.com";
-const ORG_URLKEY  = "wrienviro";              // exb_auth.urlKey must match: other WRI ExB exports share this origin's storage
+const ORG_ID      = "Ji79lWGR5B33LhY7";      // WRI Environmental Response; the session token must belong to it
+const ORG_URLKEY  = "wrienviro";              // diagnostic only: the record's key reads 'www' when the sign-in came via www.arcgis.com
 const OAUTH_CLIENT = "zXmBr5FFTyHWfh24";      // the Field App's OAuth app; redirect = this Pages origin
 const CALLBACK_URL = "https://whitewaterrescue.github.io/wri-respond/oauth-callback-201.html";
 const SESSION_KEY = "wri_grp_annotator_auth";
@@ -335,17 +337,29 @@ function confirmBox(title, text, yes="Confirm"){
    2) our own popup session; 3) popup sign-in, standalone only.
    ============================================================ */
 class AuthError extends Error {}
+const diag = {record: "", verify: ""};     // what the sign-in card reports; never the token itself
+function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = [diag.record, diag.verify].filter(Boolean).join(" "); }
 function readExbAuth(){
+  let raw = null, from = "localStorage";
   try {
-    const raw = localStorage.getItem("exb_auth") || sessionStorage.getItem("exb_auth");
-    if (!raw) return null;
-    const a = JSON.parse(raw);
-    if (!a || !a.token || a.urlKey !== ORG_URLKEY) return null;
-    if (state.badToken && a.token === state.badToken) return null;
-    const exp = a.expires ? new Date(a.expires).getTime() : NaN;   // ISO string, not a number
-    if (!isFinite(exp) || exp - Date.now() < 2 * 60000) return null;
-    return {token: a.token, username: a.email || "", expiresAt: exp, source: "fieldapp"};
-  } catch (e) { return null; }
+    raw = localStorage.getItem("exb_auth");
+    if (!raw) { raw = sessionStorage.getItem("exb_auth"); from = "sessionStorage"; }
+  } catch (e) { diag.record = "Storage is blocked in this frame: " + (e.message || e); return null; }
+  if (!raw) { diag.record = "No Field App session record in this frame yet."; return null; }
+  let a;
+  try { a = JSON.parse(raw); } catch (e) { diag.record = "The session record is not readable."; return null; }
+  if (!a || !a.token) { diag.record = "The session record has no token."; return null; }
+  // `expires` is jimu's tokenExpires: an ISO string in the current build, a number in older ones,
+  // absent when the session was synced from a JS API credential -- so absence is NOT a rejection
+  const exp = a.expires != null && a.expires !== "" ? new Date(a.expires).getTime() : NaN;
+  const who = a.email || a.username || "";
+  const expTxt = !isFinite(exp) ? "no expiry recorded"
+    : exp > Date.now() ? "expires in " + Math.round((exp - Date.now()) / 60000) + " min"
+    : "expired " + Math.round((Date.now() - exp) / 60000) + " min ago";
+  diag.record = `Session record in ${from}: user ${who || "?"}, org key '${a.urlKey || "?"}', ${expTxt}.`;
+  if (isFinite(exp) && exp - Date.now() < 2 * 60000) { diag.record += " Waiting for the app to refresh it."; return null; }
+  if (state.badToken && a.token === state.badToken) { diag.record += " ArcGIS rejected it; waiting for the app to refresh it."; return null; }
+  return {token: a.token, username: who, expiresAt: isFinite(exp) ? exp : Date.now() + 20 * 60000, source: "fieldapp"};
 }
 function readSession(){
   try {
@@ -387,11 +401,15 @@ function showAuth(){
   $("authStandalone").hidden = EMBEDDED;
   $("authDev").hidden = !DEV;
   clearInterval(authPoll);
-  authPoll = setInterval(() => { if (getAuth()) { clearInterval(authPoll); boot(); } }, 2000);
+  renderAuthDiag();
+  authPoll = setInterval(() => {
+    const a = getAuth(); renderAuthDiag();
+    if (a && Date.now() >= (state.retryAt || 0)) { clearInterval(authPoll); boot(); }
+  }, 2000);
 }
 window.addEventListener("storage", e => { if (e.key === "exb_auth" && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
-$("btnAuthRetry").onclick = () => { if (getAuth()) boot(); else toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); };
+$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); } };
 $("btnSignIn").onclick = signIn;
 
 /* ============================================================
@@ -429,12 +447,26 @@ async function rest(url, fields, opts = {}){
     throw e;
   } finally { clearTimeout(t); }
 }
-async function ensureUsername(){
+let verified = {token: null, username: ""};
+async function verifyAuth(){
+  // The record is not trusted on its own: every WRI ExB export on this origin writes the same key,
+  // and a record can outlive its token. One portals/self per token settles org + username.
   const auth = getAuth();
   if (!auth) throw new AuthError("Signed out");
-  if (auth.username) { state.username = auth.username; return; }
-  const j = await rest(PORTAL + "/sharing/rest/portals/self", {}, {label: "who am I"});
-  state.username = (j.user && j.user.username) || "";
+  if (verified.token === auth.token) { state.username = verified.username; return; }
+  diag.verify = "Checking the session with ArcGIS\u2026"; renderAuthDiag();
+  let j;
+  try { j = await rest(PORTAL + "/sharing/rest/portals/self", {}, {label: "session check"}); }
+  catch (e) {
+    diag.verify = e instanceof AuthError ? "ArcGIS rejected the session token." : "Session check failed: " + (e.message || e);
+    renderAuthDiag(); throw e;
+  }
+  const u = j && j.user;
+  if (!u || !u.username) { dropAuth(auth.token); diag.verify = "ArcGIS did not recognise the session (no user)."; renderAuthDiag(); throw new AuthError("no user"); }
+  const org = u.orgId || j.id;
+  if (org && org !== ORG_ID) { dropAuth(auth.token); diag.verify = `Signed in as ${u.username}, but not in the WRI organisation.`; renderAuthDiag(); throw new AuthError("wrong org"); }
+  verified = {token: auth.token, username: u.username};
+  state.username = u.username; diag.verify = "";
 }
 function handleErr(e, where){
   if (e instanceof AuthError) { toastMsg("Signed out of ArcGIS. Sign in again."); showAuth(); return; }
@@ -1091,8 +1123,12 @@ addEventListener("online", updateOnline); addEventListener("offline", updateOnli
 async function boot(){
   clearInterval(authPoll);
   if (!getAuth()) { showAuth(); return; }
+  try { await verifyAuth(); }
+  catch (e) {
+    if (!(e instanceof AuthError)) { state.retryAt = Date.now() + 15000; toastMsg("Could not reach ArcGIS: " + (e.message || e), 5000); }
+    showAuth(); return;
+  }
   try {
-    await ensureUsername();
     $("whoami").textContent = state.username ? "Signed in as " + state.username : "";
     showView("viewSites");
     await loadSites();
