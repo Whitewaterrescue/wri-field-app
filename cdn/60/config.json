@@ -217,6 +217,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_12": {
+      "id": "page_12",
+      "label": "GRP Photo Annotator",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_grp_annotator",
+        "MEDIUM": "layout_grp_annotator",
+        "SMALL": "layout_grp_annotator"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -252,6 +267,9 @@
     },
     {
       "page_11": []
+    },
+    {
+      "page_12": []
     }
   ],
   "layouts": {
@@ -1016,6 +1034,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_33",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_grp_annotator": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_38",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -2234,6 +2285,19 @@
       "useMapWidgetIds": [
         "widget_1"
       ]
+    },
+    "widget_38": {
+      "id": "widget_38",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "GRP Photo Annotator",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/grp-annotator/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
     }
   },
   "widgetsManifest": {},
