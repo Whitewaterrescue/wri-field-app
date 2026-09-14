@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GRP Photo Annotator</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* WRI GRP Photo Annotator -- Field App panel (same-origin with the app shell).
+     Source of truth: C:\AppsScript\grp-universal\annotator\index.html
+     Deployed copy:   ~\wri-field-app-work\panels\grp-annotator\index.html
+     Brand tokens follow panels/tasks. The symbol colours drawn ON the photo (flow blue,
+     north red, boom yellow) are cartography, not UI, and stay as the desktop tool had them. */
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#171919;--surface:#2a2c2c;--surface-alt:#3A3C3C;
+    --accent:#EC2329;
+    --text:#f0f0f0;--text-dim:#b8bcbc;--text-muted:#9a9e9e;
+    --border:#4a4d4d;--success:#22c55e;--warning:#f59e0b;
+    --font:'Alexandria',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+    --head:'Epilogue','Alexandria',system-ui,sans-serif;
+    --flow:#1e78ff;--boom:#ffd21e;--north:#ff3b30;
+  }
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;
+    -webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  #app{height:100%;display:flex;flex-direction:column}
+  .view{flex:1;min-height:0;display:flex;flex-direction:column}
+  .view[hidden]{display:none}
+
+  .topbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--border);min-height:52px}
+  .topbar h1{font-size:16px;font-weight:700;flex:1;font-family:var(--head);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar .sub{display:block;font-size:12px;font-weight:400;color:var(--text-dim);font-family:var(--font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip{padding:8px 12px;border-radius:20px;font-size:13px;font-weight:600;background:var(--surface-alt);color:var(--text-dim);
+    border:1px solid var(--border);cursor:pointer;font-family:var(--font);white-space:nowrap;touch-action:manipulation}
+  .chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .chip:active{opacity:.8}
+  .back{display:flex;align-items:center;gap:2px;padding:9px 12px 9px 8px;border-radius:8px;border:none;background:var(--surface-alt);color:#fff;
+    font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;touch-action:manipulation}
+  .back:active{opacity:.85}
+
+  .scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 40px}
+  .row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+  input[type=search]{flex:1;min-width:0;font:16px var(--font);color:var(--text);background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:11px 12px;-webkit-user-select:text;user-select:text}
+  input[type=search]::placeholder{color:var(--text-muted)}
+
+  .site{display:flex;align-items:center;gap:12px;padding:12px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;cursor:pointer;min-height:56px}
+  .site:active{transform:scale(.985)}
+  .site .main{flex:1;min-width:0}
+  .site .name{font-weight:600;font-size:15px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .site .meta{font-size:12.5px;color:var(--text-dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .site .when{font-size:12px;color:var(--text-muted);white-space:nowrap;text-align:right}
+  .badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;background:var(--surface-alt);color:var(--text-dim)}
+  .badge.green{background:#1f4d2a;color:#9be7ad}
+  .badge.amber{background:#4a3306;color:#fbd38d}
+  .badge.red{background:#4b1a1c;color:#fca5a5}
+  .badge.gray{background:var(--surface-alt);color:var(--text-dim)}
+
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  @media (min-width:640px){.grid{grid-template-columns:repeat(3,1fr)}}
+  .photo{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;cursor:pointer}
+  .photo:active{transform:scale(.985)}
+  .photo .thumb{display:block;width:100%;aspect-ratio:1/1;object-fit:cover;background:#101212}
+  .photo .cap{padding:7px 9px;font-size:12.5px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .photo .tag{position:absolute;top:6px;left:6px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:16px}
+  .card h2{font-family:var(--head);font-size:14px;font-weight:700;margin-bottom:6px}
+  .card p{font-size:13.5px;color:var(--text-dim);line-height:1.45}
+  .state{display:flex;align-items:center;gap:8px;font-size:13.5px;margin:10px 0}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px;width:100%;padding:12px 14px;border-radius:10px;border:none;
+    font-size:15px;font-weight:700;color:#fff;background:var(--surface-alt);cursor:pointer;font-family:var(--font);touch-action:manipulation}
+  .btn:active{transform:scale(.97);opacity:.85}
+  .btn.red{background:var(--accent)}
+  .btn:disabled{opacity:.45;cursor:default;transform:none}
+  .section-title{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);margin:14px 0 8px 2px}
+  .muted{color:var(--text-muted);font-size:13px}
+  .empty,.loading{color:var(--text-muted);text-align:center;padding:40px 20px;font-size:14px;line-height:1.5}
+  .spin{width:26px;height:26px;margin:0 auto 12px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--accent);animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .banner{padding:8px 14px;font-size:13px;text-align:center}
+  .banner.warn{background:#3b2a08;color:var(--warning)}
+  .banner.err{background:#4b1a1c;color:#fca5a5}
+  .banner[hidden]{display:none}
+
+  /* ---- Draw view ---- */
+  .tools{display:flex;gap:6px;padding:8px 10px;background:var(--bg);border-bottom:1px solid var(--border);overflow-x:auto}
+  .tool{flex:1 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:56px;min-height:56px;
+    padding:6px 8px;border-radius:10px;border:1px solid var(--border);background:var(--surface-alt);color:var(--text);
+    font:600 11.5px var(--font);cursor:pointer;touch-action:manipulation;white-space:nowrap}
+  .tool:active{transform:scale(.96)}
+  .tool.active{border-color:var(--boom);background:#4a3f10}
+  .tool.save{background:var(--accent);border-color:var(--accent)}
+  .tool:disabled{opacity:.45;transform:none}
+  .tool svg{display:block}
+  #hint{padding:6px 12px;font-size:12.5px;color:var(--text-dim);background:var(--bg);border-bottom:1px solid var(--border);min-height:28px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #stage{flex:1;position:relative;min-height:0;background:repeating-conic-gradient(#1b1d1d 0% 25%, #151717 0% 50%) 0 0/28px 28px}
+  #canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:default}
+  #canvas.placing{cursor:crosshair}
+  #boombar{position:absolute;left:10px;right:10px;bottom:10px;display:flex;gap:8px;z-index:5}
+  #boombar[hidden]{display:none}
+  #boombar .btn{min-height:48px;font-size:14px;box-shadow:0 4px 18px rgba(0,0,0,.45)}
+  #stageMsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--text-muted);font-size:14px;pointer-events:none}
+  #stageMsg[hidden]{display:none}
+
+  /* ---- Overlays ---- */
+  #toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(8px);background:#0d0f0f;border:1px solid var(--border);
+    border-radius:8px;padding:10px 16px;font-size:13.5px;color:var(--text);opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;
+    z-index:60;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:92vw;text-align:center}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal[hidden]{display:none}
+  .modal .box{width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px}
+  .modal h2{font-family:var(--head);font-size:16px;margin-bottom:8px}
+  .modal p{font-size:14px;color:var(--text-dim);line-height:1.45;margin-bottom:16px}
+  .modal .row{margin:0}
+  .modal .row .btn{flex:1}
+  kbd{background:var(--surface-alt);border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:11px;font-family:inherit}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="offline" class="banner warn" hidden>Offline &mdash; the annotator needs a connection to load and save photos.</div>
+
+  <!-- ===== Sign-in ===== -->
+  <section id="viewAuth" class="view" hidden>
+    <div class="topbar"><h1>GRP Photo Annotator</h1></div>
+    <div class="scroll">
+      <div class="card" id="authEmbedded" hidden>
+        <h2>Sign in to the map first</h2>
+        <p>Open the <b>Incident Map</b> tab and sign in to ArcGIS, then come back here. This panel picks the sign-in up on its own.</p>
+        <div class="state"><div class="spin" style="margin:0;width:18px;height:18px;border-width:2px"></div><span class="muted">Waiting for the map sign-in&hellip;</span></div>
+        <button class="btn" id="btnAuthRetry">Check again</button>
+      </div>
+      <div class="card" id="authStandalone" hidden>
+        <h2>Sign in to ArcGIS</h2>
+        <p>Use your WRI ArcGIS Online account. The sign-in opens in a popup and this page continues on its own.</p>
+        <button class="btn red" id="btnSignIn">Sign in</button>
+      </div>
+      <div class="card" id="authDev" hidden>
+        <h2>Engine test (no ArcGIS)</h2>
+        <p>Load a photo from this device to exercise drawing and export. Save downloads the annotated JPEG instead of uploading.</p>
+        <button class="btn" id="btnDevOpen">Open a local photo</button>
+      </div>
+      <div class="banner err" id="authErr" hidden></div>
+    </div>
+  </section>
+
+  <!-- ===== Sites ===== -->
+  <section id="viewSites" class="view" hidden>
+    <div class="topbar">
+      <h1>GRP Photo Annotator<span class="sub" id="whoami"></span></h1>
+      <button class="chip" id="btnReload" title="Reload sites">&#8635;</button>
+    </div>
+    <div class="scroll">
+      <div class="row">
+        <input type="search" id="search" placeholder="Search site name or code" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="chip on" id="filterMine">Mine &middot; 14 d</button>
+        <button class="chip" id="filterAll">All</button>
+      </div>
+      <div id="siteList"><div class="loading"><div class="spin"></div>Loading sites&hellip;</div></div>
+    </div>
+  </section>
+
+  <!-- ===== Photos ===== -->
+  <section id="viewPhotos" class="view" hidden>
+    <div class="topbar">
+      <button class="back" id="btnBackSites">&#8249; Sites</button>
+      <h1 id="photosTitle">Site<span class="sub" id="photosSub"></span></h1>
+      <button class="chip" id="btnReloadPhotos" title="Reload photos">&#8635;</button>
+    </div>
+    <div class="scroll">
+      <div class="section-title" id="photosCount">Photos</div>
+      <div id="photoGrid"><div class="loading"><div class="spin"></div>Loading photos&hellip;</div></div>
+      <div class="card" id="officeCard">
+        <h2>Send to office</h2>
+        <p>The office computer renders a fresh strategy sheet for this site with your annotated photo leading, and attaches the PDF to the site. Save your photos first, then send.</p>
+        <div class="state" id="officeState"></div>
+        <button class="btn red" id="btnSend">Send to office</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Draw ===== -->
+  <section id="viewDraw" class="view" hidden>
+    <div class="topbar">
+      <button class="back" id="btnBackPhotos">&#8249; Photos</button>
+      <h1 id="drawTitle">Photo<span class="sub" id="drawSub"></span></h1>
+    </div>
+    <div class="tools">
+      <button class="tool" id="toolFlow" title="Add a flow-direction arrow">
+        <svg width="34" height="14" viewBox="0 0 30 14"><line x1="2" y1="7" x2="21" y2="7" stroke="#1e78ff" stroke-width="3" stroke-linecap="round"/><path d="M20 2 L28 7 L20 12 Z" fill="#1e78ff"/></svg>Flow</button>
+      <button class="tool" id="toolNorth" title="Add a north arrow">
+        <svg width="34" height="14" viewBox="0 0 30 14"><line x1="2" y1="7" x2="17" y2="7" stroke="#ff3b30" stroke-width="3" stroke-linecap="round"/><path d="M16 2 L24 7 L16 12 Z" fill="#ff3b30"/><text x="25" y="11" font-size="10" font-weight="800" fill="#ff3b30">N</text></svg>North</button>
+      <button class="tool" id="toolBoom" title="Draw a boom line: tap the points, then Done">
+        <svg width="34" height="14" viewBox="0 0 30 14"><polyline points="2,11 10,4 19,9 28,3" fill="none" stroke="#ffd21e" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>Boom</button>
+      <button class="tool" id="btnDelete" title="Delete the selected symbol">
+        <svg width="18" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>Delete</button>
+      <button class="tool" id="btnFit" title="Fit the photo to the screen">
+        <svg width="18" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>Fit</button>
+      <button class="tool save" id="btnSave" title="Save the annotated copy to the site">
+        <svg width="18" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>Save</button>
+    </div>
+    <div id="hint">Loading photo&hellip;</div>
+    <div id="stage">
+      <canvas id="canvas"></canvas>
+      <div id="stageMsg" hidden></div>
+      <div id="boombar" hidden>
+        <button class="btn" id="boomUndo">Undo point</button>
+        <button class="btn" id="boomCancel">Cancel</button>
+        <button class="btn red" id="boomDone" disabled>Done</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast"></div>
+<div class="modal" id="modal" hidden>
+  <div class="box">
+    <h2 id="modalTitle"></h2>
+    <p id="modalText"></p>
+    <div class="row"><button class="btn" id="modalNo">Cancel</button><button class="btn red" id="modalYes">Confirm</button></div>
+  </div>
+</div>
+<input type="file" id="devFile" accept="image/*" hidden>
+
+<script>
+(() => {
+"use strict";
+
+/* ============================================================
+   Config -- repoint LAYER_URL at the production cutover.
+   ============================================================ */
+const LAYER_URL   = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_GRP_Universal_DEV/FeatureServer/0";
+const PORTAL      = "https://wrienviro.maps.arcgis.com";
+const ORG_URLKEY  = "wrienviro";              // exb_auth.urlKey must match: other WRI ExB exports share this origin's storage
+const OAUTH_CLIENT = "zXmBr5FFTyHWfh24";      // the Field App's OAuth app; redirect = this Pages origin
+const CALLBACK_URL = "https://whitewaterrescue.github.io/wri-respond/oauth-callback-201.html";
+const SESSION_KEY = "wri_grp_annotator_auth";
+const DRAFT_PREFIX = "wri_grp_annotator_draft:";
+const WORK_MAX    = 2048;      // long edge of the work canvas (iOS canvas cap is 16.7 MP; DJI frames are 20-48 MP)
+const MINE_DAYS   = 14;
+const UPLOAD_TIMEOUT_MS = 60000;
+const QUERY_TIMEOUT_MS  = 30000;
+const TAP_PX = 8;
+
+const params = new URLSearchParams(location.search);
+const DEV = params.get("dev") === "1";
+const EMBEDDED = window.top !== window;
+const COARSE = matchMedia("(pointer: coarse)").matches;
+
+/* ============================================================
+   Symbology -- unchanged from the desktop tool. Everything derives
+   from the work image's short dimension so output is consistent.
+   ============================================================ */
+const SYM = {
+  lineW:   d => Math.max(3, d * 0.008),
+  arrowLen:d => d * 0.16,
+  headLen: lw => lw * 5.2,
+  headW:   lw => lw * 4.2,
+  nSize:   lw => lw * 5.5,
+  casing:  lw => lw * 2.0
+};
+const COLORS = { flow:"#1e78ff", north:"#ff3b30", boom:"#ffd21e" };
+const HIT = COARSE ? 28 : 14;        // hit-test radius, screen px
+const HANDLE_R = COARSE ? 11 : 6;    // handle radius, screen px
+
+/* ---------------- State ---------------- */
+const state = {
+  username: "",
+  badToken: null,          // a token AGOL rejected (498/499); ignored until jimu rotates it
+  sites: [], filter: "mine", search: "",
+  site: null,              // selected site attributes
+  atts: [],                // image attachment infos of the site (originals only)
+  copies: new Map(),       // source attachment id -> annotated copy info
+  att: null,               // attachment being annotated
+  img: null,               // the work canvas once a photo is loaded
+  imgW: 0, imgH: 0,
+  anno: null,              // {objects:[], saved:bool}
+  view: {s:1, ox:0, oy:0},
+  selected: null,          // {obj, handle}
+  placing: null,           // 'boom' | null
+  boomDraft: null,
+  hoverPt: null,
+  gesture: null,           // one-finger gesture in progress
+  pinch: null,             // two-finger gesture in progress
+  loadSeq: 0
+};
+if (DEV || params.get("debug") === "1") window.__annotState = state;   // test hook: no secrets live in state
+const work = document.createElement("canvas");   // ONE work canvas for the session
+const wctx = work.getContext("2d");
+const pointers = new Map();
+
+/* ---------------- DOM ---------------- */
+const $ = id => document.getElementById(id);
+const canvas = $("canvas"), ctx = canvas.getContext("2d");
+const stage = $("stage"), hint = $("hint"), toast = $("toast");
+const views = ["viewAuth", "viewSites", "viewPhotos", "viewDraw"];
+function showView(id){ for (const v of views) $(v).hidden = v !== id; if (id === "viewDraw") draw(); }
+function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function toastMsg(msg, ms=2600){
+  toast.textContent = msg; toast.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(()=>toast.classList.remove("show"), ms);
+}
+function setHint(msg){ hint.textContent = msg; }
+function baseName(n){ return String(n).replace(/\.[^.]+$/, ""); }
+function ago(ms){
+  if (!ms) return "";
+  const d = Date.now() - ms;
+  if (d < 3600e3) return Math.max(1, Math.round(d/60e3)) + " min ago";
+  if (d < 86400e3) return Math.round(d/3600e3) + " h ago";
+  if (d < 14*86400e3) return Math.round(d/86400e3) + " d ago";
+  return new Date(ms).toLocaleDateString();
+}
+function siteLabel(s){ return s.site_code ? s.site_code + (s.site_name ? " \u00b7 " + s.site_name : "") : (s.site_name || "Unnamed site"); }
+
+/* In-page confirm: window.confirm() is silently a no-op inside the Field App iframe (no allow-modals). */
+function confirmBox(title, text, yes="Confirm"){
+  return new Promise(res => {
+    $("modalTitle").textContent = title; $("modalText").textContent = text; $("modalYes").textContent = yes;
+    const m = $("modal"); m.hidden = false;
+    const done = v => { m.hidden = true; $("modalYes").onclick = $("modalNo").onclick = null; res(v); };
+    $("modalYes").onclick = () => done(true);
+    $("modalNo").onclick = () => done(false);
+  });
+}
+
+/* ============================================================
+   Auth ladder. 1) the Field App's own ExB session (same origin),
+   read fresh before EVERY request because jimu rotates it;
+   2) our own popup session; 3) popup sign-in, standalone only.
+   ============================================================ */
+class AuthError extends Error {}
+function readExbAuth(){
+  try {
+    const raw = localStorage.getItem("exb_auth") || sessionStorage.getItem("exb_auth");
+    if (!raw) return null;
+    const a = JSON.parse(raw);
+    if (!a || !a.token || a.urlKey !== ORG_URLKEY) return null;
+    if (state.badToken && a.token === state.badToken) return null;
+    const exp = a.expires ? new Date(a.expires).getTime() : NaN;   // ISO string, not a number
+    if (!isFinite(exp) || exp - Date.now() < 2 * 60000) return null;
+    return {token: a.token, username: a.email || "", expiresAt: exp, source: "fieldapp"};
+  } catch (e) { return null; }
+}
+function readSession(){
+  try {
+    const a = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
+    if (!a || !a.token || !(a.expiresAt - Date.now() > 60000)) return null;
+    if (state.badToken && a.token === state.badToken) return null;
+    return {token: a.token, username: a.username || "", expiresAt: a.expiresAt, source: "popup"};
+  } catch (e) { return null; }
+}
+function getAuth(){ return readExbAuth() || readSession(); }
+function dropAuth(token){
+  state.badToken = token || null;
+  try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+function signIn(){
+  // synchronous window.open -- iOS blocks popups opened after an await
+  const url = PORTAL + "/sharing/rest/oauth2/authorize?client_id=" + encodeURIComponent(OAUTH_CLIENT) +
+    "&response_type=token&expiration=720&redirect_uri=" + encodeURIComponent(CALLBACK_URL);
+  const w = window.open(url, "agolAuth", "width=480,height=640");
+  if (!w) { showAuthErr("Popup blocked. Allow popups for this site and try again."); return; }
+  $("authErr").hidden = true;
+}
+window.addEventListener("message", e => {
+  if (e.origin !== location.origin) return;               // the callback page lives on this origin
+  const d = e.data;
+  if (!d || d.type !== "arcgis-auth") return;
+  if (d.error || !d.token) { showAuthErr("ArcGIS sign-in failed" + (d.error ? ": " + d.error : "")); return; }
+  const expiresAt = Date.now() + (Number(d.expires_in) || 7200) * 1000;
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token: String(d.token), username: String(d.username || ""), expiresAt})); } catch (x) {}
+  state.badToken = null;
+  boot();
+});
+function showAuthErr(msg){ const el = $("authErr"); el.textContent = msg; el.hidden = false; }
+
+let authPoll = null;
+function showAuth(){
+  showView("viewAuth");
+  $("authEmbedded").hidden = !EMBEDDED;
+  $("authStandalone").hidden = EMBEDDED;
+  $("authDev").hidden = !DEV;
+  clearInterval(authPoll);
+  authPoll = setInterval(() => { if (getAuth()) { clearInterval(authPoll); boot(); } }, 2000);
+}
+window.addEventListener("storage", e => { if (e.key === "exb_auth" && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
+$("btnAuthRetry").onclick = () => { if (getAuth()) boot(); else toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); };
+$("btnSignIn").onclick = signIn;
+
+/* ============================================================
+   REST helper: POST form-encoded (or multipart), real abort on timeout,
+   AGOL's HTTP-200 error bodies raised, 498/499 = token gone.
+   ============================================================ */
+async function rest(url, fields, opts = {}){
+  const auth = getAuth();
+  if (!auth) throw new AuthError("Signed out");
+  const timeout = opts.timeout || QUERY_TIMEOUT_MS, label = opts.label || "request";
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeout);
+  try {
+    let init;
+    if (opts.body instanceof FormData) {
+      opts.body.append("f", "json"); opts.body.append("token", auth.token);
+      init = {method: "POST", body: opts.body, signal: ac.signal};
+    } else {
+      const p = new URLSearchParams();
+      for (const [k, v] of Object.entries(fields || {})) if (v != null) p.set(k, String(v));
+      p.set("f", "json"); p.set("token", auth.token);
+      init = {method: "POST", body: p, signal: ac.signal};
+    }
+    const r = await fetch(url, init);
+    let j;
+    try { j = await r.json(); } catch (e) { throw new Error(label + ": HTTP " + r.status + " (not JSON)"); }
+    if (j && j.error) {
+      const code = Number(j.error.code);
+      if (code === 498 || code === 499) { dropAuth(auth.token); throw new AuthError(j.error.message || "Session expired"); }
+      throw new Error(j.error.message || (label + " error " + code));
+    }
+    return j;
+  } catch (e) {
+    if (e && e.name === "AbortError") throw new Error(label + " timed out after " + Math.round(timeout/1000) + " s");
+    throw e;
+  } finally { clearTimeout(t); }
+}
+async function ensureUsername(){
+  const auth = getAuth();
+  if (!auth) throw new AuthError("Signed out");
+  if (auth.username) { state.username = auth.username; return; }
+  const j = await rest(PORTAL + "/sharing/rest/portals/self", {}, {label: "who am I"});
+  state.username = (j.user && j.user.username) || "";
+}
+function handleErr(e, where){
+  if (e instanceof AuthError) { toastMsg("Signed out of ArcGIS. Sign in again."); showAuth(); return; }
+  console.error(where, e);
+  toastMsg((where ? where + ": " : "") + (e && e.message ? e.message : String(e)), 5000);
+}
+
+/* ============================================================
+   Sites
+   ============================================================ */
+const SITE_FIELDS = "OBJECTID,GlobalID,site_code,site_name,assigned_grp,Creator,EditDate,sheet_status,sheet_note,sheet_updated,office_action,revision_status";
+async function loadSites(){
+  $("siteList").innerHTML = '<div class="loading"><div class="spin"></div>Loading sites&hellip;</div>';
+  const j = await rest(LAYER_URL + "/query", {
+    where: "1=1", outFields: SITE_FIELDS, returnGeometry: "false",
+    orderByFields: "EditDate DESC", resultRecordCount: 2000
+  }, {label: "sites"});
+  state.sites = (j.features || []).map(f => f.attributes).filter(a => a.revision_status !== "superseded");
+  renderSites();
+}
+function officeBadge(s){
+  const st = s.sheet_status;
+  if (st === "rendering") return '<span class="badge amber">rendering</span>';
+  if (s.office_action && st !== "rendered" && st !== "published") return '<span class="badge amber">queued</span>';
+  if (st === "held") return '<span class="badge red">held</span>';
+  if (st === "failed") return '<span class="badge red">failed</span>';
+  if (st === "rendered" || st === "published") return '<span class="badge green">' + st + '</span>';
+  return "";
+}
+function renderSites(){
+  const q = state.search.trim().toLowerCase();
+  const cutoff = Date.now() - MINE_DAYS * 86400e3;
+  const me = (state.username || "").toLowerCase();
+  let rows = state.sites;
+  if (state.filter === "mine") rows = rows.filter(s => (s.Creator || "").toLowerCase() === me || (s.EditDate || 0) > cutoff);
+  if (q) rows = rows.filter(s => ((s.site_name || "") + " " + (s.site_code || "") + " " + (s.assigned_grp || "")).toLowerCase().includes(q));
+  const el = $("siteList");
+  if (!rows.length) {
+    el.innerHTML = '<div class="empty">' + (state.filter === "mine" && !q
+      ? 'No sites you created or that changed in the last ' + MINE_DAYS + ' days.<br>Tap <b>All</b> to see every site.'
+      : 'No sites match.') + '</div>';
+    return;
+  }
+  el.innerHTML = rows.map(s => `
+    <div class="site" data-oid="${s.OBJECTID}">
+      <div class="main">
+        <div class="name">${esc(s.site_name || "Unnamed site")}</div>
+        <div class="meta">${esc(s.site_code || "no code yet")}${s.assigned_grp ? " \u00b7 " + esc(s.assigned_grp) : ""} ${officeBadge(s)}</div>
+      </div>
+      <div class="when">${esc(ago(s.EditDate))}</div>
+    </div>`).join("");
+  el.querySelectorAll(".site").forEach(d => d.onclick = () => openSite(Number(d.dataset.oid)));
+}
+$("search").addEventListener("input", e => { state.search = e.target.value; renderSites(); });
+$("filterMine").onclick = () => setFilter("mine");
+$("filterAll").onclick = () => setFilter("all");
+function setFilter(f){
+  state.filter = f;
+  $("filterMine").classList.toggle("on", f === "mine");
+  $("filterAll").classList.toggle("on", f === "all");
+  renderSites();
+}
+$("btnReload").onclick = () => loadSites().catch(e => handleErr(e, "Sites"));
+
+/* ============================================================
+   Photos of a site
+   ============================================================ */
+const ANNOTATED_RE = /^(.+)_annotated\.(jpe?g|png)$/i;
+function kw(info){ return String(info.keywords || "").split(",").map(s => s.trim()).filter(Boolean); }
+function attUrl(oid, id, extra){
+  const auth = getAuth();
+  return `${LAYER_URL}/${oid}/attachments/${id}?token=${encodeURIComponent(auth ? auth.token : "")}${extra || ""}`;
+}
+async function listAttachments(oid){
+  const j = await rest(LAYER_URL + "/queryAttachments", {objectIds: oid, returnUrl: "false"}, {label: "photos"});
+  const g = (j.attachmentGroups || []).find(x => Number(x.parentObjectId) === Number(oid));
+  return g ? (g.attachmentInfos || []) : [];
+}
+function splitAttachments(infos){
+  const imgs = infos.filter(i => String(i.contentType || "").toLowerCase().startsWith("image/"));
+  const copies = new Map();          // source id -> copy
+  const originals = [];
+  const byStem = new Map();
+  for (const i of imgs) {
+    const k = kw(i);
+    const src = k.find(x => x.startsWith("src:"));
+    const isCopy = k.includes("lead") || ANNOTATED_RE.test(i.name || "");
+    if (isCopy) {
+      if (src) copies.set(Number(src.slice(4)), i);
+      else { const m = ANNOTATED_RE.exec(i.name || ""); if (m) byStem.set(m[1].toLowerCase(), i); }
+    } else originals.push(i);
+  }
+  // legacy copies (hand-uploaded, no src keyword): match by name stem, first original wins
+  for (const o of originals) {
+    if (copies.has(o.id)) continue;
+    const c = byStem.get(baseName(o.name || "").toLowerCase());
+    if (c) { copies.set(o.id, c); byStem.delete(baseName(o.name || "").toLowerCase()); }
+  }
+  originals.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, {numeric: true}));
+  return {originals, copies};
+}
+async function openSite(oid){
+  const s = state.sites.find(x => x.OBJECTID === oid);
+  if (!s) return;
+  state.site = s;
+  $("photosTitle").firstChild.textContent = s.site_name || "Unnamed site";
+  $("photosSub").textContent = (s.site_code || "no code yet") + (s.assigned_grp ? " \u00b7 " + s.assigned_grp : "");
+  $("officeCard").hidden = DEV && !getAuth();
+  renderOfficeState();
+  showView("viewPhotos");
+  await loadPhotos().catch(e => handleErr(e, "Photos"));
+}
+async function loadPhotos(){
+  const oid = state.site.OBJECTID;
+  $("photoGrid").innerHTML = '<div class="loading"><div class="spin"></div>Loading photos&hellip;</div>';
+  const infos = await listAttachments(oid);
+  if (state.site.OBJECTID !== oid) return;
+  const {originals, copies} = splitAttachments(infos);
+  state.atts = originals; state.copies = copies;
+  renderPhotos();
+}
+function hasDraft(oid, attId){ try { return !!sessionStorage.getItem(DRAFT_PREFIX + oid + ":" + attId); } catch (e) { return false; } }
+function renderPhotos(){
+  const oid = state.site.OBJECTID;
+  $("photosCount").textContent = state.atts.length ? `Photos (${state.atts.length}) \u2014 tap one to annotate` : "Photos";
+  if (!state.atts.length) {
+    $("photoGrid").innerHTML = '<div class="empty">No photos on this site yet.<br>Take them in the Field Maps form; they show up here once synced.</div>';
+    return;
+  }
+  $("photoGrid").innerHTML = '<div class="grid">' + state.atts.map(a => {
+    const copy = state.copies.get(a.id);
+    const tag = copy ? '<span class="badge green tag">Annotated \u2713</span>'
+              : hasDraft(oid, a.id) ? '<span class="badge amber tag">Draft</span>' : "";
+    return `<div class="photo" data-id="${a.id}">
+      <img class="thumb" alt="" src="${attUrl(oid, a.id, "&size=240,240")}" data-full="${attUrl(oid, a.id)}" loading="lazy">
+      ${tag}<div class="cap">${esc(a.name)}</div></div>`;
+  }).join("") + "</div>";
+  $("photoGrid").querySelectorAll("img.thumb").forEach(im => {
+    im.onerror = () => { if (im.dataset.full && im.src !== im.dataset.full) im.src = im.dataset.full; };   // no resize support -> full image
+  });
+  $("photoGrid").querySelectorAll(".photo").forEach(d => d.onclick = () => openPhoto(Number(d.dataset.id)));
+}
+$("btnReloadPhotos").onclick = () => loadPhotos().catch(e => handleErr(e, "Photos"));
+$("btnBackSites").onclick = () => { showView("viewSites"); renderSites(); };
+
+/* ---- Send to office ---- */
+function renderOfficeState(){
+  const s = state.site, el = $("officeState"), b = $("btnSend");
+  if (!s) return;
+  const when = s.sheet_updated ? " (" + ago(s.sheet_updated) + ")" : "";
+  const note = s.sheet_note ? " \u2014 " + s.sheet_note : "";
+  let html = "", disabled = false, label = "Send to office";
+  const st = s.sheet_status;
+  if (st === "rendering") { html = '<span class="badge amber">rendering</span> The office is rendering this site now.'; disabled = true; label = "Office is rendering now"; }
+  else if (s.office_action && st !== "rendered" && st !== "published") { html = '<span class="badge amber">queued</span> Already queued for the office' + when + '. Sending again is harmless.'; }
+  else if (st === "held") html = '<span class="badge red">held</span> Held by the office' + when + esc(note);
+  else if (st === "failed") html = '<span class="badge red">failed</span> Last attempt failed' + when + esc(note);
+  else if (st === "rendered" || st === "published") html = '<span class="badge green">' + st + '</span> Sheet ' + st + when + '. Send again after new photos.';
+  else html = '<span class="badge gray">none</span> No office request yet.';
+  el.innerHTML = html; b.disabled = disabled; b.textContent = label;
+}
+$("btnSend").onclick = async () => {
+  const s = state.site; if (!s) return;
+  if (s.sheet_status === "rendering") { toastMsg("The office is rendering this site now."); return; }
+  const ok = await confirmBox("Send " + siteLabel(s) + " to the office?",
+    "The office renders a fresh strategy sheet with your annotated photo leading and attaches the PDF to this site. Have you saved your photos?", "Send");
+  if (!ok) return;
+  const b = $("btnSend"); b.disabled = true; b.textContent = "Sending\u2026";
+  try {
+    const j = await rest(LAYER_URL + "/applyEdits", {
+      updates: JSON.stringify([{attributes: {OBJECTID: s.OBJECTID, office_action: "render"}}])
+    }, {label: "send"});
+    const r = (j.updateResults || [])[0];
+    if (!r || !r.success) throw new Error((r && r.error && (r.error.description || r.error.message)) || "update rejected");
+    const q = await rest(LAYER_URL + "/query", {where: "OBJECTID=" + s.OBJECTID, outFields: SITE_FIELDS, returnGeometry: "false"}, {label: "verify"});
+    const back = q.features && q.features[0] && q.features[0].attributes;
+    if (!back || back.office_action !== "render") throw new Error("the request did not stick (read back " + (back ? back.office_action : "nothing") + ")");
+    Object.assign(s, back);
+    toastMsg("Sent. The office renders within about 15 minutes and attaches the PDF to this site.", 5000);
+  } catch (e) { handleErr(e, "Send to office"); }
+  finally { renderOfficeState(); }
+};
+
+/* ============================================================
+   Photo load -> ONE work canvas capped at WORK_MAX
+   ============================================================ */
+function loadImg(blob){
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); res(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error("The photo could not be decoded")); };
+    img.src = url;
+  });
+}
+function setWorkImage(img){
+  const k = Math.min(1, WORK_MAX / Math.max(img.naturalWidth, img.naturalHeight));
+  const W = Math.max(1, Math.round(img.naturalWidth * k)), H = Math.max(1, Math.round(img.naturalHeight * k));
+  work.width = W; work.height = H;
+  wctx.imageSmoothingEnabled = true; wctx.imageSmoothingQuality = "high";
+  wctx.drawImage(img, 0, 0, W, H);          // EXIF orientation is applied by the browser (naturalWidth/Height are oriented)
+  state.img = work; state.imgW = W; state.imgH = H;
+}
+async function fetchAttachment(oid, id){
+  const auth = getAuth();
+  if (!auth) throw new AuthError("Signed out");
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    const r = await fetch(attUrl(oid, id), {signal: ac.signal});
+    const ct = String(r.headers.get("content-type") || "");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    if (ct.includes("json")) { const j = await r.json(); const c = j && j.error && Number(j.error.code); if (c === 498 || c === 499) { dropAuth(auth.token); throw new AuthError("Session expired"); } throw new Error((j.error && j.error.message) || "AGOL refused the photo"); }
+    return await r.blob();
+  } catch (e) { if (e && e.name === "AbortError") throw new Error("photo download timed out"); throw e; }
+  finally { clearTimeout(t); }
+}
+async function openPhoto(attId, localBlob){
+  const att = localBlob ? {id: 0, name: localBlob.name || "local.jpg", local: true} : state.atts.find(a => a.id === attId);
+  if (!att) return;
+  const seq = ++state.loadSeq;
+  state.att = att; state.img = null; state.anno = {objects: [], saved: !!state.copies.get(att.id)};
+  state.selected = null; state.placing = null; state.boomDraft = null; state.gesture = null; state.pinch = null; pointers.clear();
+  cancelBoom(true);
+  $("drawTitle").firstChild.textContent = att.name;
+  $("drawSub").textContent = state.site ? siteLabel(state.site) : "";
+  $("stageMsg").hidden = false; $("stageMsg").textContent = "Loading photo\u2026";
+  setHint("Loading photo\u2026");
+  showView("viewDraw");
+  try {
+    const blob = localBlob || await fetchAttachment(state.site.OBJECTID, att.id);
+    if (seq !== state.loadSeq) return;
+    const img = await loadImg(blob);
+    if (seq !== state.loadSeq) return;
+    setWorkImage(img);
+    fitView();
+    const draft = loadDraft();
+    if (draft && draft.length) { state.anno.objects = draft; state.anno.saved = false; toastMsg("Restored your unsaved drawing."); }
+    $("stageMsg").hidden = true;
+    draw();
+    setHint(`${img.naturalWidth}\u00d7${img.naturalHeight}${state.imgW !== img.naturalWidth ? " \u2192 " + state.imgW + "\u00d7" + state.imgH : ""} \u2014 add a symbol, drag to place, pinch to zoom.`);
+  } catch (e) {
+    if (seq !== state.loadSeq) return;
+    $("stageMsg").textContent = "Could not load this photo: " + (e.message || e);
+    handleErr(e, "Photo");
+  }
+}
+$("btnBackPhotos").onclick = () => { state.loadSeq++; showView("viewPhotos"); if (state.site) renderPhotos(); };
+
+/* ---- draft persistence: iOS reloads backgrounded tabs; a trip to the Map tab must not lose the drawing ---- */
+function draftKey(){ return state.site && state.att ? DRAFT_PREFIX + state.site.OBJECTID + ":" + state.att.id : null; }
+let draftT = null;
+function saveDraft(){
+  clearTimeout(draftT);
+  draftT = setTimeout(() => {
+    const k = draftKey(); if (!k) return;
+    try {
+      if (state.anno && state.anno.objects.length) sessionStorage.setItem(k, JSON.stringify(state.anno.objects));
+      else sessionStorage.removeItem(k);
+    } catch (e) {}
+  }, 250);
+}
+function loadDraft(){ const k = draftKey(); if (!k) return null; try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } }
+function clearDraft(){ clearTimeout(draftT); const k = draftKey(); if (k) try { sessionStorage.removeItem(k); } catch (e) {} }
+function changed(){ if (state.anno) state.anno.saved = false; saveDraft(); }
+
+/* ============================================================
+   View transform: work px -> screen px, now with zoom + pan
+   ============================================================ */
+function fitScale(){ return Math.min(canvas.clientWidth / state.imgW, canvas.clientHeight / state.imgH) * 0.97; }
+function fitView(){
+  if (!state.img) return;
+  const s = fitScale();
+  state.view = {s, ox: (canvas.clientWidth - state.imgW * s) / 2, oy: (canvas.clientHeight - state.imgH * s) / 2};
+}
+function clampView(){
+  const v = state.view, w = canvas.clientWidth, h = canvas.clientHeight;
+  const iw = state.imgW * v.s, ih = state.imgH * v.s;
+  v.ox = iw <= w ? (w - iw) / 2 : Math.min(0, Math.max(w - iw, v.ox));
+  v.oy = ih <= h ? (h - ih) / 2 : Math.min(0, Math.max(h - ih, v.oy));
+}
+function zoomAbout(sp, s){
+  const fit = fitScale();
+  s = Math.max(fit * 0.9, Math.min(Math.max(2, fit * 8), s));
+  const ip = s2i(sp);
+  state.view = {s, ox: sp.x - ip.x * s, oy: sp.y - ip.y * s};
+  clampView(); draw();
+}
+function viewT(){ return state.view; }
+function i2s(p){ const t = viewT(); return {x: p.x*t.s + t.ox, y: p.y*t.s + t.oy}; }
+function s2i(p){ const t = viewT(); return {x: (p.x - t.ox)/t.s, y: (p.y - t.oy)/t.s}; }
+$("btnFit").onclick = () => { fitView(); draw(); };
+
+/* ============================================================
+   Tools (engine unchanged apart from the work canvas + touch bar)
+   ============================================================ */
+function currentAnno(){ return state.anno; }
+function addArrow(kind){
+  if (!state.img) { toastMsg("Wait for the photo to load."); return; }
+  const W = state.imgW, H = state.imgH;
+  const d = Math.min(W, H), len = SYM.arrowLen(d);
+  // place inside the CURRENT view so a zoomed-in user sees it appear: flow at the centre,
+  // north near the top-right (as the desktop tool did) so the two defaults never overlap
+  // within a finger's hit radius
+  const c = s2i(kind === "flow" ? {x: canvas.clientWidth / 2, y: canvas.clientHeight / 2}
+                                : {x: canvas.clientWidth * 0.84, y: canvas.clientHeight * 0.18});
+  const cx = Math.max(len/2, Math.min(W - len/2, c.x)), cy = Math.max(len/2, Math.min(H - len/2, c.y));
+  let obj;
+  if (kind === "flow") obj = {kind, pts: [{x: cx - len/2, y: cy}, {x: cx + len/2, y: cy}]};
+  else obj = {kind, pts: [{x: cx, y: cy + len/2}, {x: cx, y: cy - len/2}]};   // north: pointing up
+  currentAnno().objects.push(obj);
+  state.selected = {obj, handle: null};
+  changed(); draw();
+  setHint(kind === "flow" ? "Drag the arrow into position; drag either end to aim and size it."
+                          : "Drag the north arrow into position; drag either end to rotate it.");
+}
+$("toolFlow").onclick  = () => addArrow("flow");
+$("toolNorth").onclick = () => addArrow("north");
+$("toolBoom").onclick = () => {
+  if (!state.img) { toastMsg("Wait for the photo to load."); return; }
+  if (state.placing === "boom") { finishBoom(); return; }
+  state.placing = "boom"; state.boomDraft = []; state.selected = null;
+  canvas.classList.add("placing"); $("toolBoom").classList.add("active");
+  $("boombar").hidden = false; updateBoomBar();
+  setHint("Tap along the boom placement, then Done. Drag to pan, pinch to zoom.");
+  draw();
+};
+function updateBoomBar(){
+  const n = state.boomDraft ? state.boomDraft.length : 0;
+  $("boomDone").disabled = n < 2;
+  $("boomDone").textContent = n < 2 ? "Done" : `Done (${n} pts)`;
+  $("boomUndo").disabled = n < 1;
+}
+function finishBoom(){
+  if (state.boomDraft && state.boomDraft.length >= 2) {
+    currentAnno().objects.push({kind: "boom", pts: state.boomDraft});
+    state.selected = {obj: currentAnno().objects[currentAnno().objects.length - 1], handle: null};
+    changed();
+    setHint("Boom placed. Drag its points to adjust, or add the flow arrow.");
+  } else if (state.boomDraft) toastMsg("A boom line needs at least two points.");
+  cancelBoom(false);
+}
+function cancelBoom(silent){
+  state.placing = null; state.boomDraft = null; state.hoverPt = null;
+  canvas.classList.remove("placing"); $("toolBoom").classList.remove("active");
+  $("boombar").hidden = true;
+  if (!silent) draw();
+}
+$("boomDone").onclick = finishBoom;
+$("boomCancel").onclick = () => cancelBoom(false);
+$("boomUndo").onclick = () => { if (state.boomDraft) { state.boomDraft.pop(); updateBoomBar(); draw(); } };
+$("btnDelete").onclick = deleteSelected;
+function deleteSelected(){
+  const a = currentAnno();
+  if (!a || !state.selected) { toastMsg("Tap a symbol first, then Delete."); return; }
+  a.objects = a.objects.filter(o => o !== state.selected.obj);
+  state.selected = null;
+  changed(); draw();
+}
+
+/* ---------------- Drawing primitives (shared by view + export; unchanged) ---------------- */
+function drawArrow(c, obj, lw){
+  const [t, h] = obj.pts;
+  const ang = Math.atan2(h.y - t.y, h.x - t.x);
+  const hl = SYM.headLen(lw), hw = SYM.headW(lw);
+  const shaftEnd = {x: h.x - Math.cos(ang)*hl*0.85, y: h.y - Math.sin(ang)*hl*0.85};
+  const color = COLORS[obj.kind];
+  c.lineCap = "round"; c.lineJoin = "round";
+  c.strokeStyle = "rgba(255,255,255,0.9)"; c.lineWidth = SYM.casing(lw);
+  c.beginPath(); c.moveTo(t.x, t.y); c.lineTo(shaftEnd.x, shaftEnd.y); c.stroke();
+  headPath(c, h, ang, hl, hw);
+  c.lineWidth = lw * 0.9; c.stroke();
+  c.strokeStyle = color; c.lineWidth = lw;
+  c.beginPath(); c.moveTo(t.x, t.y); c.lineTo(shaftEnd.x, shaftEnd.y); c.stroke();
+  headPath(c, h, ang, hl, hw);
+  c.fillStyle = color; c.fill();
+  if (obj.kind === "north") {
+    const fs = SYM.nSize(lw);
+    const lx = h.x + Math.cos(ang) * fs * 1.0, ly = h.y + Math.sin(ang) * fs * 1.0;
+    c.font = `800 ${fs}px -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+    c.textAlign = "center"; c.textBaseline = "middle";
+    c.lineWidth = lw * 0.9; c.strokeStyle = "rgba(255,255,255,0.9)";
+    c.strokeText("N", lx, ly);
+    c.fillStyle = color; c.fillText("N", lx, ly);
+  }
+}
+function headPath(c, tip, ang, hl, hw){
+  const bx = tip.x - Math.cos(ang)*hl, by = tip.y - Math.sin(ang)*hl;
+  const px = -Math.sin(ang), py = Math.cos(ang);
+  c.beginPath(); c.moveTo(tip.x, tip.y);
+  c.lineTo(bx + px*hw, by + py*hw); c.lineTo(bx - px*hw, by - py*hw); c.closePath();
+}
+function drawBoom(c, obj, lw, ptsOverride){
+  const pts = ptsOverride || obj.pts;
+  if (pts.length < 2) return;
+  c.lineCap = "round"; c.lineJoin = "round";
+  c.strokeStyle = "rgba(0,0,0,0.55)"; c.lineWidth = SYM.casing(lw);
+  path(c, pts); c.stroke();
+  c.strokeStyle = COLORS.boom; c.lineWidth = lw;
+  path(c, pts); c.stroke();
+}
+function path(c, pts){ c.beginPath(); c.moveTo(pts[0].x, pts[0].y); for (let i=1;i<pts.length;i++) c.lineTo(pts[i].x, pts[i].y); }
+
+/* ---------------- View rendering ---------------- */
+function sizeCanvas(){
+  const dpr = window.devicePixelRatio || 1;
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (w < 1 || h < 1) return false;
+  if (canvas.width !== Math.round(w*dpr) || canvas.height !== Math.round(h*dpr)) { canvas.width = Math.round(w*dpr); canvas.height = Math.round(h*dpr); }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return true;
+}
+function draw(){
+  if ($("viewDraw").hidden) return;
+  if (!sizeCanvas()) return;
+  ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  if (!state.img) return;
+  const t = viewT();
+  ctx.save();
+  ctx.translate(t.ox, t.oy); ctx.scale(t.s, t.s);
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(state.img, 0, 0);
+  const lw = SYM.lineW(Math.min(state.imgW, state.imgH));
+  const a = currentAnno();
+  if (a) for (const obj of a.objects) { if (obj.kind === "boom") drawBoom(ctx, obj, lw); else drawArrow(ctx, obj, lw); }
+  if (state.boomDraft) {
+    const pts = state.hoverPt && state.boomDraft.length ? [...state.boomDraft, state.hoverPt] : state.boomDraft;
+    if (pts.length >= 2) drawBoom(ctx, {kind: "boom"}, lw, pts);
+    ctx.fillStyle = COLORS.boom;
+    for (const p of state.boomDraft) { ctx.beginPath(); ctx.arc(p.x, p.y, lw*0.9, 0, Math.PI*2); ctx.fill(); }
+  }
+  ctx.restore();
+  if (state.selected) {
+    for (const p of state.selected.obj.pts) {
+      const s = i2s(p);
+      ctx.beginPath(); ctx.arc(s.x, s.y, HANDLE_R, 0, Math.PI*2);
+      ctx.fillStyle = "#fff"; ctx.fill();
+      ctx.lineWidth = 2; ctx.strokeStyle = COLORS[state.selected.obj.kind]; ctx.stroke();
+    }
+  }
+}
+let lastStage = {w: 0, h: 0};
+new ResizeObserver(() => {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  if (w < 1 || h < 1) { lastStage = {w: 0, h: 0}; return; }        // hidden view: nothing to fit to
+  if (state.img && lastStage.w && (w !== lastStage.w || h !== lastStage.h)) {
+    // keep the fit when the container resizes (rotation, keyboard); a zoomed view just re-clamps
+    if (Math.abs(state.view.s - Math.min(lastStage.w / state.imgW, lastStage.h / state.imgH) * 0.97) < 1e-6) fitView(); else clampView();
+  }
+  lastStage = {w, h};
+  draw();
+}).observe(stage);
+
+/* ---------------- Hit testing (unchanged) ---------------- */
+function distToSeg(p, a, b){
+  const dx=b.x-a.x, dy=b.y-a.y, L2=dx*dx+dy*dy;
+  let t = L2 ? ((p.x-a.x)*dx + (p.y-a.y)*dy)/L2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy));
+}
+function hitTest(sp){
+  const a = currentAnno(); if (!a) return null;
+  if (state.selected) {
+    const pts = state.selected.obj.pts;
+    for (let i=0;i<pts.length;i++) { const s = i2s(pts[i]); if (Math.hypot(sp.x-s.x, sp.y-s.y) <= HIT) return {obj: state.selected.obj, handle: i}; }
+  }
+  for (let k=a.objects.length-1; k>=0; k--) {
+    const obj = a.objects[k], pts = obj.pts.map(i2s);
+    for (let i=0;i<pts.length;i++) if (Math.hypot(sp.x-pts[i].x, sp.y-pts[i].y) <= HIT) return {obj, handle: i};
+    for (let i=0;i<pts.length-1;i++) if (distToSeg(sp, pts[i], pts[i+1]) <= HIT) return {obj, handle: null};
+  }
+  return null;
+}
+
+/* ============================================================
+   Pointer interaction: one finger = drag symbol / pan / tap;
+   two fingers = pinch zoom; mouse wheel = zoom.
+   ============================================================ */
+function evtPt(e){ const r = canvas.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const mid = (a, b) => ({x: (a.x + b.x) / 2, y: (a.y + b.y) / 2});
+
+canvas.addEventListener("pointerdown", e => {
+  if (!state.img) return;
+  try { canvas.setPointerCapture(e.pointerId); } catch (x) {}
+  pointers.set(e.pointerId, evtPt(e));
+  if (pointers.size === 2) {
+    // a second finger turns whatever was happening into a pinch; undo any partial drag
+    if (state.gesture && state.gesture.hit) state.gesture.hit.obj.pts = state.gesture.orig.map(p => ({...p}));
+    state.gesture = null;
+    const [a, b] = [...pointers.values()];
+    state.pinch = {d0: Math.max(1, dist(a, b)), mid0: mid(a, b), view0: {...state.view}};
+    draw(); return;
+  }
+  if (pointers.size > 2 || state.pinch) return;
+  const sp = evtPt(e);
+  const hit = state.placing ? null : hitTest(sp);
+  state.gesture = {id: e.pointerId, start: sp, moved: false, hit, view0: {...state.view},
+                   orig: hit ? hit.obj.pts.map(p => ({...p})) : null, type: e.pointerType};
+  if (hit) { state.selected = {obj: hit.obj, handle: hit.handle}; canvas.style.cursor = "grabbing"; draw(); }
+});
+canvas.addEventListener("pointermove", e => {
+  if (!state.img) return;
+  const sp = evtPt(e);
+  if (pointers.has(e.pointerId)) pointers.set(e.pointerId, sp);
+  if (state.pinch && pointers.size >= 2) {
+    const [a, b] = [...pointers.values()];
+    const p = state.pinch, m = mid(a, b);
+    const fit = fitScale();
+    const s = Math.max(fit * 0.9, Math.min(Math.max(2, fit * 8), p.view0.s * dist(a, b) / p.d0));
+    const ip = {x: (p.mid0.x - p.view0.ox) / p.view0.s, y: (p.mid0.y - p.view0.oy) / p.view0.s};
+    state.view = {s, ox: m.x - ip.x * s, oy: m.y - ip.y * s};
+    clampView(); draw(); return;
+  }
+  const g = state.gesture;
+  if (g && g.id === e.pointerId) {
+    if (!g.moved && dist(sp, g.start) > TAP_PX) g.moved = true;
+    if (g.hit) {
+      const dx = (sp.x - g.start.x) / state.view.s, dy = (sp.y - g.start.y) / state.view.s;
+      if (g.hit.handle !== null) g.hit.obj.pts[g.hit.handle] = {x: g.orig[g.hit.handle].x + dx, y: g.orig[g.hit.handle].y + dy};
+      else g.hit.obj.pts = g.orig.map(p => ({x: p.x + dx, y: p.y + dy}));
+      if (g.moved) changed();
+      draw(); return;
+    }
+    if (g.moved) {
+      state.view.ox = g.view0.ox + (sp.x - g.start.x); state.view.oy = g.view0.oy + (sp.y - g.start.y);
+      clampView(); draw(); return;
+    }
+  }
+  if (e.pointerType === "mouse") {
+    if (state.placing === "boom") { state.hoverPt = s2i(sp); draw(); return; }
+    canvas.style.cursor = hitTest(sp) ? "grab" : "default";
+  }
+});
+function pointerEnd(e){
+  pointers.delete(e.pointerId);
+  if (state.pinch) { if (pointers.size < 2) { state.pinch = null; state.gesture = null; } return; }
+  const g = state.gesture;
+  if (!g || g.id !== e.pointerId) return;
+  state.gesture = null;
+  canvas.style.cursor = "default";
+  if (e.type === "pointercancel") { if (g.hit) { g.hit.obj.pts = g.orig.map(p => ({...p})); draw(); } return; }
+  if (!g.moved) {
+    if (state.placing === "boom") { state.boomDraft.push(s2i(g.start)); updateBoomBar(); draw(); }
+    else if (!g.hit) { state.selected = null; draw(); }
+  } else if (g.hit) saveDraft();
+}
+canvas.addEventListener("pointerup", pointerEnd);
+canvas.addEventListener("pointercancel", pointerEnd);
+canvas.addEventListener("wheel", e => {
+  if (!state.img) return;
+  e.preventDefault();
+  zoomAbout(evtPt(e), state.view.s * Math.exp(-e.deltaY * 0.0015));
+}, {passive: false});
+// belt and braces against iOS page gestures inside the sandboxed iframe
+for (const ev of ["touchstart", "touchmove"]) canvas.addEventListener(ev, e => e.preventDefault(), {passive: false});
+document.addEventListener("gesturestart", e => e.preventDefault());
+document.addEventListener("dblclick", e => { if (e.target === canvas) e.preventDefault(); });
+
+/* ---------------- Keyboard (desktop convenience) ---------------- */
+document.addEventListener("keydown", e => {
+  if ($("viewDraw").hidden || e.target.tagName === "INPUT") return;
+  if (state.placing === "boom") {
+    if (e.key === "Enter") { finishBoom(); e.preventDefault(); }
+    else if (e.key === "Escape") cancelBoom(false);
+    else if (e.key === "Backspace") { state.boomDraft.pop(); updateBoomBar(); draw(); e.preventDefault(); }
+    return;
+  }
+  if (e.key === "Delete" || e.key === "Backspace") { if (state.selected) { deleteSelected(); e.preventDefault(); } }
+  else if (e.key === "Escape") { state.selected = null; draw(); }
+});
+
+/* ============================================================
+   Export + upload
+   ============================================================ */
+async function exportBlob(){
+  const W = state.imgW, H = state.imgH;
+  const off = document.createElement("canvas");
+  off.width = W; off.height = H;
+  const c = off.getContext("2d");
+  c.drawImage(state.img, 0, 0);
+  const lw = SYM.lineW(Math.min(W, H));
+  for (const obj of currentAnno().objects) { if (obj.kind === "boom") drawBoom(c, obj, lw); else drawArrow(c, obj, lw); }
+  const blob = await new Promise(res => off.toBlob(res, "image/jpeg", 0.92));
+  off.width = off.height = 0;
+  if (!blob) throw new Error("the image could not be encoded on this device");
+  return blob;
+}
+async function saveCurrent(){
+  const a = currentAnno();
+  if (!state.img || !a) return;
+  if (state.placing === "boom") finishBoom();
+  if (!a.objects.length) { toastMsg("Nothing drawn yet. Add a flow arrow or a boom line first."); return; }
+  const btn = $("btnSave"); btn.disabled = true;
+  setHint("Saving\u2026");
+  try {
+    const blob = await exportBlob();
+    const outName = baseName(state.att.name) + "_annotated.jpg";
+    if (state.att.local || !state.site) {           // ?dev=1 engine test: download instead of upload
+      const url = URL.createObjectURL(blob); const el = document.createElement("a");
+      el.href = url; el.download = outName; el.click(); setTimeout(() => URL.revokeObjectURL(url), 4000);
+      a.saved = true; toastMsg("Downloaded " + outName + " (" + Math.round(blob.size/1024) + " KB)"); setHint("Saved (local test).");
+      return;
+    }
+    const oid = state.site.OBJECTID, srcId = state.att.id;
+    // fresh list: a copy may exist from an earlier save, or from an upload that timed out but landed
+    const infos = await listAttachments(oid);
+    const {copies} = splitAttachments(infos);
+    const existing = copies.get(srcId) || null;
+    const fd = new FormData();
+    fd.append("attachment", blob, outName);
+    fd.append("keywords", "lead,src:" + srcId);
+    let id, res;
+    if (existing) {
+      fd.append("attachmentId", existing.id);
+      res = await rest(`${LAYER_URL}/${oid}/updateAttachment`, null, {body: fd, timeout: UPLOAD_TIMEOUT_MS, label: "upload"});
+      const r = res.updateAttachmentResult || {};
+      if (!r.success) throw new Error((r.error && (r.error.description || r.error.message)) || "updateAttachment rejected");
+      id = existing.id;
+    } else {
+      res = await rest(`${LAYER_URL}/${oid}/addAttachment`, null, {body: fd, timeout: UPLOAD_TIMEOUT_MS, label: "upload"});
+      const r = res.addAttachmentResult || {};
+      if (!r.success) throw new Error((r.error && (r.error.description || r.error.message)) || "addAttachment rejected");
+      id = r.objectId;
+    }
+    // write-then-read: success:true has been known to persist nothing
+    const back = (await listAttachments(oid)).find(i => Number(i.id) === Number(id));
+    if (!back || !(back.size > 0)) throw new Error("AGOL reported success but the copy is not on the site; try again");
+    state.copies.set(srcId, back);
+    a.saved = true; clearDraft();
+    toastMsg(`Saved ${outName} to ${state.site.site_code || state.site.site_name}${existing ? " (replaced)" : ""}`, 4000);
+    setHint("Saved. Go back to Photos and tap Send to office when the photos are done.");
+  } catch (e) {
+    setHint("Not saved.");
+    if (e instanceof AuthError) handleErr(e, "Save");
+    else toastMsg("Upload failed \u2014 " + (e.message || e) + ". Retry from better signal; nothing was changed.", 6000);
+  } finally { btn.disabled = false; }
+}
+$("btnSave").onclick = saveCurrent;
+
+/* ============================================================
+   Dev mode + boot
+   ============================================================ */
+$("btnDevOpen").onclick = () => $("devFile").click();
+$("devFile").onchange = () => {
+  const f = $("devFile").files[0]; if (!f) return;
+  state.site = state.site || {OBJECTID: 0, site_name: "Local test", site_code: "", sheet_status: null};
+  state.atts = []; state.copies = new Map();
+  openPhoto(0, f);
+  $("devFile").value = "";
+};
+function updateOnline(){ $("offline").hidden = navigator.onLine !== false; }
+addEventListener("online", updateOnline); addEventListener("offline", updateOnline); updateOnline();
+
+async function boot(){
+  clearInterval(authPoll);
+  if (!getAuth()) { showAuth(); return; }
+  try {
+    await ensureUsername();
+    $("whoami").textContent = state.username ? "Signed in as " + state.username : "";
+    showView("viewSites");
+    await loadSites();
+    const want = Number(params.get("oid"));
+    if (want && state.sites.some(s => s.OBJECTID === want)) openSite(want);
+  } catch (e) { handleErr(e, "Start"); if (!(e instanceof AuthError)) $("siteList").innerHTML = '<div class="empty">' + esc(e.message || e) + '<br><br><button class="btn" id="btnRetryBoot">Try again</button></div>'; const b = $("btnRetryBoot"); if (b) b.onclick = boot; }
+}
+boot();
+})();
+</script>
+</body>
+</html>
