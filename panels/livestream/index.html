@@ -90,10 +90,18 @@
     status.textContent = msg || '';
   }
 
-  // ExB hides a page with display:none, which collapses this panel's iframe to
-  // 0x0 -- that is the only "you left the page" signal a same-origin panel gets.
+  // ExB hides a page with display:none; the panel's own iframe element then has
+  // a 0x0 rect -- that is the "you left the page" signal a same-origin panel gets.
   function isHidden() {
-    return document.visibilityState === 'hidden' || window.innerWidth === 0 || window.innerHeight === 0;
+    if (document.visibilityState === 'hidden') return true;
+    // Same-origin with the ExB shell, so our own <iframe> element is reachable:
+    // inside a display:none page it has a 0x0 rect. (window.innerWidth does NOT
+    // go to 0 in Chrome for a display:none frame -- measured 2026-09-17.)
+    try {
+      var fe = window.frameElement;
+      if (fe) { var r = fe.getBoundingClientRect(); return r.width === 0 || r.height === 0; }
+    } catch (e) {}
+    return window.innerWidth === 0 || window.innerHeight === 0;
   }
   function check() {
     if (!frame) return;
