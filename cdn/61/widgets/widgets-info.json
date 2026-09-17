@@ -12167,7 +12167,7 @@
       "version": "1.0.0",
       "exbVersion": "1.20.0",
       "author": "Whitewater Rescue Institute",
-      "description": "Invisible map companion: on phones, turns off orthomosaic layers (tiled-imagery/KML overflight layers and their Drone Overflights-style groups) after the webmap loads. Visibility is flipped client-side only, so the saved webmap and desktop users are untouched and a phone user can still re-enable a layer from the Layers list.",
+      "description": "Invisible map companion: on phones, removes KML ground-overlay layers from the map the instant the webmap adds them (hidden Overflights KMLs still downloaded 31 MB of Nova PNGs per open) and turns off tiled-imagery orthomosaic layers after load. Client-side only: the saved webmap and desktop users are untouched.",
       "copyright": "WRI",
       "license": "",
       "properties": {
@@ -12312,6 +12312,40 @@
     "i18nDescription": {},
     "uri": "widgets/spill-trace-snake/",
     "icon": "widgets/spill-trace-snake/icon.svg",
+    "order": 700,
+    "group": 7
+  },
+  {
+    "name": "wri-map-guard",
+    "manifest": {
+      "name": "wri-map-guard",
+      "label": "WRI Map Guard",
+      "type": "widget",
+      "version": "1.0.0",
+      "exbVersion": "1.20.0",
+      "author": "Whitewater Rescue Institute",
+      "description": "Invisible map companion for phones. (1) If the map's WebGL context is lost and ExB's own recovery has not brought it back within 8 s, shows a one-tap 'restore' button that reloads onto the same page. (2) Optionally (releaseOnHide) destroys the MapView that ExB parks in memory when a reference-map page is hidden, so only the current map holds a WebGL context; the next visit rebuilds the map fresh.",
+      "copyright": "WRI",
+      "license": "",
+      "properties": {
+        "hasConfig": false,
+        "hasSettingPage": false
+      },
+      "dependency": [
+        "jimu-arcgis"
+      ],
+      "translatedLocales": [
+        "en"
+      ],
+      "defaultSize": {
+        "width": 1,
+        "height": 1
+      }
+    },
+    "i18nLabel": {},
+    "i18nDescription": {},
+    "uri": "widgets/wri-map-guard/",
+    "icon": "widgets/wri-map-guard/icon.svg",
     "order": 700,
     "group": 7
   },

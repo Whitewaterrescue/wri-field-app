@@ -19,8 +19,8 @@
  *  - Everything else same-scope: network-first (8s race) + cache fallback.
  *  - No skipWaiting: new versions activate when all tabs close.
  */
-var CDN = '60';
-var STAMP = '20260914-125122';
+var CDN = '61';
+var STAMP = '20260917-113549';
 // The cdn cache is keyed to the BUILD, not the deploy stamp, so a config-only
 // redeploy reuses the ~25 MB a device already warmed. That also means patching
 // a file in place inside an already-published cdn/<N> is invisible to anyone
@@ -41,7 +41,7 @@ var PRECACHE = [
   './panels/hasp/index.html',
   './panels/trailers/index.html',
   './panels/gateway/index.html',
-  './panels/wa-grps/index.html',
+  './panels/livestream/index.html',
   './panels/grp-annotator/index.html',
   './cdn/' + CDN + '/config.json',
   './cdn/' + CDN + '/jimu-core/init.js'
@@ -126,7 +126,10 @@ self.addEventListener('fetch', function (event) {
  * build file in small batches, so the ENTIRE app UI opens offline after one
  * online visit — not just the pages the user happened to open. Failures are
  * ignored (partial warm still helps; the next open retries the diff).
- * Skipped when the browser reports Save-Data. ~25 MB once per build. */
+ * Skipped when the browser reports Save-Data. ~25 MB once per build.
+ * Batches of 3 (was 6) and the page only asks after 60 s / off the map
+ * pages -- see SW_REG in deploy_field_app.py -- so the warm never competes
+ * with a map load on a phone. */
 var warmRunning = false;
 function warmCdn() {
   if (warmRunning) return Promise.resolve();
@@ -143,12 +146,12 @@ function warmCdn() {
           var missing = manifest.files.filter(function (f) { return !have[SCOPE_PATH + f]; });
           function batch(i) {
             if (i >= missing.length) return null;
-            var slice = missing.slice(i, i + 6);
+            var slice = missing.slice(i, i + 3);
             return Promise.all(slice.map(function (f) {
               return fetch(SCOPE_PATH + f).then(function (resp) {
                 if (resp && resp.ok) return c.put(SCOPE_PATH + f, resp);
               }).catch(function () {});
-            })).then(function () { return batch(i + 6); });
+            })).then(function () { return batch(i + 3); });
           }
           return batch(0);
         });

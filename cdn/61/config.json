@@ -203,21 +203,6 @@
       "header": true,
       "footer": false
     },
-    "page_11": {
-      "id": "page_11",
-      "label": "WA DOE GRPs",
-      "type": "NORMAL",
-      "mode": "FIT_WINDOW",
-      "layout": {
-        "LARGE": "layout_spokane_qr",
-        "MEDIUM": "layout_spokane_qr",
-        "SMALL": "layout_spokane_qr"
-      },
-      "isVisible": true,
-      "isDefault": false,
-      "header": true,
-      "footer": false
-    },
     "page_12": {
       "id": "page_12",
       "label": "GRP Photo Annotator",
@@ -227,6 +212,21 @@
         "LARGE": "layout_grp_annotator",
         "MEDIUM": "layout_grp_annotator",
         "SMALL": "layout_grp_annotator"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_13": {
+      "id": "page_13",
+      "label": "Live Stream",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_livestream",
+        "MEDIUM": "layout_livestream",
+        "SMALL": "layout_livestream"
       },
       "isVisible": true,
       "isDefault": false,
@@ -260,13 +260,13 @@
       "page_5": []
     },
     {
+      "page_13": []
+    },
+    {
       "page_8": []
     },
     {
       "page_9": []
-    },
-    {
-      "page_11": []
     },
     {
       "page_12": []
@@ -312,7 +312,8 @@
         "0",
         "1",
         "2",
-        "3"
+        "3",
+        "4"
       ],
       "content": {
         "0": {
@@ -393,6 +394,19 @@
         "3": {
           "type": "WIDGET",
           "widgetId": "widget_34",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {}
+        },
+        "4": {
+          "type": "WIDGET",
+          "widgetId": "widget_40",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -551,7 +565,8 @@
         "0",
         "1",
         "2",
-        "3"
+        "3",
+        "4"
       ],
       "content": {
         "0": {
@@ -641,6 +656,19 @@
             "height": "1px"
           },
           "setting": {}
+        },
+        "4": {
+          "type": "WIDGET",
+          "widgetId": "widget_41",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {}
         }
       }
     },
@@ -686,7 +714,8 @@
         "0",
         "1",
         "2",
-        "3"
+        "3",
+        "4"
       ],
       "content": {
         "0": {
@@ -767,6 +796,19 @@
         "3": {
           "type": "WIDGET",
           "widgetId": "widget_36",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {}
+        },
+        "4": {
+          "type": "WIDGET",
+          "widgetId": "widget_42",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -1025,7 +1067,7 @@
         }
       }
     },
-    "layout_spokane_qr": {
+    "layout_grp_annotator": {
       "type": "FIXED",
       "order": [
         "0"
@@ -1033,7 +1075,7 @@
       "content": {
         "0": {
           "type": "WIDGET",
-          "widgetId": "widget_33",
+          "widgetId": "widget_38",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -1058,7 +1100,7 @@
         }
       }
     },
-    "layout_grp_annotator": {
+    "layout_livestream": {
       "type": "FIXED",
       "order": [
         "0"
@@ -1066,7 +1108,7 @@
       "content": {
         "0": {
           "type": "WIDGET",
-          "widgetId": "widget_38",
+          "widgetId": "widget_39",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -1113,7 +1155,7 @@
           "canLayers": false,
           "canBaseMap": true,
           "canScaleBar": true,
-          "canFullScreen": true
+          "canFullScreen": false
         },
         "isUseCustomMapState": false
       },
@@ -1580,7 +1622,7 @@
           "canLayers": false,
           "canBaseMap": true,
           "canScaleBar": true,
-          "canFullScreen": true
+          "canFullScreen": false
         },
         "isUseCustomMapState": false
       },
@@ -1696,7 +1738,7 @@
           "canLayers": false,
           "canBaseMap": true,
           "canScaleBar": true,
-          "canFullScreen": true
+          "canFullScreen": false
         },
         "isUseCustomMapState": false
       },
@@ -2218,19 +2260,6 @@
         "widget_17"
       ]
     },
-    "widget_33": {
-      "id": "widget_33",
-      "uri": "widgets/common/embed/",
-      "version": "1.20.0",
-      "label": "WA DOE GRPs",
-      "config": {
-        "embedType": "url",
-        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/wa-grps/</p>",
-        "enableLabel": false
-      },
-      "useDataSourcesEnabled": false,
-      "useDataSources": []
-    },
     "widget_34": {
       "id": "widget_34",
       "uri": "widgets/ortho-trim/",
@@ -2298,6 +2327,58 @@
       },
       "useDataSourcesEnabled": false,
       "useDataSources": []
+    },
+    "widget_39": {
+      "id": "widget_39",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Live Stream",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/livestream/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_40": {
+      "id": "widget_40",
+      "uri": "widgets/wri-map-guard/",
+      "version": "1.0.0",
+      "label": "Map Guard",
+      "config": {
+        "releaseOnHide": false,
+        "releaseDelayMs": 20000
+      },
+      "useMapWidgetIds": [
+        "widget_1"
+      ]
+    },
+    "widget_41": {
+      "id": "widget_41",
+      "uri": "widgets/wri-map-guard/",
+      "version": "1.0.0",
+      "label": "Map Guard",
+      "config": {
+        "releaseOnHide": true,
+        "releaseDelayMs": 20000
+      },
+      "useMapWidgetIds": [
+        "widget_13"
+      ]
+    },
+    "widget_42": {
+      "id": "widget_42",
+      "uri": "widgets/wri-map-guard/",
+      "version": "1.0.0",
+      "label": "Map Guard",
+      "config": {
+        "releaseOnHide": true,
+        "releaseDelayMs": 20000
+      },
+      "useMapWidgetIds": [
+        "widget_17"
+      ]
     }
   },
   "widgetsManifest": {},
