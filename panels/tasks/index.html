@@ -149,7 +149,9 @@
   // Hosts that refuse to render in an iframe (X-Frame-Options / CSP / login
   // redirects). Task links have no per-app Embed flag, so this list is the
   // only guard — everything else opens in the overlay.
-  var NEVER_EMBED = ['docs.google.com', 'accounts.google.com', 'app.mapnova.com',
+  // app.mapnova.com used to be listed here; it serves CSP frame-ancestors * and
+  // renders in-frame (verified 2026-09-17), so Nova links now open in the overlay.
+  var NEVER_EMBED = ['docs.google.com', 'accounts.google.com',
                      'dashboard.pexcard.com', 'experience.arcgis.com', 'arcg.is'];
 
   function canEmbed(url) {
