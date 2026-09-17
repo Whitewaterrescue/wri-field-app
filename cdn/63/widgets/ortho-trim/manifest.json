@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "exbVersion": "1.20.0",
   "author": "Whitewater Rescue Institute",
-  "description": "Invisible map companion: on phones, removes KML ground-overlay layers from the map the instant the webmap adds them (hidden Overflights KMLs still downloaded 31 MB of Nova PNGs per open) and turns off tiled-imagery orthomosaic layers after load. Client-side only: the saved webmap and desktop users are untouched.",
+  "description": "Invisible map companion: on phones, removes KML ground-overlay layers from the map the instant the webmap adds them (hidden Overflights KMLs still downloaded 31 MB of Nova PNGs per open). Tiled orthos stay visible. Client-side only.",
   "copyright": "WRI",
   "license": "",
   "properties": {
