@@ -219,6 +219,20 @@ function walk(layers, out=[]){ for (const l of layers || []) { out.push(l); if (
 function onMap(kmlId){ return walk(state.mapData && state.mapData.operationalLayers).find(l => l.id === "ortho_" + kmlId) || null; }
 function kmlOnMap(kmlId){ return walk(state.mapData && state.mapData.operationalLayers).find(l => l.layerType === "KML" && (l.itemId === kmlId || (l.url || "").includes(kmlId))) || null; }
 function currentProjects(){ const s = new Set(); for (const l of walk(state.mapData && state.mapData.operationalLayers)) if (l.wriOrtho && l.wriOrtho.project) s.add(l.wriOrtho.project); return s; }
+// Tell the app shell what orthos the web map holds now; the wri-map-guard widget on the Incident Map
+// reconciles the LIVE MapView (adds new tiled layers, drops removed ones and the replaced KML), so a
+// fresh ortho shows without reopening the map. Same origin -> window.top; the guard checks origin + mapId.
+let lastSync = "";
+function syncLiveMap(){
+  if (!EMBEDDED || !state.mapId || !state.mapData) return;
+  const layers = walk(state.mapData.operationalLayers).filter(l => typeof l.id === "string" && l.id.startsWith("ortho_") && l.url)
+    .map(l => ({id: l.id, url: l.url, title: l.title, itemId: l.itemId, sourceKml: (l.wriOrtho && l.wriOrtho.sourceKml) || l.id.slice(6)}));
+  const msg = {type: "wri-ortho-sync", mapId: state.mapId, layers};
+  const key = JSON.stringify(msg);
+  if (key === lastSync) return;
+  lastSync = key;
+  try { window.top.postMessage(msg, location.origin); } catch (e) { console.warn("live sync", e); }
+}
 
 async function loadKmls(){
   const j = await rest(PORTAL + "/sharing/rest/search", {q: `type:"KML" orgid:${ORG_ID}`, num: 100, sortField: "created", sortOrder: "desc"}, {label: "KML search"});
@@ -330,6 +344,7 @@ async function refresh(quiet){
   try { await verifyAuth(); if (!quiet) $("subtitle").textContent = "Loading…";
     await Promise.all([currentMap(), loadKmls()]); await loadRequests();
     $("subtitle").textContent = `${state.kmls.length} Nova orthos · signed in as ${state.username}`; render(); showView("viewList");
+    syncLiveMap();
   } catch (e) { handleErr(e, quiet ? "" : "load"); }
 }
 async function boot(){
