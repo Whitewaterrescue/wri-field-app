@@ -227,6 +227,14 @@ async function loadKmls(){
     return {id: r.id, title: r.title, owner: r.owner, project: m[1], name: m[2].trim(), date: new Date(epoch * 1000), access: r.access}; }).filter(Boolean);
 }
 async function loadRequests(){
+  state.imagery = state.imagery || {};
+  // imagery already published for a KML (tag wri_source_kml:<id>) -- "Tiles ready" even when it never went through this queue
+  try {
+    const s = await rest(PORTAL + "/sharing/rest/search", {q: `tags:"wri_ortho" type:"Image Service" orgid:${ORG_ID}`, num: 100, sortField: "created", sortOrder: "desc"}, {label: "imagery search"});
+    const by = {};
+    for (const r of s.results || []) { const t = (r.tags || []).find(x => x.startsWith("wri_source_kml:")); if (t) by[t.slice(15)] = {id: r.id, url: r.url, title: r.title}; }
+    state.imagery = by;
+  } catch (e) { console.warn("imagery search", e); }
   if (!REQUESTS_URL || REQUESTS_URL.startsWith("__")) { state.requests = {}; return; }
   const ids = state.kmls.map(k => `'${k.id}'`).join(","); if (!ids) { state.requests = {}; return; }
   const j = await rest(REQUESTS_URL + "/query", {where: `kml_item_id IN (${ids})`, outFields: "*", returnGeometry: "false", orderByFields: "requested_at DESC"}, {label: "requests"});
@@ -235,6 +243,7 @@ async function loadRequests(){
   state.requests = by;
 }
 function reqFor(k){ return state.requests[k.id + "|" + state.mapId] || null; }
+function imageryFor(k){ return (state.imagery || {})[k.id] || null; }
 
 /* ============================================================ Render */
 function stateOf(k){
@@ -243,7 +252,7 @@ function stateOf(k){
   if (layer) return {key: "onmap", badge: '<span class="badge green">On the map</span>'};
   if (r && r.status === "held") return {key: "held", badge: '<span class="badge red">Needs Cody</span>'};
   if (r && r.status === "failed") return {key: "failed", badge: '<span class="badge red">Failed</span>'};
-  if (r && r.imagery_item_id) return {key: "ready", badge: '<span class="badge blue">Tiles ready</span>'};
+  if ((r && r.imagery_item_id) || imageryFor(k)) return {key: "ready", badge: '<span class="badge blue">Tiles ready</span>'};
   if (kmlOnMap(k.id)) return {key: "kmlonmap", badge: '<span class="badge red">KML on map (heavy)</span>'};
   return {key: "new", badge: ""};
 }
