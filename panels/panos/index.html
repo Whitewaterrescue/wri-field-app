@@ -508,19 +508,42 @@ function render(){
   el.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => removePano(Number(b.dataset.remove)));
   el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => window.open(b.dataset.open, "_blank", "noopener"));
 
-  clearTimeout(state.timer);
-  if (state.requests.length) state.timer = setTimeout(() => refresh(true), POLL_MS);
+  armPoll();
   syncLiveMap();
 }
 
 /* ============================================================ Boot */
+function armPoll(){
+  // Re-armed from refresh()'s finally, NOT only on a successful render: one slow query used to
+  // kill the loop for good. Seen live 2026-09-18 -- polls at 2s/13s/23s/33s, then `panoramas
+  // timed out` rejected the Promise.all, render() never ran, the timer was never re-set, and the
+  // card span forever until Cody hit Refresh by hand.
+  clearTimeout(state.timer);
+  if (state.requests.length && $("viewMain") && !$("viewMain").hidden) {
+    state.timer = setTimeout(() => refresh(true), POLL_MS);
+  }
+}
+
 async function refresh(quiet){
+  let authLost = false;
   try {
     await verifyAuth();
     if (!quiet) await currentMap();
-    await Promise.all([loadPanos(), loadRequests()]);
+    // allSettled, not all: the two lists are independent, and a slow pano query must not throw
+    // away a perfectly good requests result (which is the one driving the spinner)
+    const [panos, reqs] = await Promise.allSettled([loadPanos(), loadRequests()]);
+    if (panos.status === "rejected" && reqs.status === "rejected") throw reqs.reason;
+    if (panos.status === "rejected") console.warn("panoramas:", panos.reason);
+    if (reqs.status === "rejected") console.warn("requests:", reqs.reason);
     render();
-  } catch (e) { handleErr(e, quiet ? "" : "Refresh"); }
+  } catch (e) {
+    authLost = e instanceof AuthError;
+    if (quiet) console.warn("refresh:", e && e.message || e);   // don't toast every 10 s
+    else handleErr(e, "Refresh");
+    if (authLost) handleErr(e, "");                              // hands over to showAuth()
+  } finally {
+    if (!authLost) armPoll();
+  }
 }
 
 async function boot(){
