@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>360 Panoramas</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* WRI 360 Panoramas -- Field App panel (same-origin with the app shell, reads the ExB session).
+     Source of truth: C:\AppsScript\Initial Response Apps\pano-tiles\panel\index.html
+     Deployed copy:   ~\wri-field-app-work\panels\panos\index.html
+     Takes an equirectangular sphere off the SD card and turns it into a dot on the incident map
+     (worker: pano-tiles.yml). Brand tokens follow panels/orthos. */
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{--bg:#171919;--surface:#2a2c2c;--surface-alt:#3A3C3C;--accent:#EC2329;--text:#f0f0f0;--text-dim:#b8bcbc;--text-muted:#9a9e9e;
+    --border:#4a4d4d;--success:#22c55e;--warning:#f59e0b;--font:'Alexandria',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;--head:'Epilogue','Alexandria',system-ui,sans-serif}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;-webkit-touch-callout:none}
+  #app{height:100%;display:flex;flex-direction:column}
+  .view{flex:1;min-height:0;display:flex;flex-direction:column}
+  .view[hidden]{display:none}
+  .topbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--border);min-height:52px}
+  .topbar h1{font-size:16px;font-weight:700;flex:1;font-family:var(--head);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar .sub{display:block;font-size:12px;font-weight:400;color:var(--text-dim);font-family:var(--font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip{padding:8px 12px;border-radius:20px;font-size:13px;font-weight:600;background:var(--surface-alt);color:var(--text-dim);border:1px solid var(--border);cursor:pointer;font-family:var(--font);white-space:nowrap;touch-action:manipulation}
+  .chip:active{opacity:.8}
+  .scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 40px}
+  .card{padding:12px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+  .card .name{font-weight:600;font-size:15px;line-height:1.3}
+  .card .meta{font-size:12.5px;color:var(--text-dim);margin-top:2px}
+  .card .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .btn{padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-alt);color:#fff;font:600 14px var(--font);cursor:pointer;touch-action:manipulation}
+  .btn.primary{background:var(--accent);border-color:var(--accent)}
+  .btn.ghost{background:transparent;color:var(--text-dim)}
+  .btn.wide{width:100%;padding:14px}
+  .btn[disabled]{opacity:.45;cursor:default}
+  .btn:active:not([disabled]){opacity:.85}
+  .badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;background:var(--surface-alt);color:var(--text-dim);vertical-align:middle;margin-left:6px}
+  .badge.green{background:#1f4d2a;color:#9be7ad}.badge.amber{background:#4a3306;color:#fbd38d}.badge.red{background:#4b1a1c;color:#fca5a5}.badge.blue{background:#1e3a5f;color:#9ec5ff}
+  .group{margin:14px 0 6px;font:700 12px var(--head);letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted)}
+  .mapline{padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);font-size:13px;color:var(--text-dim)}
+  .mapline b{color:var(--text)}
+  .note{font-size:12.5px;color:var(--text-muted);margin:8px 2px;line-height:1.45}
+  .warn{font-size:12.5px;color:#fbd38d;background:#3a2c10;border:1px solid #6b5316;border-radius:8px;padding:8px 10px;margin:8px 0;line-height:1.4}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--text-muted);border-top-color:var(--text);border-radius:50%;animation:sp .9s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .auth{padding:24px 18px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;flex:1}
+  .auth p{color:var(--text-dim);max-width:420px;font-size:14px}
+  .diag{font-size:12px;color:var(--text-muted);max-width:440px;word-break:break-word}
+  label.fld{display:block;font-size:12px;color:var(--text-muted);margin:10px 2px 4px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+  input[type=text],textarea{width:100%;padding:11px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:400 15px var(--font)}
+  textarea{resize:vertical;min-height:54px}
+  .pick{border:1px dashed var(--border);border-radius:10px;padding:16px 12px;text-align:center;color:var(--text-dim);cursor:pointer}
+  .pick:active{opacity:.85}
+  .pick b{color:var(--text);display:block;font-size:15px;margin-bottom:2px}
+  .bar{height:8px;border-radius:4px;background:var(--surface-alt);overflow:hidden;margin-top:8px}
+  .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;border:1px solid var(--border);max-width:92vw;z-index:50}
+  #toast[hidden]{display:none}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}
+  #modal[hidden]{display:none}
+  .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:440px;width:100%}
+  .box h2{font:700 16px var(--head);margin-bottom:8px}.box p{color:var(--text-dim);font-size:14px;line-height:1.4}
+  .box .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  .err{color:#fca5a5;font-size:13px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar"><h1>360 Panoramas<span class="sub" id="subtitle">Spheres on the incident map</span></h1><button class="chip" id="btnReload">Refresh</button></div>
+  <div class="mapline" id="mapline">Finding the incident map…</div>
+
+  <section class="view" id="viewAuth" hidden>
+    <div class="auth">
+      <h2 style="font-family:var(--head)">Sign in needed</h2>
+      <p id="authEmbedded" hidden>Open the <b>Incident Map</b> tab and sign in to ArcGIS. This page picks the session up automatically.</p>
+      <p id="authStandalone" hidden>Sign in with your WRI ArcGIS account.</p>
+      <div style="display:flex;gap:8px"><button class="btn primary" id="btnSignIn">Sign in</button><button class="btn" id="btnAuthRetry">Check again</button></div>
+      <div class="err" id="authErr" hidden></div>
+      <div class="diag" id="authDiag"></div>
+    </div>
+  </section>
+
+  <section class="view" id="viewMain" hidden>
+    <div class="scroll">
+      <div class="card">
+        <div class="pick" id="pick">
+          <b id="pickTitle">Choose a 360 photo</b>
+          <span id="pickHint">Browse &rsaquo; the SD card. Pick the stitched sphere from <b>DCIM/DJI_001</b> — not DCIM/PANORAMA.</span>
+        </div>
+        <input type="file" id="file" accept="image/jpeg,.jpg,.jpeg,.JPG" hidden>
+
+        <div id="fileInfo" hidden>
+          <label class="fld" for="name">Name on the map</label>
+          <input type="text" id="name" maxlength="120" placeholder="(auto: Site N)">
+          <label class="fld" for="notes">Notes (optional)</label>
+          <textarea id="notes" maxlength="255" placeholder="Anything the ICP should know"></textarea>
+          <div class="warn" id="publicWarn">This sphere goes on the <b>public gateway map</b> as well as the ICP screens. Don't name it anything you wouldn't show outside the response.</div>
+          <div class="actions"><button class="btn primary wide" id="btnUpload">Add to the map</button></div>
+          <div class="bar" id="bar" hidden><i id="barFill"></i></div>
+          <div class="note" id="progress" hidden></div>
+        </div>
+      </div>
+
+      <div id="list"></div>
+    </div>
+  </section>
+
+  <div id="modal" hidden><div class="box"><h2 id="modalTitle"></h2><p id="modalText"></p>
+    <div class="actions"><button class="btn ghost" id="modalNo">Cancel</button><button class="btn primary" id="modalYes">Confirm</button></div></div></div>
+  <div id="toast" hidden></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+/* ============================================================ Config */
+const PORTAL      = "https://wrienviro.maps.arcgis.com";
+const ORG_ID      = "Ji79lWGR5B33LhY7";
+const OAUTH_CLIENT = "zXmBr5FFTyHWfh24";                      // the Field App's OAuth app (this Pages origin)
+const CALLBACK_URL = "https://whitewaterrescue.github.io/wri-respond/oauth-callback-201.html";
+const SESSION_KEY = "wri_panos_auth";
+// hosted layer WRI_Pano_Requests (create_requests_table.py) -- filled in by add_panos_page.py
+const REQUESTS_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Pano_Requests/FeatureServer/0";
+// wri-incident-admin GAS app: ?api=pano-dispatch starts the worker at once (else the 30-min cron)
+const DISPATCH_URL = "https://script.google.com/macros/s/AKfycbxfNt0qmV37WmLTsCxBsHj873kIZJWoYZQumbY40SBu5hMjkGcjr2WMoh1WPu5gZXVw/exec";
+// the ONE permanent incident pano service. The stable maps carry its PUBLIC view as layer id
+// wri_incident_panos; this panel reads the org source so it can list unpublished rows too.
+const PANO_LAYER_ID = "wri_incident_panos";
+const PANO_SOURCE_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRIIncident360Panoramas/FeatureServer/0";
+// which client owns each stable map (wri-incident-setup/clients.json); only used to stamp client_name
+const CLIENTS = {"5e30a96b8bcc4d6f981ce7b7435c61c0": "BNSF", "ecff87d286874a8d864c2a9935811ea6": "UP",
+                 "e6406c338b7c4e8598503d4e15cb9f62": "MT/WY Coop", "373f7625cfc74c87a8523fbaf7ad9691": "WRI"};
+
+// AGOL rejects a single attachment over ~10.5 MB (429 "Large attachment", then a bare HTML 413
+// past ~20 MB) and hosted services have no uploadId route, so the sphere goes up in slices.
+// Blob.slice touches no pixels -- which is mandatory, not just cheap: iOS caps a canvas at
+// 16.7 MP and these spheres are 72-104 MP, so the browser cannot decode one to resize it.
+const CHUNK = 8 * 1024 * 1024;
+const MAX_SPHERE = 120 * 1024 * 1024;       // sanity stop; real DJI spheres are 21-53 MB
+const POLL_MS = 10000, QUERY_TIMEOUT_MS = 30000, UPLOAD_TIMEOUT_MS = 15 * 60 * 1000;
+const params = new URLSearchParams(location.search);
+const EMBEDDED = window.top !== window;
+const $ = id => document.getElementById(id);
+const state = {username: "", badToken: null, retryAt: 0, mapId: null, mapTitle: "", mapData: null,
+               project: null, client: "", file: null, dims: null, fix: null, panos: [], requests: [],
+               timer: null, busy: false};
+
+/* ============================================================ UI helpers */
+function showView(id){ for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; }
+let toastT = null;
+function toastMsg(msg, ms=3200){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
+function confirmBox(title, text, yes="Confirm"){           // window.confirm() is a no-op inside the Field App iframe
+  return new Promise(res => {
+    $("modalTitle").textContent = title; $("modalText").textContent = text; $("modalYes").textContent = yes;
+    const m = $("modal"); m.hidden = false;
+    const done = v => { m.hidden = true; $("modalYes").onclick = $("modalNo").onclick = null; res(v); };
+    $("modalYes").onclick = () => done(true); $("modalNo").onclick = () => done(false);
+  });
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const mb = n => (n / 1048576).toFixed(1) + " MB";
+
+/* ============================================================ Auth ladder (annotator pattern) */
+class AuthError extends Error {}
+const diag = {record: "", verify: ""};
+function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = [diag.record, diag.verify].filter(Boolean).join(" "); }
+function readExbAuth(){
+  let raw = null, from = "localStorage";
+  try { raw = localStorage.getItem("exb_auth"); if (!raw) { raw = sessionStorage.getItem("exb_auth"); from = "sessionStorage"; } }
+  catch (e) { diag.record = "Storage is blocked in this frame: " + (e.message || e); return null; }
+  if (!raw) { diag.record = "No Field App session record in this frame yet."; return null; }
+  let a; try { a = JSON.parse(raw); } catch (e) { diag.record = "The session record is not readable."; return null; }
+  if (!a || !a.token) { diag.record = "The session record has no token."; return null; }
+  const exp = a.expires != null && a.expires !== "" ? new Date(a.expires).getTime() : NaN;
+  const who = a.email || a.username || "";
+  diag.record = `Session in ${from}: user ${who || "?"}, ${!isFinite(exp) ? "no expiry recorded" : exp > Date.now() ? "expires in " + Math.round((exp - Date.now())/60000) + " min" : "expired"}.`;
+  if (isFinite(exp) && exp - Date.now() < 2 * 60000) { diag.record += " Waiting for the app to refresh it."; return null; }
+  if (state.badToken && a.token === state.badToken) { diag.record += " ArcGIS rejected it; waiting for a refresh."; return null; }
+  return {token: a.token, username: who, source: "fieldapp"};
+}
+function readSession(){
+  try { const a = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
+    if (!a || !a.token || !(a.expiresAt - Date.now() > 60000)) return null;
+    if (state.badToken && a.token === state.badToken) return null;
+    return {token: a.token, username: a.username || "", source: "popup"}; } catch (e) { return null; }
+}
+function getAuth(){ return readExbAuth() || readSession(); }
+function dropAuth(token){ state.badToken = token || null; try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {} }
+function signIn(){
+  const url = PORTAL + "/sharing/rest/oauth2/authorize?client_id=" + encodeURIComponent(OAUTH_CLIENT) + "&response_type=token&expiration=720&redirect_uri=" + encodeURIComponent(CALLBACK_URL);
+  const w = window.open(url, "agolAuth", "width=480,height=640");     // synchronous: iOS blocks popups opened after an await
+  if (!w) { showAuthErr("Popup blocked. Allow popups for this site and try again."); return; }
+  $("authErr").hidden = true;
+}
+window.addEventListener("message", e => {
+  if (e.origin !== location.origin) return;
+  const d = e.data; if (!d || d.type !== "arcgis-auth") return;
+  if (d.error || !d.token) { showAuthErr("ArcGIS sign-in failed" + (d.error ? ": " + d.error : "")); return; }
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token: String(d.token), username: String(d.username || ""), expiresAt: Date.now() + (Number(d.expires_in) || 7200) * 1000})); } catch (x) {}
+  state.badToken = null; boot();
+});
+function showAuthErr(msg){ const el = $("authErr"); el.textContent = msg; el.hidden = false; }
+let authPoll = null;
+function showAuth(){
+  showView("viewAuth"); $("authEmbedded").hidden = !EMBEDDED; $("authStandalone").hidden = EMBEDDED;
+  clearInterval(authPoll); renderAuthDiag();
+  authPoll = setInterval(() => { const a = getAuth(); renderAuthDiag(); if (a && Date.now() >= (state.retryAt || 0)) { clearInterval(authPoll); boot(); } }, 2000);
+}
+window.addEventListener("storage", e => { if (e.key === "exb_auth" && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
+$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); } };
+$("btnSignIn").onclick = signIn;
+
+async function rest(url, fields, opts = {}){
+  const auth = getAuth(); if (!auth) throw new AuthError("Signed out");
+  const timeout = opts.timeout || QUERY_TIMEOUT_MS, label = opts.label || "request";
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), timeout);
+  try {
+    let body;
+    if (opts.body instanceof FormData) { body = opts.body; body.set("f", "json"); body.set("token", auth.token); }
+    else { body = new URLSearchParams(); for (const [k, v] of Object.entries(fields || {})) if (v != null) body.set(k, String(v)); body.set("f", "json"); body.set("token", auth.token); }
+    const r = await fetch(url, {method: "POST", body, signal: ac.signal});
+    let j; try { j = await r.json(); } catch (e) { throw new Error(label + ": HTTP " + r.status + " (not JSON)"); }
+    if (j && j.error) { const code = Number(j.error.code); if (code === 498 || code === 499) { dropAuth(auth.token); throw new AuthError(j.error.message || "Session expired"); } throw new Error(j.error.message || (label + " error " + code)); }
+    return j;
+  } catch (e) { if (e && e.name === "AbortError") throw new Error(label + " timed out"); throw e; } finally { clearTimeout(t); }
+}
+let verified = {token: null, username: ""};
+async function verifyAuth(){
+  const auth = getAuth(); if (!auth) throw new AuthError("Signed out");
+  if (verified.token === auth.token) { state.username = verified.username; return; }
+  diag.verify = "Checking the session with ArcGIS…"; renderAuthDiag();
+  const j = await rest(PORTAL + "/sharing/rest/portals/self", {}, {label: "session check"});
+  const u = j && j.user;
+  if (!u || !u.username) { dropAuth(auth.token); diag.verify = "ArcGIS did not recognise the session."; renderAuthDiag(); throw new AuthError("no user"); }
+  const org = u.orgId || j.id;       // orgId, never urlKey (a JS-API sign-in reads 'www')
+  if (org && org !== ORG_ID) { dropAuth(auth.token); diag.verify = `Signed in as ${u.username}, but not in the WRI organisation.`; renderAuthDiag(); throw new AuthError("wrong org"); }
+  verified = {token: auth.token, username: u.username}; state.username = u.username; diag.verify = "";
+}
+function handleErr(e, where){
+  if (e instanceof AuthError) { toastMsg("Signed out of ArcGIS. Sign in again."); showAuth(); return; }
+  console.error(where, e); toastMsg((where ? where + ": " : "") + (e && e.message || e), 5000);
+}
+
+/* ============================================================ The incident map */
+function walk(layers, out=[]){ for (const l of layers || []) { out.push(l); if (l.layerType === "GroupLayer") walk(l.layers, out); } return out; }
+
+async function currentMap(){
+  // the Field App's own served config knows which incident map is active (same origin; cdn/** is cache-first in the SW -> bust it)
+  try {
+    const idx = await (await fetch("../../index.html?ts=" + Date.now(), {cache: "no-store"})).text();
+    const m = idx.match(/base href="\.\/cdn\/(\d+)\/"/); if (!m) throw new Error("no cdn base");
+    const cfg = await (await fetch(`../../cdn/${m[1]}/config.json?ts=` + Date.now(), {cache: "no-store"})).json();
+    const ds = cfg.dataSources && cfg.dataSources.dataSource_1;
+    state.mapId = params.get("map") || (ds && ds.itemId) || null;
+    state.mapTitle = (ds && ds.sourceLabel) || "";
+  } catch (e) { state.mapId = params.get("map") || null; }
+  if (!state.mapId) { $("mapline").innerHTML = '<span class="err">Could not find the incident map id.</span>'; return; }
+  const item = await rest(PORTAL + "/sharing/rest/content/items/" + state.mapId, {}, {label: "map item"});
+  state.mapTitle = item.title || state.mapTitle;
+  state.mapData = await rest(PORTAL + "/sharing/rest/content/items/" + state.mapId + "/data", {}, {label: "map data"});
+  state.client = CLIENTS[state.mapId] || "";
+
+  // The project comes from the pano layer's OWN filter on this map, never from a guess: that is
+  // exactly what the map, the viewers and the gateway are showing right now, so a sphere written
+  // with it is guaranteed to be visible (and one written with anything else silently would not be).
+  const layer = walk(state.mapData && state.mapData.operationalLayers).find(l => l.id === PANO_LAYER_ID);
+  const de = layer && ((layer.layerDefinition || {}).definitionExpression || "");
+  const m = /project_name\s*=\s*'([^']+)'/i.exec(de || "");
+  state.project = m ? m[1] : null;
+
+  if (!layer) {
+    $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> — this map has never carried the 360 layer. ` +
+      `Run <code>incident_panos.py webmap</code> once for this client, then reload.`;
+  } else if (!state.project) {
+    $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> — the 360 layer has no project filter, so a new sphere ` +
+      `could not be scoped. Re-run the incident activation.`;
+  } else {
+    $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> · project <b>${esc(state.project)}</b>` +
+      (state.client ? ` · ${esc(state.client)}` : "");
+  }
+}
+
+/* ============================================================ Data */
+async function loadPanos(){
+  if (!state.project) { state.panos = []; return; }
+  const j = await rest(PANO_SOURCE_URL + "/query", {
+    where: `project_name='${state.project.replace(/'/g, "''")}'`,
+    outFields: "OBJECTID,pano_name,site_label,captured_date,pano_url,source_device",
+    returnGeometry: "false", orderByFields: "captured_date DESC"}, {label: "panoramas"});
+  state.panos = (j.features || []).map(f => f.attributes);
+}
+async function loadRequests(){
+  const j = await rest(REQUESTS_URL + "/query", {
+    where: `project='${(state.project || "").replace(/'/g, "''")}' AND status IN ('queued','processing','failed','held')`,
+    outFields: "OBJECTID,GlobalID,pano_name,mode,status,message,attempts,requested_at,requested_by",
+    returnGeometry: "false", orderByFields: "requested_at DESC"}, {label: "requests"});
+  state.requests = (j.features || []).map(f => f.attributes);
+}
+
+/* ============================================================ Live map sync */
+let lastSync = "";
+function syncLiveMap(){
+  // Appending a feature does NOT bump the web map's `modified` stamp, so wri-map-guard's ortho
+  // poll would never notice a new sphere. This nudge refreshes the layer on the open MapView.
+  if (!EMBEDDED || !state.mapId) return;
+  const key = state.mapId + "|" + state.panos.length;
+  if (key === lastSync) return;
+  lastSync = key;
+  try { window.top.postMessage({type: "wri-pano-sync", mapId: state.mapId, layerId: PANO_LAYER_ID,
+                                count: state.panos.length}, location.origin); }
+  catch (e) { console.warn("live sync", e); }
+}
+
+/* ============================================================ Picking a file */
+function jpegSize(buf){
+  /* Read w/h straight out of the JPEG SOF marker. We must NOT decode: iOS caps a canvas at
+     16.7 MP and these spheres are 72-104 MP, so `new Image()`/createImageBitmap would fail or
+     blow the tab up. DJI buries a ~3 MB XMP packet before SOF, hence the generous slice. */
+  const dv = new DataView(buf);
+  if (dv.byteLength < 4 || dv.getUint16(0) !== 0xFFD8) return null;
+  let off = 2;
+  while (off + 9 < dv.byteLength) {
+    if (dv.getUint8(off) !== 0xFF) { off++; continue; }
+    const marker = dv.getUint8(off + 1);
+    if (marker === 0xD8 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)) { off += 2; continue; }
+    if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+      return {h: dv.getUint16(off + 5), w: dv.getUint16(off + 7)};
+    }
+    const len = dv.getUint16(off + 2);
+    if (len < 2) return null;
+    off += 2 + len;
+  }
+  return null;
+}
+
+async function pickFile(f){
+  state.file = null; state.dims = null;
+  $("fileInfo").hidden = true;
+  if (!f) return;
+  if (f.size > MAX_SPHERE) { toastMsg(`${mb(f.size)} is too big to be a sphere — pick the stitched JPEG.`, 6000); return; }
+  let dims = null;
+  try { dims = jpegSize(await f.slice(0, 6 * 1024 * 1024).arrayBuffer()); } catch (e) { /* worker re-checks */ }
+  const ratio = dims ? dims.w / dims.h : null;
+  if (dims && Math.abs(ratio - 2) > 0.06) {
+    const go = await confirmBox("That doesn't look like a 360",
+      `It is ${dims.w}×${dims.h} (ratio ${ratio.toFixed(2)}), not the 2:1 a sphere has. DJI writes the ` +
+      `stitched sphere to DCIM/DJI_001; DCIM/PANORAMA holds the raw frames. Upload it anyway?`, "Upload anyway");
+    if (!go) return;
+  }
+  state.file = f; state.dims = dims;
+  const parts = Math.ceil(f.size / CHUNK);
+  $("pickTitle").textContent = f.name;
+  $("pickHint").innerHTML = `${mb(f.size)}${dims ? ` · ${dims.w}×${dims.h}` : ""} · uploads in ${parts} part${parts === 1 ? "" : "s"}`;
+  $("fileInfo").hidden = false;
+  $("name").value = "";
+  navigator.geolocation && navigator.geolocation.getCurrentPosition(
+    p => { state.fix = {lat: p.coords.latitude, lon: p.coords.longitude}; },
+    () => {}, {enableHighAccuracy: true, timeout: 8000, maximumAge: 60000});
+}
+$("pick").onclick = () => $("file").click();
+$("file").onchange = e => { pickFile(e.target.files && e.target.files[0]); e.target.value = ""; };
+
+/* ============================================================ Upload */
+function setProgress(done, total, label){
+  $("bar").hidden = false; $("progress").hidden = false;
+  $("barFill").style.width = Math.round(100 * done / total) + "%";
+  $("progress").textContent = label;
+}
+
+async function upload(){
+  if (state.busy) return;
+  if (!state.file) { toastMsg("Pick a 360 photo first."); return; }
+  if (!state.project) { toastMsg("No project on this map — a sphere could not be scoped."); return; }
+  const f = state.file, parts = Math.ceil(f.size / CHUNK);
+  const name = ($("name").value || "").trim();
+  const ok = await confirmBox("Add this sphere?",
+    `${f.name} (${mb(f.size)}) goes onto the ${state.project} map and the public gateway. ` +
+    `Uploading takes a few minutes on cell signal; it is live a few minutes after that.`, "Add to the map");
+  if (!ok) return;
+
+  state.busy = true; $("btnUpload").disabled = true;
+  let oid = null;
+  try {
+    await verifyAuth();
+    const attrs = {pano_name: name, project: state.project, client: state.client, mode: "add",
+                   notes: ($("notes").value || "").trim() || null,
+                   target_map_id: state.mapId, file_name: f.name, file_size: f.size, parts,
+                   requested_by: state.username, requested_at: Date.now(),
+                   status: "queued", message: null, attempts: 0,
+                   phone_lat: state.fix ? state.fix.lat : null, phone_lon: state.fix ? state.fix.lon : null};
+    const geom = state.fix ? {x: state.fix.lon, y: state.fix.lat, spatialReference: {wkid: 4326}} : null;
+    setProgress(0, parts + 2, "Queueing…");
+    const j = await rest(REQUESTS_URL + "/addFeatures",
+      {features: JSON.stringify([geom ? {attributes: attrs, geometry: geom} : {attributes: attrs}])},
+      {label: "queue"});
+    const res = j.addResults && j.addResults[0];
+    if (!res || !res.success) throw new Error("could not queue the request: " + JSON.stringify(j).slice(0, 200));
+    oid = res.objectId;
+    // read the GlobalID back -- AGOL returns success:true for writes it dropped
+    const back = await rest(REQUESTS_URL + "/query", {where: "OBJECTID=" + oid, outFields: "GlobalID", returnGeometry: "false"}, {label: "queue read-back"});
+    const gid = back.features && back.features[0] && back.features[0].attributes.GlobalID;
+    if (!gid) throw new Error("the request did not stick (read back empty)");
+
+    for (let i = 0; i < parts; i++) {
+      setProgress(i + 1, parts + 2, `Uploading part ${i + 1} of ${parts}…  (${mb(Math.min((i + 1) * CHUNK, f.size))} of ${mb(f.size)})`);
+      const fd = new FormData();
+      // every slice is named .jpg with an image type: AGOL validates the attachment on
+      // extension/MIME (it never decodes the bytes) and 400s anything else
+      fd.append("attachment", f.slice(i * CHUNK, (i + 1) * CHUNK), `sphere_p${String(i + 1).padStart(2, "0")}.jpg`);
+      fd.append("keywords", `pano,part:${i + 1}/${parts}`);
+      const r = await rest(`${REQUESTS_URL}/${oid}/addAttachment`, null,
+                           {body: fd, timeout: UPLOAD_TIMEOUT_MS, label: `part ${i + 1}`});
+      const ar = r.addAttachmentResult || {};
+      if (!ar.success) throw new Error(`part ${i + 1} rejected: ` + JSON.stringify(r).slice(0, 160));
+    }
+
+    // confirm every part is really there before starting the worker
+    setProgress(parts + 1, parts + 2, "Checking the upload…");
+    const chk = await rest(`${REQUESTS_URL}/${oid}/attachments`, {}, {label: "attachment check"});
+    const landed = (chk.attachmentInfos || []).filter(a => (a.keywords || "").includes("part:"));
+    const bytes = landed.reduce((n, a) => n + (Number(a.size) || 0), 0);
+    if (landed.length !== parts || bytes !== f.size)
+      throw new Error(`only ${landed.length}/${parts} parts (${mb(bytes)} of ${mb(f.size)}) reached ArcGIS — retry from better signal`);
+
+    setProgress(parts + 2, parts + 2, "Starting the worker…");
+    try {
+      // text/plain body = a CORS simple request, so GAS never has to answer a preflight (it cannot)
+      const d = await (await fetch(DISPATCH_URL, {method: "POST",
+        body: JSON.stringify({api: "pano-dispatch", token: getAuth().token, request_id: gid})})).json();
+      toastMsg(d && d.ok ? "Uploaded. On the map in about 3 minutes."
+                         : "Uploaded; the worker runs on its 30-minute cycle (" + ((d && d.error) || "dispatch unavailable") + ")", 6000);
+    } catch (e) { toastMsg("Uploaded; the worker runs on its 30-minute cycle.", 5000); }
+
+    state.file = null; $("fileInfo").hidden = true; $("pickTitle").textContent = "Choose a 360 photo";
+    $("pickHint").innerHTML = "Browse &rsaquo; the SD card. Pick the stitched sphere from <b>DCIM/DJI_001</b> — not DCIM/PANORAMA.";
+  } catch (e) {
+    handleErr(e, "Upload");
+    // a half-uploaded row would be picked up by the cron and held -- clear it instead
+    if (oid != null) { try { await rest(REQUESTS_URL + "/deleteFeatures", {objectIds: oid}, {label: "cleanup"}); } catch (x) {} }
+  } finally {
+    state.busy = false; $("btnUpload").disabled = false;
+    $("bar").hidden = true; $("progress").hidden = true; $("barFill").style.width = "0";
+    await refresh(true);
+  }
+}
+$("btnUpload").onclick = upload;
+
+/* ============================================================ Remove */
+async function removePano(oid){
+  const p = state.panos.find(x => x.OBJECTID === oid); if (!p) return;
+  const ok = await confirmBox("Remove this sphere?",
+    `"${p.pano_name}" comes off the incident map, the viewers and the public gateway, and its tiles are deleted. This cannot be undone.`, "Remove");
+  if (!ok) return;
+  try {
+    await verifyAuth();
+    const attrs = {pano_name: p.pano_name, project: state.project, client: state.client, mode: "delete",
+                   target_pano_url: p.pano_url, target_map_id: state.mapId,
+                   requested_by: state.username, requested_at: Date.now(), status: "queued", attempts: 0};
+    const j = await rest(REQUESTS_URL + "/addFeatures", {features: JSON.stringify([{attributes: attrs}])}, {label: "queue"});
+    const res = j.addResults && j.addResults[0];
+    if (!res || !res.success) throw new Error("could not queue the removal");
+    const back = await rest(REQUESTS_URL + "/query", {where: "OBJECTID=" + res.objectId, outFields: "GlobalID", returnGeometry: "false"}, {label: "read-back"});
+    const gid = back.features && back.features[0] && back.features[0].attributes.GlobalID;
+    try {
+      await fetch(DISPATCH_URL, {method: "POST", body: JSON.stringify({api: "pano-dispatch", token: getAuth().token, request_id: gid})});
+    } catch (e) {}
+    toastMsg("Removing…");
+  } catch (e) { handleErr(e, "Remove"); }
+  await refresh(true);
+}
+
+/* ============================================================ Render */
+function render(){
+  const el = $("list");
+  const rows = [];
+
+  if (state.requests.length) {
+    rows.push('<div class="group">In progress</div>');
+    for (const r of state.requests) {
+      const badge = r.status === "held" ? '<span class="badge red">Needs Cody</span>'
+                  : r.status === "failed" ? '<span class="badge red">Retrying</span>'
+                  : `<span class="badge amber"><span class="spin"></span>${r.status === "queued" ? "Queued" : "Processing"}</span>`;
+      rows.push(`<div class="card"><div class="name">${esc(r.pano_name || "(unnamed)")}${badge}</div>
+        <div class="meta">${esc(r.mode === "delete" ? "removing" : "adding")}${r.requested_by ? " · " + esc(r.requested_by) : ""}${r.attempts > 1 ? " · attempt " + r.attempts : ""}</div>
+        ${r.message ? `<div class="meta">${esc(r.message)}</div>` : ""}</div>`);
+    }
+  }
+
+  rows.push(`<div class="group">On the map${state.project ? " — " + esc(state.project) : ""}</div>`);
+  if (!state.panos.length) {
+    rows.push('<div class="note">No 360s on this incident yet.</div>');
+  } else {
+    for (const p of state.panos) {
+      rows.push(`<div class="card">
+        <div class="name">${esc(p.pano_name)}</div>
+        <div class="meta">${esc(p.site_label || "")}${p.captured_date ? " · " + esc(p.captured_date) : ""}</div>
+        <div class="actions">
+          <button class="btn" data-open="${esc(p.pano_url)}">Open</button>
+          <button class="btn ghost" data-remove="${p.OBJECTID}">Remove</button>
+        </div></div>`);
+    }
+  }
+  rows.push('<div class="note">Spheres appear on the ICP screens, the client viewer and the public gateway within a couple of minutes — no reload needed.</div>');
+  el.innerHTML = rows.join("");
+  el.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => removePano(Number(b.dataset.remove)));
+  el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => window.open(b.dataset.open, "_blank", "noopener"));
+
+  clearTimeout(state.timer);
+  if (state.requests.length) state.timer = setTimeout(() => refresh(true), POLL_MS);
+  syncLiveMap();
+}
+
+/* ============================================================ Boot */
+async function refresh(quiet){
+  try {
+    await verifyAuth();
+    if (!quiet) await currentMap();
+    await Promise.all([loadPanos(), loadRequests()]);
+    render();
+  } catch (e) { handleErr(e, quiet ? "" : "Refresh"); }
+}
+
+async function boot(){
+  clearInterval(authPoll);
+  if (!getAuth()) { showAuth(); return; }
+  try {
+    await verifyAuth();
+  } catch (e) { showAuth(); return; }
+  showView("viewMain");
+  $("subtitle").textContent = state.username ? "Signed in as " + state.username : "Spheres on the incident map";
+  try { await currentMap(); } catch (e) { handleErr(e, "Map"); }
+  if (!REQUESTS_URL || REQUESTS_URL.startsWith("__")) {
+    $("mapline").innerHTML = '<span class="err">The requests layer is not configured in this build.</span>';
+  }
+  await refresh(true);
+}
+$("btnReload").onclick = () => refresh(false);
+boot();
+})();
+</script>
+</body>
+</html>
