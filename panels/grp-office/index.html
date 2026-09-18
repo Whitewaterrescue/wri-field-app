@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GRP Office</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* WRI GRP Office -- Field App panel (same-origin with the app shell, reads the ExB session).
+     Source of truth: C:\AppsScript\grp-universal\office-panel\index.html
+     Deployed copy:   ~\wri-field-app-work\panels\grp-office\index.html
+     Sends a captured GRP site to the office worker (GitHub Actions, grp-office.yml), picks the WRI
+     staff who get the finished sheet by email (roster only -- no free-text address, D28), shows
+     the request's progress and opens the sheet. Brand tokens follow panels/orthos. */
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{--bg:#171919;--surface:#2a2c2c;--surface-alt:#3A3C3C;--accent:#EC2329;--text:#f0f0f0;--text-dim:#b8bcbc;--text-muted:#9a9e9e;
+    --border:#4a4d4d;--success:#22c55e;--warning:#f59e0b;--font:'Alexandria',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;--head:'Epilogue','Alexandria',system-ui,sans-serif}
+  html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;-webkit-touch-callout:none}
+  #app{height:100%;display:flex;flex-direction:column}
+  .view{flex:1;min-height:0;display:flex;flex-direction:column}
+  .view[hidden]{display:none}
+  .topbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--bg);border-bottom:1px solid var(--border);min-height:52px}
+  .topbar h1{font-size:16px;font-weight:700;flex:1;font-family:var(--head);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .topbar .sub{display:block;font-size:12px;font-weight:400;color:var(--text-dim);font-family:var(--font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip{padding:8px 12px;border-radius:20px;font-size:13px;font-weight:600;background:var(--surface-alt);color:var(--text-dim);border:1px solid var(--border);cursor:pointer;font-family:var(--font);white-space:nowrap;touch-action:manipulation}
+  .chip:active{opacity:.8}
+  .filters{display:flex;gap:6px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--surface)}
+  .filters .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+  .scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px 40px}
+  .card{padding:12px;margin-bottom:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+  .card .name{font-weight:600;font-size:15px;line-height:1.3}
+  .card .meta{font-size:12.5px;color:var(--text-dim);margin-top:2px}
+  .card .actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .btn{padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-alt);color:#fff;font:600 14px var(--font);cursor:pointer;touch-action:manipulation;text-decoration:none;display:inline-block}
+  .btn.primary{background:var(--accent);border-color:var(--accent)}
+  .btn.ghost{background:transparent;color:var(--text-dim)}
+  .btn[disabled]{opacity:.45;cursor:default}
+  .btn:active:not([disabled]){opacity:.85}
+  .badge{display:inline-block;padding:2px 7px;border-radius:6px;font-size:11px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;background:var(--surface-alt);color:var(--text-dim);vertical-align:middle;margin-left:6px}
+  .badge.green{background:#1f4d2a;color:#9be7ad}.badge.amber{background:#4a3306;color:#fbd38d}.badge.red{background:#4b1a1c;color:#fca5a5}.badge.blue{background:#1e3a5f;color:#9ec5ff}
+  .note{font-size:12.5px;color:var(--text-muted);margin:8px 2px}
+  .recips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+  .recips span{background:#1e3a5f;color:#9ec5ff;border-radius:10px;padding:1px 8px;font-size:11.5px}
+  .spin{display:inline-block;width:12px;height:12px;border:2px solid var(--text-muted);border-top-color:var(--text);border-radius:50%;animation:sp .9s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .auth{padding:24px 18px;text-align:center;display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;flex:1}
+  .auth p{color:var(--text-dim);max-width:420px;font-size:14px}
+  .diag{font-size:12px;color:var(--text-muted);max-width:440px;word-break:break-word}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;border:1px solid var(--border);max-width:92vw;z-index:50}
+  #toast[hidden]{display:none}
+  #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}
+  #modal[hidden]{display:none}
+  .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:460px;width:100%;max-height:92vh;display:flex;flex-direction:column}
+  .box h2{font:700 16px var(--head);margin-bottom:6px}.box p{color:var(--text-dim);font-size:14px;line-height:1.4}
+  .box .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  .err{color:#fca5a5;font-size:13px}
+  /* roster picker (JSA generator pattern, dark) */
+  .search{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font:14px var(--font);margin:10px 0 6px}
+  .roster{flex:1;min-height:0;overflow-y:auto;border:1px solid var(--border);border-radius:8px;max-height:44vh}
+  .recip-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:14.5px}
+  .recip-row:last-child{border-bottom:0}
+  .recip-row input{width:20px;height:20px;accent-color:var(--accent)}
+  .recip-row small{color:var(--text-muted);font-size:12px;margin-left:auto}
+  .count{font-size:12.5px;color:var(--text-dim);margin-top:6px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar"><h1>GRP Office<span class="sub" id="subtitle">Strategy sheets: send, track, share</span></h1><button class="chip" id="btnReload">Refresh</button></div>
+  <div class="filters" id="filters">
+    <button class="chip on" data-f="active">Active</button>
+    <button class="chip" data-f="mine">Mine</button>
+    <button class="chip" data-f="recent">Recent captures</button>
+    <button class="chip" data-f="done">Sheets ready</button>
+  </div>
+
+  <section class="view" id="viewAuth" hidden>
+    <div class="auth">
+      <h2 style="font-family:var(--head)">Sign in needed</h2>
+      <p id="authEmbedded" hidden>Open the <b>Incident Map</b> tab and sign in to ArcGIS. This page picks the session up automatically.</p>
+      <p id="authStandalone" hidden>Sign in with your WRI ArcGIS account.</p>
+      <div style="display:flex;gap:8px"><button class="btn primary" id="btnSignIn">Sign in</button><button class="btn" id="btnAuthRetry">Check again</button></div>
+      <div class="err" id="authErr" hidden></div>
+      <div class="diag" id="authDiag"></div>
+    </div>
+  </section>
+
+  <section class="view" id="viewList" hidden>
+    <div class="scroll" id="list"></div>
+  </section>
+
+  <div id="modal" hidden><div class="box">
+    <h2 id="modalTitle"></h2><p id="modalText"></p>
+    <div id="pickerWrap" hidden>
+      <input class="search" id="recipientSearch" placeholder="Search WRI staff…" autocomplete="off">
+      <div class="roster" id="roster"></div>
+      <div class="count" id="recipientCount">0 selected</div>
+    </div>
+    <div class="actions"><button class="btn ghost" id="modalNo">Cancel</button><button class="btn primary" id="modalYes">Confirm</button></div>
+  </div></div>
+  <div id="toast" hidden></div>
+</div>
+
+<script>
+(() => {
+"use strict";
+/* ============================================================ Config */
+const PORTAL      = "https://wrienviro.maps.arcgis.com";
+const ORG_ID      = "Ji79lWGR5B33LhY7";
+const OAUTH_CLIENT = "zXmBr5FFTyHWfh24";                      // the Field App's OAuth app (this Pages origin)
+const CALLBACK_URL = "https://whitewaterrescue.github.io/wri-respond/oauth-callback-201.html";
+const SESSION_KEY = "wri_grpoffice_auth";
+// Strategy_Sites of WRI_GRP_Universal_DEV -- filled in by add_grp_office_page.py (PROD cutover repoints it)
+const SITES_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_GRP_Universal_DEV/FeatureServer/0";
+// wri-incident-admin GAS app: ?api=grp-dispatch starts the worker now; ?api=grp-roster = WRI staff emails
+const DISPATCH_URL = "https://script.google.com/macros/s/AKfycbxfNt0qmV37WmLTsCxBsHj873kIZJWoYZQumbY40SBu5hMjkGcjr2WMoh1WPu5gZXVw/exec";
+const POLL_MS = 10000, QUERY_TIMEOUT_MS = 30000, RECENT_DAYS = 14, CAPTURE_DAYS = 7;
+const OUT_FIELDS = "OBJECTID,GlobalID,site_name,site_code,assigned_grp,office_action,details_complete,sheet_status,sheet_note,sheet_url,sheet_updated,sheet_attempts,notify_emails,requested_by_email,notified_at,Creator,CreationDate,Editor,EditDate";
+const params = new URLSearchParams(location.search);
+const EMBEDDED = window.top !== window;
+const $ = id => document.getElementById(id);
+const state = {username: "", email: "", badToken: null, retryAt: 0, sites: [], attachments: {}, roster: null, filter: "active", timer: null, busy: new Set(), focusOid: Number(params.get("oid")) || null};
+
+/* ============================================================ UI helpers */
+function showView(id){ for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; }
+let toastT = null;
+function toastMsg(msg, ms=3200){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function fmtWhen(ms){ if (!ms) return ""; const d = new Date(ms); return d.toLocaleDateString(undefined, {month: "short", day: "numeric"}) + " " + d.toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}); }
+
+/* ============================================================ Auth ladder (annotator / orthos pattern) */
+class AuthError extends Error {}
+const diag = {record: "", verify: ""};
+function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = [diag.record, diag.verify].filter(Boolean).join(" "); }
+function readExbAuth(){
+  let raw = null, from = "localStorage";
+  try { raw = localStorage.getItem("exb_auth"); if (!raw) { raw = sessionStorage.getItem("exb_auth"); from = "sessionStorage"; } }
+  catch (e) { diag.record = "Storage is blocked in this frame: " + (e.message || e); return null; }
+  if (!raw) { diag.record = "No Field App session record in this frame yet."; return null; }
+  let a; try { a = JSON.parse(raw); } catch (e) { diag.record = "The session record is not readable."; return null; }
+  if (!a || !a.token) { diag.record = "The session record has no token."; return null; }
+  const exp = a.expires != null && a.expires !== "" ? new Date(a.expires).getTime() : NaN;
+  const who = a.email || a.username || "";
+  diag.record = `Session in ${from}: user ${who || "?"}, ${!isFinite(exp) ? "no expiry recorded" : exp > Date.now() ? "expires in " + Math.round((exp - Date.now())/60000) + " min" : "expired"}.`;
+  if (isFinite(exp) && exp - Date.now() < 2 * 60000) { diag.record += " Waiting for the app to refresh it."; return null; }
+  if (state.badToken && a.token === state.badToken) { diag.record += " ArcGIS rejected it; waiting for a refresh."; return null; }
+  return {token: a.token, username: who, source: "fieldapp"};
+}
+function readSession(){
+  try { const a = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
+    if (!a || !a.token || !(a.expiresAt - Date.now() > 60000)) return null;
+    if (state.badToken && a.token === state.badToken) return null;
+    return {token: a.token, username: a.username || "", source: "popup"}; } catch (e) { return null; }
+}
+function getAuth(){ return readExbAuth() || readSession(); }
+function dropAuth(token){ state.badToken = token || null; try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {} }
+function signIn(){
+  const url = PORTAL + "/sharing/rest/oauth2/authorize?client_id=" + encodeURIComponent(OAUTH_CLIENT) + "&response_type=token&expiration=720&redirect_uri=" + encodeURIComponent(CALLBACK_URL);
+  const w = window.open(url, "agolAuth", "width=480,height=640");     // synchronous: iOS blocks popups opened after an await
+  if (!w) { showAuthErr("Popup blocked. Allow popups for this site and try again."); return; }
+  $("authErr").hidden = true;
+}
+window.addEventListener("message", e => {
+  if (e.origin !== location.origin) return;
+  const d = e.data; if (!d || d.type !== "arcgis-auth") return;
+  if (d.error || !d.token) { showAuthErr("ArcGIS sign-in failed" + (d.error ? ": " + d.error : "")); return; }
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token: String(d.token), username: String(d.username || ""), expiresAt: Date.now() + (Number(d.expires_in) || 7200) * 1000})); } catch (x) {}
+  state.badToken = null; boot();
+});
+function showAuthErr(msg){ const el = $("authErr"); el.textContent = msg; el.hidden = false; }
+let authPoll = null;
+function showAuth(){
+  showView("viewAuth"); $("authEmbedded").hidden = !EMBEDDED; $("authStandalone").hidden = EMBEDDED;
+  clearInterval(authPoll); renderAuthDiag();
+  authPoll = setInterval(() => { const a = getAuth(); renderAuthDiag(); if (a && Date.now() >= (state.retryAt || 0)) { clearInterval(authPoll); boot(); } }, 2000);
+}
+window.addEventListener("storage", e => { if (e.key === "exb_auth" && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
+document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
+$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); } };
+$("btnSignIn").onclick = signIn;
+
+async function rest(url, fields, opts = {}){
+  const auth = getAuth(); if (!auth) throw new AuthError("Signed out");
+  const timeout = opts.timeout || QUERY_TIMEOUT_MS, label = opts.label || "request";
+  const ac = new AbortController(); const t = setTimeout(() => ac.abort(), timeout);
+  try {
+    const p = new URLSearchParams(); for (const [k, v] of Object.entries(fields || {})) if (v != null) p.set(k, String(v));
+    p.set("f", "json"); p.set("token", auth.token);
+    const r = await fetch(url, {method: "POST", body: p, signal: ac.signal});
+    let j; try { j = await r.json(); } catch (e) { throw new Error(label + ": HTTP " + r.status + " (not JSON)"); }
+    if (j && j.error) { const code = Number(j.error.code); if (code === 498 || code === 499) { dropAuth(auth.token); throw new AuthError(j.error.message || "Session expired"); } throw new Error(j.error.message || (label + " error " + code)); }
+    return j;
+  } catch (e) { if (e && e.name === "AbortError") throw new Error(label + " timed out"); throw e; } finally { clearTimeout(t); }
+}
+let verified = {token: null, username: ""};
+async function verifyAuth(){
+  const auth = getAuth(); if (!auth) throw new AuthError("Signed out");
+  if (verified.token === auth.token) { state.username = verified.username; return; }
+  diag.verify = "Checking the session with ArcGIS…"; renderAuthDiag();
+  const j = await rest(PORTAL + "/sharing/rest/portals/self", {}, {label: "session check"});
+  const u = j && j.user;
+  if (!u || !u.username) { dropAuth(auth.token); diag.verify = "ArcGIS did not recognise the session."; renderAuthDiag(); throw new AuthError("no user"); }
+  const org = u.orgId || j.id;       // orgId, never urlKey (a JS-API sign-in reads 'www')
+  if (org && org !== ORG_ID) { dropAuth(auth.token); diag.verify = `Signed in as ${u.username}, but not in the WRI organisation.`; renderAuthDiag(); throw new AuthError("wrong org"); }
+  verified = {token: auth.token, username: u.username}; state.username = u.username; state.email = (u.email || "").toLowerCase(); diag.verify = "";
+}
+function handleErr(e, where){
+  if (e instanceof AuthError) { toastMsg("Signed out of ArcGIS. Sign in again."); showAuth(); return; }
+  console.error(where, e); toastMsg((where ? where + ": " : "") + (e && e.message || e), 5000);
+}
+async function adminApi(body){            // text/plain-ish body = no CORS preflight against the GAS /exec
+  const auth = getAuth(); if (!auth) throw new AuthError("Signed out");
+  const r = await fetch(DISPATCH_URL, {method: "POST", body: JSON.stringify(Object.assign({token: auth.token}, body))});
+  return r.json();
+}
+
+/* ============================================================ Data */
+function sqlTs(ms){ return "timestamp '" + new Date(ms).toISOString().slice(0, 19).replace("T", " ") + "'"; }
+async function loadSites(){
+  if (!SITES_URL || SITES_URL.startsWith("__")) throw new Error("the sites layer is not configured yet");
+  const now = Date.now();
+  const where = `office_action IS NOT NULL OR sheet_status IN ('rendering','held','failed') ` +
+    `OR (sheet_status IN ('rendered','published') AND sheet_updated > ${sqlTs(now - RECENT_DAYS * 86400000)}) ` +
+    `OR (sheet_status IS NULL AND EditDate > ${sqlTs(now - CAPTURE_DAYS * 86400000)})` +
+    (state.focusOid ? ` OR OBJECTID = ${state.focusOid}` : "");
+  const j = await rest(SITES_URL + "/query", {where, outFields: OUT_FIELDS, returnGeometry: "false", orderByFields: "EditDate DESC", resultRecordCount: 200}, {label: "sites"});
+  state.sites = (j.features || []).map(f => f.attributes);
+}
+async function loadAttachments(){
+  const oids = state.sites.filter(s => /^(rendered|published)$/.test(s.sheet_status || "")).map(s => s.OBJECTID);
+  state.attachments = {};
+  if (!oids.length) return;
+  try {
+    const j = await rest(SITES_URL + "/queryAttachments", {objectIds: oids.join(","), returnUrl: "true"}, {label: "attachments", timeout: 20000});
+    for (const g of j.attachmentGroups || []) {
+      const sheets = (g.attachmentInfos || []).filter(a => /_strategy\.pdf$/i.test(a.name || ""));
+      if (sheets.length) { const a = sheets.sort((x, y) => y.id - x.id)[0]; state.attachments[g.parentObjectId] = {id: a.id, name: a.name, size: a.size}; }
+    }
+  } catch (e) { console.warn("attachments", e); }
+}
+async function loadRoster(){
+  if (state.roster) return state.roster;
+  const j = await adminApi({api: "grp-roster"});
+  if (!j || !j.ok) throw new Error(j && j.error || "roster unavailable");
+  state.roster = j.employees || [];
+  if (j.email && !state.email) state.email = String(j.email).toLowerCase();
+  return state.roster;
+}
+
+/* ============================================================ Render */
+function stateOf(s){
+  const st = s.sheet_status, act = s.office_action;
+  if (st === "rendering") return {key: "rendering", badge: '<span class="badge amber"><span class="spin"></span>Rendering</span>'};
+  if (act && st !== "held" && !(st === "rendered" && act === "render_publish")) return {key: "queued", badge: '<span class="badge amber"><span class="spin"></span>Queued</span>'};
+  if (st === "held") return {key: "held", badge: '<span class="badge red">Needs office</span>'};
+  if (st === "failed") return {key: "failed", badge: '<span class="badge red">Failed · retrying</span>'};
+  if (st === "published") return {key: "done", badge: '<span class="badge green">Published</span>'};
+  if (st === "rendered") return {key: "done", badge: '<span class="badge green">Sheet ready</span>'};
+  return {key: "new", badge: '<span class="badge">No sheet yet</span>'};
+}
+function visible(s){
+  const k = stateOf(s).key;
+  if (s.OBJECTID === state.focusOid) return true;
+  switch (state.filter) {
+    case "active": return ["queued", "rendering", "held", "failed"].includes(k);
+    case "mine": return [s.Creator, s.Editor].includes(state.username) || (state.email && String(s.notify_emails || s.requested_by_email || "").toLowerCase().includes(state.email));
+    case "recent": return k === "new";
+    case "done": return k === "done";
+  }
+  return true;
+}
+function sheetLink(s){
+  const a = state.attachments[s.OBJECTID]; const auth = getAuth();
+  if (!a || !auth) return "";
+  return `${SITES_URL}/${s.OBJECTID}/attachments/${a.id}?token=${encodeURIComponent(auth.token)}`;
+}
+function render(){
+  const list = $("list");
+  const rows = state.sites.filter(visible);
+  for (const b of $("filters").querySelectorAll(".chip")) b.classList.toggle("on", b.dataset.f === state.filter);
+  if (!rows.length) { list.innerHTML = `<p class="note">${state.filter === "active" ? "Nothing waiting on the office." : "Nothing here."} Capture a site in Field Maps, then send it from <b>Recent captures</b>.</p>`; }
+  else {
+    let html = "";
+    for (const s of rows) {
+      const st = stateOf(s), busy = state.busy.has(s.OBJECTID);
+      const code = s.site_code || ("site " + String(s.GlobalID || "").replace(/[{}]/g, "").slice(0, 8));
+      const recips = String(s.notify_emails || s.requested_by_email || "").split(/[,;\s]+/).filter(x => x.includes("@"));
+      let actions = "";
+      if (st.key === "new" || st.key === "done" || st.key === "held") actions += `<button class="btn primary" data-act="send" data-oid="${s.OBJECTID}" ${busy ? "disabled" : ""}>${st.key === "done" ? "Re-render & send" : st.key === "held" ? "Send again" : "Send to office"}</button>`;
+      if (st.key === "done") {
+        const link = sheetLink(s);
+        if (link) actions += `<a class="btn" href="${link}" target="_blank" rel="noopener">Open sheet</a>`;
+        actions += `<button class="btn" data-act="resend" data-oid="${s.OBJECTID}" ${busy ? "disabled" : ""}>Email sheet</button>`;
+      }
+      if (st.key === "queued") actions += `<button class="btn ghost" data-act="withdraw" data-oid="${s.OBJECTID}" ${busy ? "disabled" : ""}>Withdraw</button>`;
+      const when = st.key === "new" ? "captured " + fmtWhen(s.CreationDate) : (s.sheet_updated ? "updated " + fmtWhen(s.sheet_updated) : "");
+      html += `<div class="card" id="site-${s.OBJECTID}"><div class="name">${esc(s.site_name || code)}${st.badge}</div>` +
+        `<div class="meta">${esc(code)}${s.assigned_grp ? " · " + esc(s.assigned_grp) : ""}${when ? " · " + when : ""}${s.Editor ? " · " + esc(s.Editor) : ""}</div>` +
+        (s.sheet_note && st.key !== "new" ? `<div class="note">${esc(s.sheet_note)}</div>` : "") +
+        (recips.length ? `<div class="recips">${recips.map(r => `<span>${esc(r)}</span>`).join("")}${s.notified_at ? `<span style="background:#1f4d2a;color:#9be7ad">emailed ${esc(fmtWhen(s.notified_at))}</span>` : ""}</div>` : "") +
+        `<div class="actions">${actions}</div></div>`;
+    }
+    html += `<p class="note"><b>Send to office</b> renders the two-page strategy sheet in the cloud (usually 3–6 minutes), attaches it to the site on the GRP map and emails it to the WRI staff you pick. Publishing to a client's GRP layer is a separate office step.</p>`;
+    list.innerHTML = html;
+  }
+  for (const b of list.querySelectorAll("button[data-act]")) b.onclick = () => act(b.dataset.act, Number(b.dataset.oid));
+  if (state.focusOid) { const el = $("site-" + state.focusOid); if (el) { el.scrollIntoView({block: "center"}); state.focusOid = null; } }
+  armPoll();
+}
+// poll while anything is queued/rendering; re-armed from refresh() so one slow query cannot kill it (pano panel lesson)
+function armPoll(){
+  clearTimeout(state.timer);
+  const pending = state.sites.some(s => ["queued", "rendering"].includes(stateOf(s).key));
+  if (pending) state.timer = setTimeout(() => refresh(true), POLL_MS);
+}
+
+/* ============================================================ Recipient picker */
+function pickRecipients(title, text, preset, yes){
+  return new Promise(async res => {
+    $("modalTitle").textContent = title; $("modalText").textContent = text; $("modalYes").textContent = yes;
+    const wrap = $("pickerWrap"), roster = $("roster"); wrap.hidden = false; roster.innerHTML = '<div class="recip-row"><span class="spin"></span>Loading WRI staff…</div>';
+    const m = $("modal"); m.hidden = false;
+    const done = v => { m.hidden = true; wrap.hidden = true; $("modalYes").onclick = $("modalNo").onclick = null; $("recipientSearch").oninput = null; res(v); };
+    $("modalNo").onclick = () => done(null);
+    $("modalYes").onclick = () => done([...roster.querySelectorAll("input:checked")].map(i => i.value));
+    let people;
+    try { people = await loadRoster(); } catch (e) { roster.innerHTML = `<div class="recip-row err">${esc(e.message || e)}</div>`; return; }
+    const pre = new Set((preset || []).map(x => x.toLowerCase()));
+    if (!pre.size && state.email) pre.add(state.email);
+    roster.innerHTML = people.map(p => `<label class="recip-row" data-name="${esc(p.name.toLowerCase())}"><input type="checkbox" value="${esc(p.email)}" ${pre.has(p.email) ? "checked" : ""}><span>${esc(p.name)}</span><small>${p.email === state.email ? "you" : ""}</small></label>`).join("") ||
+      '<div class="recip-row">No WRI staff emails on the roster.</div>';
+    const count = () => { $("recipientCount").textContent = roster.querySelectorAll("input:checked").length + " selected"; };
+    roster.onchange = count; count();
+    $("recipientSearch").value = "";
+    $("recipientSearch").oninput = () => { const q = $("recipientSearch").value.toLowerCase().trim(); for (const row of roster.querySelectorAll(".recip-row")) row.style.display = !q || (row.dataset.name || "").includes(q) ? "" : "none"; };
+  });
+}
+function confirmBox(title, text, yes="Confirm"){
+  return new Promise(res => {
+    $("modalTitle").textContent = title; $("modalText").textContent = text; $("modalYes").textContent = yes; $("pickerWrap").hidden = true;
+    const m = $("modal"); m.hidden = false;
+    const done = v => { m.hidden = true; $("modalYes").onclick = $("modalNo").onclick = null; res(v); };
+    $("modalYes").onclick = () => done(true); $("modalNo").onclick = () => done(false);
+  });
+}
+
+/* ============================================================ Actions */
+async function writeSite(oid, attrs){
+  const j = await rest(SITES_URL + "/applyEdits", {updates: JSON.stringify([{attributes: Object.assign({OBJECTID: oid}, attrs)}])}, {label: "update"});
+  const r = j.updateResults && j.updateResults[0];
+  if (!r || !r.success) throw new Error("could not update the site: " + JSON.stringify(r && r.error || j).slice(0, 160));
+  const back = await rest(SITES_URL + "/query", {where: "OBJECTID=" + oid, outFields: Object.keys(attrs).join(","), returnGeometry: "false"}, {label: "read-back"});
+  const got = back.features && back.features[0] && back.features[0].attributes || {};
+  for (const [k, v] of Object.entries(attrs)) if (v != null && String(got[k]) !== String(v)) throw new Error(`the ${k} write did not stick`);
+}
+async function dispatch(oid, notifyOnly){
+  try {
+    const d = await adminApi({api: "grp-dispatch", oid, notify_only: !!notifyOnly});
+    if (d && d.ok) toastMsg(notifyOnly ? "Email on its way (a minute or two)." : "Worker started — the sheet usually lands in 3–6 minutes.");
+    else toastMsg("Queued; the office poller picks it up within a few minutes (" + (d && d.error || "dispatch unavailable") + ")", 6000);
+  } catch (e) { toastMsg("Queued; the office poller picks it up within a few minutes.", 5000); }
+}
+async function act(mode, oid){
+  const s = state.sites.find(x => x.OBJECTID === oid); if (!s) return;
+  const label = s.site_name || s.site_code || ("OID " + oid);
+  state.busy.add(oid); render();
+  try {
+    if (mode === "send") {
+      const preset = String(s.notify_emails || "").split(/[,;\s]+/).filter(x => x.includes("@"));
+      const picked = await pickRecipients(`Send "${label}" to the office`, "The sheet is rendered in the cloud, attached to the site on the GRP map, and emailed to the WRI staff you tick. Only roster addresses can be chosen.", preset, "Send");
+      if (picked === null) return;
+      await writeSite(oid, {office_action: "render", details_complete: 1, notify_emails: picked.join(", ") || null});
+      toastMsg("Sent to the office. Starting the worker…");
+      await dispatch(oid, false);
+    } else if (mode === "resend") {
+      const preset = String(s.notify_emails || s.requested_by_email || "").split(/[,;\s]+/).filter(x => x.includes("@"));
+      const picked = await pickRecipients(`Email the sheet for "${label}"`, "Re-sends the finished sheet already attached to the site. Nothing is re-rendered.", preset, "Email");
+      if (picked === null) return;
+      if (!picked.length) { toastMsg("Pick at least one person."); return; }
+      await writeSite(oid, {notify_emails: picked.join(", ")});
+      await dispatch(oid, true);
+    } else if (mode === "withdraw") {
+      if (!(await confirmBox(`Withdraw "${label}"?`, "The office request is cleared. Nothing already rendered is removed.", "Withdraw"))) return;
+      await writeSite(oid, {office_action: null, details_complete: 0});
+      toastMsg("Withdrawn.");
+    }
+  } catch (e) { handleErr(e, mode); }
+  finally { state.busy.delete(oid); await refresh(true); }
+}
+for (const b of $("filters").querySelectorAll(".chip")) b.onclick = () => { state.filter = b.dataset.f; render(); };
+
+/* ============================================================ Boot */
+async function refresh(quiet){
+  try { await verifyAuth(); if (!quiet) $("subtitle").textContent = "Loading…";
+    await loadSites();
+    await loadAttachments();                      // best-effort; a slow attachment query must not hide the list
+    const pending = state.sites.filter(s => ["queued", "rendering"].includes(stateOf(s).key)).length;
+    $("subtitle").textContent = `${pending ? pending + " in progress · " : ""}signed in as ${state.username}`;
+    render(); showView("viewList");
+  } catch (e) { handleErr(e, quiet ? "" : "load"); armPoll(); }
+}
+async function boot(){
+  clearInterval(authPoll);
+  if (!getAuth()) { showAuth(); return; }
+  await refresh(false);
+}
+$("btnReload").onclick = () => refresh(false);
+boot();
+})();
+</script>
+</body>
+</html>
