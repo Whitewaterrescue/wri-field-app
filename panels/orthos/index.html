@@ -226,7 +226,8 @@ let lastSync = "";
 function syncLiveMap(){
   if (!EMBEDDED || !state.mapId || !state.mapData) return;
   const layers = walk(state.mapData.operationalLayers).filter(l => typeof l.id === "string" && l.id.startsWith("ortho_") && l.url)
-    .map(l => ({id: l.id, url: l.url, title: l.title, itemId: l.itemId, sourceKml: (l.wriOrtho && l.wriOrtho.sourceKml) || l.id.slice(6)}));
+    .map(l => ({id: l.id, url: l.url, title: l.title, itemId: l.itemId, visible: l.visibility !== false,
+                sourceKml: (l.wriOrtho && l.wriOrtho.sourceKml) || l.id.slice(6)}));
   const msg = {type: "wri-ortho-sync", mapId: state.mapId, layers};
   const key = JSON.stringify(msg);
   if (key === lastSync) return;
@@ -263,6 +264,10 @@ function imageryFor(k){ return (state.imagery || {})[k.id] || null; }
 function stateOf(k){
   const r = reqFor(k), layer = onMap(k.id);
   if (r && (r.status === "queued" || r.status === "processing")) return {key: r.status, badge: `<span class="badge amber"><span class="spin"></span>${r.status === "queued" ? "Queued" : "Tiling in AGOL"}</span>`};
+  // a newer ortho of the same ground leaves this one on the map but switched off (ortho_webmap
+  // .apply_newest_at_location) -- say so, or "On the map" looks like a lie when nothing draws
+  if (layer && layer.visibility === false) return {key: "onmap", badge: '<span class="badge">Superseded</span>',
+    note: "A newer ortho covers this ground, so this one is on the map but switched off. Turn it on in the map's layer list to compare."};
   if (layer) return {key: "onmap", badge: '<span class="badge green">On the map</span>'};
   if (r && r.status === "held") return {key: "held", badge: '<span class="badge red">Needs Cody</span>'};
   if (r && r.status === "failed") return {key: "failed", badge: '<span class="badge red">Failed</span>'};
@@ -286,7 +291,8 @@ function render(){
       if (st.key === "ready") actions += `<button class="btn primary" data-act="attach" data-id="${k.id}" ${busy ? "disabled" : ""}>Add to incident map</button>`;
       if (st.key === "onmap") actions += `<button class="btn" data-act="detach" data-id="${k.id}" ${busy ? "disabled" : ""}>Remove from map</button>`;
       if (st.key === "held") actions += `<button class="btn" data-act="convert" data-id="${k.id}" ${busy ? "disabled" : ""}>Try again</button>`;
-      const msg = r && r.message && st.key !== "onmap" ? `<div class="note">${esc(r.message)}${r.updated_at ? " · " + new Date(r.updated_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : ""}</div>` : "";
+      const msg = st.note ? `<div class="note">${esc(st.note)}</div>`
+        : (r && r.message && st.key !== "onmap" ? `<div class="note">${esc(r.message)}${r.updated_at ? " · " + new Date(r.updated_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"}) : ""}</div>` : "");
       html += `<div class="card"><div class="name">${esc(k.name)}${st.badge}</div><div class="meta">${when} · ${esc(k.owner)}${k.access === "public" ? " · public item" : ""}</div>${msg}<div class="actions">${actions}</div></div>`;
     }
   }
