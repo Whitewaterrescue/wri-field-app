@@ -262,6 +262,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_16": {
+      "id": "page_16",
+      "label": "GRP Office",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_grp_office",
+        "MEDIUM": "layout_grp_office",
+        "SMALL": "layout_grp_office"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -306,6 +321,9 @@
     },
     {
       "page_12": []
+    },
+    {
+      "page_16": []
     }
   ],
   "layouts": {
@@ -1211,6 +1229,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_44",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_grp_office": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_45",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -2503,6 +2554,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/panos/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_45": {
+      "id": "widget_45",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "GRP Office",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/grp-office/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
