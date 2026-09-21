@@ -227,6 +227,7 @@ function syncLiveMap(){
   if (!EMBEDDED || !state.mapId || !state.mapData) return;
   const layers = walk(state.mapData.operationalLayers).filter(l => typeof l.id === "string" && l.id.startsWith("ortho_") && l.url)
     .map(l => ({id: l.id, url: l.url, title: l.title, itemId: l.itemId, visible: l.visibility !== false,
+                kind: l.layerType === "ArcGISImageServiceLayer" ? "dynamic" : "tiled", format: l.format || null,
                 sourceKml: (l.wriOrtho && l.wriOrtho.sourceKml) || l.id.slice(6)}));
   const msg = {type: "wri-ortho-sync", mapId: state.mapId, layers};
   const key = JSON.stringify(msg);
@@ -271,7 +272,7 @@ function stateOf(k){
   if (layer) return {key: "onmap", badge: '<span class="badge green">On the map</span>'};
   if (r && r.status === "held") return {key: "held", badge: '<span class="badge red">Needs Cody</span>'};
   if (r && r.status === "failed") return {key: "failed", badge: '<span class="badge red">Failed</span>'};
-  if ((r && r.imagery_item_id) || imageryFor(k)) return {key: "ready", badge: '<span class="badge blue">Tiles ready</span>'};
+  if ((r && r.imagery_item_id) || imageryFor(k)) return {key: "ready", badge: '<span class="badge blue">Imagery ready</span>'};
   if (kmlOnMap(k.id)) return {key: "kmlonmap", badge: '<span class="badge red">KML on map (heavy)</span>'};
   return {key: "new", badge: ""};
 }
@@ -296,7 +297,7 @@ function render(){
       html += `<div class="card"><div class="name">${esc(k.name)}${st.badge}</div><div class="meta">${when} · ${esc(k.owner)}${k.access === "public" ? " · public item" : ""}</div>${msg}<div class="actions">${actions}</div></div>`;
     }
   }
-  html += `<p class="note">Tap <b>Add to incident map</b>: the KML's Nova image is turned into a hosted tiled-imagery layer (phone-safe) and added to the map's Overflights group; orthos from other incidents leave the map but stay in content. Takes a few minutes. Reopen the Incident Map afterwards to see it.</p>`;
+  html += `<p class="note">Tap <b>Add to incident map</b>: the KML's Nova image is turned into a hosted imagery layer drawn as JPEG (phone-safe) and added to the map's Overflights group; orthos from other incidents leave the map but stay in content. Takes a few minutes. Reopen the Incident Map afterwards to see it.</p>`;
   list.innerHTML = html;
   for (const b of list.querySelectorAll("button[data-act]")) b.onclick = () => act(b.dataset.act, b.dataset.id);
   const pending = state.kmls.some(k => ["queued", "processing"].includes(stateOf(k).key));
