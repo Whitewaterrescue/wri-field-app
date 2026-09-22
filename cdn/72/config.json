@@ -1719,6 +1719,30 @@
               "min_boom_l",
               "sector"
             ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_GRP_Universal_DEV/FeatureServer/0",
+            "nameField": "site_name",
+            "bufferM": 500,
+            "where": "assigned_grp = 'WAB' AND (status IS NULL OR status <> 'rejected') AND (revision_status IS NULL OR revision_status <> 'superseded')",
+            "extraFields": [
+              "site_code",
+              "river_mile",
+              "strategy_type",
+              "has_boom",
+              "workflow_status",
+              "GlobalID"
+            ],
+            "boomLayer": {
+              "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_GRP_Universal_DEV/FeatureServer/1",
+              "siteKeyField": "site_globalid"
+            },
+            "noEquipment": {
+              "field": "strategy_type",
+              "values": [
+                "notification"
+              ]
+            }
           }
         ],
         "receptorLayers": [],
@@ -2242,6 +2266,30 @@
               "min_boom_l",
               "sector"
             ]
+          },
+          {
+            "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_GRP_Universal_DEV/FeatureServer/0",
+            "nameField": "site_name",
+            "bufferM": 500,
+            "where": "assigned_grp = 'WAB' AND (status IS NULL OR status <> 'rejected') AND (revision_status IS NULL OR revision_status <> 'superseded')",
+            "extraFields": [
+              "site_code",
+              "river_mile",
+              "strategy_type",
+              "has_boom",
+              "workflow_status",
+              "GlobalID"
+            ],
+            "boomLayer": {
+              "url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_GRP_Universal_DEV/FeatureServer/1",
+              "siteKeyField": "site_globalid"
+            },
+            "noEquipment": {
+              "field": "strategy_type",
+              "values": [
+                "notification"
+              ]
+            }
           }
         ],
         "receptorLayers": [],
