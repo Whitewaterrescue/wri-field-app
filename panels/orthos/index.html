@@ -54,6 +54,13 @@
   .box{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;max-width:440px;width:100%}
   .box h2{font:700 16px var(--head);margin-bottom:8px}.box p{color:var(--text-dim);font-size:14px;line-height:1.4}
   .box .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  .optin{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:10px 12px;border-radius:10px;
+         border:1px solid #b45309;background:rgba(180,83,9,.14);font-size:13px;line-height:1.4;cursor:pointer}
+  .optin[hidden]{display:none}
+  .optin input{margin-top:2px;width:18px;height:18px;flex:none}
+  .optin i{display:block;margin-top:4px;color:var(--text-dim);font-style:normal;font-size:12px}
+  .pubtag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:700;
+          border:1px solid #b45309;background:rgba(180,83,9,.18);color:#fbbf24}
   .err{color:#fca5a5;font-size:13px}
 </style>
 </head>
@@ -78,6 +85,13 @@
   </section>
 
   <div id="modal" hidden><div class="box"><h2 id="modalTitle"></h2><p id="modalText"></p>
+    <label class="optin" id="modalOptInRow" hidden>
+      <input type="checkbox" id="modalOptIn">
+      <span>Also publish to the <b>public gateway map</b><br>
+        <i>Off by default. Ticking this shares the imagery with <b>everyone</b> — any external responder
+        with the gateway link sees it, and the image service becomes readable by anyone who has its URL.
+        Leave it off and the ortho stays inside the WRI org.</i></span>
+    </label>
     <div class="actions"><button class="btn ghost" id="modalNo">Cancel</button><button class="btn primary" id="modalYes">Confirm</button></div></div></div>
   <div id="toast" hidden></div>
 </div>
@@ -107,11 +121,16 @@ const state = {username: "", badToken: null, retryAt: 0, mapId: null, mapTitle: 
 function showView(id){ for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; }
 let toastT = null;
 function toastMsg(msg, ms=3200){ const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
-function confirmBox(title, text, yes="Confirm"){           // window.confirm() is a no-op inside the Field App iframe
+function confirmBox(title, text, yes="Confirm", optIn=false){  // window.confirm() is a no-op inside the Field App iframe
   return new Promise(res => {
     $("modalTitle").textContent = title; $("modalText").textContent = text; $("modalYes").textContent = yes;
+    // The gateway opt-in rides the confirm box so the warning is unavoidable and the default is
+    // always off — nothing is remembered between requests on purpose.
+    const row = $("modalOptInRow"), box = $("modalOptIn");
+    row.hidden = !optIn; box.checked = false;
     const m = $("modal"); m.hidden = false;
-    const done = v => { m.hidden = true; $("modalYes").onclick = $("modalNo").onclick = null; res(v); };
+    const done = v => { m.hidden = true; $("modalYes").onclick = $("modalNo").onclick = null;
+                        res(v ? {ok: true, gateway: optIn && box.checked} : {ok: false}); };
     $("modalYes").onclick = () => done(true); $("modalNo").onclick = () => done(false);
   });
 }
@@ -263,6 +282,18 @@ function imageryFor(k){ return (state.imagery || {})[k.id] || null; }
 
 /* ============================================================ Render */
 function stateOf(k){
+  const s = orthoState(k), r = reqFor(k);
+  // Which orthos are on the PUBLIC gateway has to be readable at a glance — the opt-in is a
+  // one-tap decision buried in a confirm box, and this is the only place it shows afterwards.
+  if (r && Number(r.gateway_public) === 1 && (s.key === "onmap" || s.key === "ready")) {
+    s.badge += '<span class="pubtag">PUBLIC</span>';
+    s.note = (s.note ? s.note + " " : "") +
+      "Published to the public gateway map: anyone with the responder link can see this imagery. " +
+      "Re-add it with the box unticked to take it back off.";
+  }
+  return s;
+}
+function orthoState(k){
   const r = reqFor(k), layer = onMap(k.id);
   if (r && (r.status === "queued" || r.status === "processing")) return {key: r.status, badge: `<span class="badge amber"><span class="spin"></span>${r.status === "queued" ? "Queued" : "Tiling in AGOL"}</span>`};
   // a newer ortho of the same ground leaves this one on the map but switched off (ortho_webmap
@@ -323,11 +354,13 @@ async function act(mode, kmlId){
   const what = mode === "detach" ? `Remove "${k.name}" from ${state.mapTitle}?` : `Add "${k.name}" (${k.project}) to ${state.mapTitle}?`;
   const detail = mode === "detach" ? "The tiled layer comes off the map; the imagery item stays in content."
     : "The image is converted to a hosted tiled-imagery layer in AGOL and added to the Overflights group. Orthos from other incidents are taken off the map (they stay in content).";
-  if (!(await confirmBox(what, detail, mode === "detach" ? "Remove" : "Add"))) return;
+  const ans = await confirmBox(what, detail, mode === "detach" ? "Remove" : "Add", mode !== "detach");
+  if (!ans.ok) return;
   state.busy.add(kmlId); render();
   try {
     const ov = mode === "detach" ? null : await parseKml(kmlId);
     const attrs = {kml_item_id: kmlId, kml_title: k.title, project: k.project, name: k.name, target_map_id: state.mapId, mode,
+                   gateway_public: ans.gateway ? 1 : 0,
                    requested_by: state.username, requested_at: Date.now(), status: "queued", message: null, attempts: 0};
     if (ov) Object.assign(attrs, {image_url: ov.href, north: ov.north, south: ov.south, east: ov.east, west: ov.west, rotation: ov.rotation});
     const j = await rest(REQUESTS_URL + "/addFeatures", {features: JSON.stringify([{attributes: attrs}])}, {label: "queue"});
