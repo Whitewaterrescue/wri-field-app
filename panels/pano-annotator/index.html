@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-<script src="pano-annot.js?v=7ba71ffc01e6"></script>
+<script src="pano-annot.js?v=ac9414c5b6b8"></script>
 <style>
   /* WRI 360 Annotator -- Field App panel. Draw points, lines and areas with labels ON a sphere;
      everyone who opens that sphere from the map sees them.
@@ -83,9 +83,21 @@
   .tool.on{background:var(--accent);border-color:var(--accent);color:#fff}
   .tool[disabled]{opacity:.4}
   .tool .gl{font-size:15px;line-height:1}
-  .sheet{padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+  .sheet{padding:10px 12px;background:var(--surface);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
   .sheet[hidden]{display:none}
-  .sheet input{flex:1}
+  .sheetRow{display:flex;gap:8px;align-items:center}
+  .sheetRow input{flex:1}
+  .sheet textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--border);
+    background:var(--bg);color:var(--text);font:400 15px/1.4 var(--font);resize:vertical;min-height:52px}
+  .sheetHint{font-size:11.5px;color:var(--text-muted)}
+  /* Colour swatches. On-sphere colours are cartography, so these are the palette from
+     pano-annot.js, not UI tokens -- the chip shows exactly what will be drawn. */
+  #swatches{display:flex;gap:6px;padding:8px 12px 0;align-items:center;overflow-x:auto}
+  #swatches[hidden]{display:none}
+  .sw-dot{flex:none;width:38px;height:38px;border-radius:50%;border:2px solid transparent;
+    cursor:pointer;touch-action:manipulation;position:relative;box-shadow:inset 0 0 0 2px rgba(0,0,0,.45)}
+  .sw-dot.on{border-color:#fff;transform:scale(1.06)}
+  .sw-label{font-size:11.5px;color:var(--text-muted);margin-left:2px;white-space:nowrap}
   .footer{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--bg);border-top:1px solid var(--border)}
   .sw{display:flex;align-items:center;gap:8px;flex:1;font-size:12.5px;color:var(--text-dim);cursor:pointer;line-height:1.25}
   .sw input{width:20px;height:20px;accent-color:var(--accent);flex:none}
@@ -137,9 +149,16 @@
       <div id="hint"></div>
     </div>
 
+    <div id="swatches"></div>
+
     <div class="sheet" id="labelSheet" hidden>
-      <input type="text" id="labelInput" placeholder="What is this? e.g. Boom anchor" maxlength="80" autocomplete="off">
-      <button class="btn" id="btnLabelOk">Done</button>
+      <div class="sheetRow">
+        <input type="text" id="labelInput" placeholder="What is this? e.g. Parking" maxlength="80" autocomplete="off">
+        <button class="btn" id="btnLabelOk">Done</button>
+      </div>
+      <textarea id="noteInput" rows="2" maxlength="600" autocomplete="off"
+        placeholder="Details (optional) — shown when someone taps this shape. e.g. Boats park on the right, cars on the left. Clear the lot by 1700."></textarea>
+      <div class="sheetHint" id="noteHint"></div>
     </div>
 
     <div class="toolbar">
@@ -152,7 +171,7 @@
     </div>
 
     <div class="footer">
-      <label class="sw"><input type="checkbox" id="pubOk"><span id="pubTxt">Show these labels on the public gateway</span></label>
+      <label class="sw"><input type="checkbox" id="pubOk"><span id="pubTxt">Show these labels and details on the public gateway</span></label>
       <button class="btn ghost" id="btnDone">Finish</button>
     </div>
   </section>
@@ -201,7 +220,7 @@ const state = {
   mapId: null, mapTitle: "", project: null, client: "",
   sources: [], sourceKey: "incident", panos: [], filter: "",
   pano: null, key: null, oid: null, publicOk: false,
-  shapes: [], sel: null, tool: "select", draft: null, dirty: false,
+  shapes: [], sel: null, tool: "select", draft: null, dirty: false, color: "yellow",
   viewer: null, overlay: null, saving: false
 };
 
@@ -568,12 +587,12 @@ function onTap(cx, cy){
   const pt = [round2(c[0]), round2(c[1])];
 
   if (state.tool === "point") {
-    const s = {id: newId(), kind: "point", label: "", pts: [pt]};
+    const s = {id: newId(), kind: "point", label: "", c: state.color, pts: [pt]};
     state.shapes.push(s); markDirty(); setTool("select"); state.sel = s.id; redraw(); editLabel(s);
     return;
   }
   if (state.tool === "line" || state.tool === "area") {
-    if (!state.draft) state.draft = {id: newId(), kind: state.tool, label: "", pts: []};
+    if (!state.draft) state.draft = {id: newId(), kind: state.tool, label: "", c: state.color, pts: []};
     state.draft.pts.push(pt);
     renderHint(); redraw();
     return;
@@ -581,6 +600,7 @@ function onTap(cx, cy){
   // select
   const hit = state.overlay.hitTest(cx, cy, HIT);
   state.sel = hit ? hit.shape.id : null;
+  if (hit && hit.shape.c) { state.color = hit.shape.c; renderSwatches(); }
   renderHint(); redraw();
   if (hit) editLabel(hit.shape);
 }
@@ -613,17 +633,61 @@ async function deleteSel(){
 }
 
 function editLabel(shape){
-  const sheet = $("labelSheet"), input = $("labelInput");
+  const sheet = $("labelSheet"), input = $("labelInput"), note = $("noteInput");
   sheet.hidden = false;
   input.value = shape.label || "";
+  note.value = shape.note || "";
+  renderNoteHint();
   input.focus();
   const commit = () => {
     shape.label = input.value.trim().slice(0, 80);
-    sheet.hidden = true; input.onkeydown = null;
+    const n = note.value.trim().slice(0, A.MAX_NOTE);
+    if (n) shape.note = n; else delete shape.note;
+    sheet.hidden = true; input.onkeydown = null; note.oninput = null;
     markDirty(); redraw();
   };
   $("btnLabelOk").onclick = commit;
+  // Enter commits from the one-line label; the details box needs Enter for line breaks.
   input.onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); commit(); } };
+  note.oninput = renderNoteHint;
+}
+
+function renderNoteHint(){
+  const n = $("noteInput").value.length;
+  $("noteHint").textContent = n
+    ? `${n}/${A.MAX_NOTE} - tapping this shape in the viewer opens these details`
+    : "Details are optional. Add them for anything that needs more than a name.";
+}
+
+/* ---- colour ---------------------------------------------------------------------------
+   The palette lives in pano-annot.js so the swatch, the editor and the viewer can never drift.
+   The choice is sticky across tools: drawing five hazards in a row should not mean picking red
+   five times. Tapping a swatch with a shape selected recolours that shape.                   */
+function renderSwatches(){
+  const row = $("swatches");
+  row.innerHTML = "";
+  for (const key of A.PALETTE_ORDER) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "sw-dot" + (key === state.color ? " on" : "");
+    b.style.background = A.PALETTE[key].hex;
+    b.title = key + " - " + A.PALETTE[key].means;
+    b.setAttribute("aria-label", b.title);
+    b.onclick = () => pickColor(key);
+    row.appendChild(b);
+  }
+  const lab = document.createElement("span");
+  lab.className = "sw-label";
+  lab.textContent = A.PALETTE[state.color].means;
+  row.appendChild(lab);
+}
+
+function pickColor(key){
+  state.color = key;
+  const sel = state.shapes.find(x => x.id === state.sel);
+  if (sel) { sel.c = key; markDirty(); }
+  if (state.draft) state.draft.c = key;
+  renderSwatches(); redraw();
 }
 
 /* ============================================================ Open / save */
@@ -639,6 +703,7 @@ async function openPano(p){
   $("pubOk").checked = false;
   showView("viewDraw");
   setTool("select");
+  renderSwatches();
 
   // Existing labels first, so a re-edit starts from what is live rather than a blank sphere.
   try {
@@ -717,7 +782,12 @@ function teardownViewer(){
 function payload(){
   const shapes = state.shapes
     .filter(s => s.pts.length >= MIN_PTS[s.kind])
-    .map(s => ({id: s.id, kind: s.kind, label: s.label || "", pts: s.pts.map(p => [round2(p[0]), round2(p[1])])}));
+    .map(s => {
+      const o = {id: s.id, kind: s.kind, label: s.label || "", pts: s.pts.map(p => [round2(p[0]), round2(p[1])])};
+      if (s.c) o.c = s.c;                               // omitted when absent: keeps the JSON small
+      if (s.note) o.note = s.note.slice(0, A.MAX_NOTE);
+      return o;
+    });
   return {shapes, json: JSON.stringify({v: 1, shapes})};
 }
 
@@ -800,7 +870,7 @@ $("search").oninput = e => { state.filter = e.target.value; renderPanos(new Map(
 $("pubOk").onchange = e => {
   state.publicOk = e.target.checked;
   markDirty();
-  if (state.publicOk) toastMsg("These labels will be readable by anyone with the sphere link", 4200);
+  if (state.publicOk) toastMsg("These labels AND their details will be readable by anyone with the sphere link", 5000);
 };
 
 let annotT = null;
