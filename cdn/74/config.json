@@ -277,6 +277,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_17": {
+      "id": "page_17",
+      "label": "360 Annotator",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_pano_annot",
+        "MEDIUM": "layout_pano_annot",
+        "SMALL": "layout_pano_annot"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -312,6 +327,9 @@
     },
     {
       "page_15": []
+    },
+    {
+      "page_17": []
     },
     {
       "page_8": []
@@ -1262,6 +1280,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_45",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_pano_annot": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_46",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -2615,6 +2666,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/grp-office/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_46": {
+      "id": "widget_46",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "360 Annotator",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/pano-annotator/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,

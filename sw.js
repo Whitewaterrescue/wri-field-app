@@ -19,8 +19,8 @@
  *  - Everything else same-scope: network-first (8s race) + cache fallback.
  *  - No skipWaiting: new versions activate when all tabs close.
  */
-var CDN = '73';
-var STAMP = '20260923-115236';
+var CDN = '74';
+var STAMP = '20260923-115906';
 // The cdn cache is keyed to the BUILD, not the deploy stamp, so a config-only
 // redeploy reuses the ~25 MB a device already warmed. That also means patching
 // a file in place inside an already-published cdn/<N> is invisible to anyone
