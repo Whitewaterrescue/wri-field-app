@@ -55,7 +55,7 @@
   "pages": {
     "page_1": {
       "id": "page_1",
-      "label": "Home",
+      "label": "Checklist",
       "type": "NORMAL",
       "mode": "FIT_WINDOW",
       "layout": {
@@ -292,6 +292,81 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_18": {
+      "id": "page_18",
+      "label": "Maps",
+      "type": "FOLDER",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_folder",
+        "MEDIUM": "layout_folder",
+        "SMALL": "layout_folder"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_19": {
+      "id": "page_19",
+      "label": "Imagery & Panos",
+      "type": "FOLDER",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_folder",
+        "MEDIUM": "layout_folder",
+        "SMALL": "layout_folder"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_20": {
+      "id": "page_20",
+      "label": "GRP Tools",
+      "type": "FOLDER",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_folder",
+        "MEDIUM": "layout_folder",
+        "SMALL": "layout_folder"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_21": {
+      "id": "page_21",
+      "label": "Reference",
+      "type": "FOLDER",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_folder",
+        "MEDIUM": "layout_folder",
+        "SMALL": "layout_folder"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
+    },
+    "page_22": {
+      "id": "page_22",
+      "label": "Ops",
+      "type": "FOLDER",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_folder",
+        "MEDIUM": "layout_folder",
+        "SMALL": "layout_folder"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -299,49 +374,43 @@
       "page_10": []
     },
     {
-      "page_1": []
-    },
-    {
-      "page_2": []
-    },
-    {
-      "page_6": []
-    },
-    {
-      "page_7": []
-    },
-    {
       "page_3": []
     },
     {
-      "page_4": []
+      "page_1": []
     },
     {
-      "page_5": []
+      "page_18": [
+        "page_2",
+        "page_6",
+        "page_7"
+      ]
     },
     {
-      "page_13": []
+      "page_19": [
+        "page_13",
+        "page_14",
+        "page_15",
+        "page_17"
+      ]
     },
     {
-      "page_14": []
+      "page_20": [
+        "page_12",
+        "page_16"
+      ]
     },
     {
-      "page_15": []
+      "page_21": [
+        "page_4",
+        "page_8"
+      ]
     },
     {
-      "page_17": []
-    },
-    {
-      "page_8": []
-    },
-    {
-      "page_9": []
-    },
-    {
-      "page_12": []
-    },
-    {
-      "page_16": []
+      "page_22": [
+        "page_5",
+        "page_9"
+      ]
     }
   ],
   "layouts": {
@@ -1336,6 +1405,11 @@
           "isPending": false
         }
       }
+    },
+    "layout_folder": {
+      "type": "FIXED",
+      "order": [],
+      "content": {}
     }
   },
   "sections": {},
