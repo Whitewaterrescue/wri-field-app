@@ -19,8 +19,8 @@
  *  - Everything else same-scope: network-first (8s race) + cache fallback.
  *  - No skipWaiting: new versions activate when all tabs close.
  */
-var CDN = '75';
-var STAMP = '20260924-085052';
+var CDN = '76';
+var STAMP = '20260924-163255';
 // The cdn cache is keyed to the BUILD, not the deploy stamp, so a config-only
 // redeploy reuses the ~25 MB a device already warmed. That also means patching
 // a file in place inside an already-published cdn/<N> is invisible to anyone
@@ -43,6 +43,7 @@ var PRECACHE = [
   './panels/gateway/index.html',
   './panels/livestream/index.html',
   './panels/orthos/index.html',
+  './panels/drone/index.html',
   './panels/panos/index.html',
   './panels/grp-annotator/index.html',
   './panels/grp-office/index.html',

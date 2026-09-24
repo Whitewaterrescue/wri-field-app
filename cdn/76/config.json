@@ -2713,7 +2713,7 @@
       "label": "Drone Orthos",
       "config": {
         "embedType": "url",
-        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/orthos/</p>",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/drone/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
