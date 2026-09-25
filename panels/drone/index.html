@@ -20,62 +20,90 @@
   incident map from the app's served cdn/N/config.json. window.confirm() is a no-op inside the ExB
   iframe, hence confirmBox().
 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+/* WRI 2025 brand (WRI_Style_Sheet_2025). Dark is the default theme.
+   No blue anywhere -- legacy WRI blues (#16213e/#0f3460) and the pink accent (#e94560) are
+   off-brand. Muted text stays >= #b0b4b4 or it fails AA on Rapids Gray. */
 :root{
-  --gray:#3A3C3C; --crimson:#EC2329; --ink:#1d1f1f; --line:#d9dcdc; --bg:#f6f7f7;
-  --ok:#1d7a4c; --warn:#a8630b; --muted:#6b7070;
+  --wipeout:#171919;      /* page background        */
+  --rapids:#3A3C3C;       /* panels, header, cards  */
+  --rapids-hi:#4a4d4d;
+  --line:#55595a;         /* dividers - never blue  */
+  --crimson:#EC2329;      /* Mayday Crimson accent  */
+  --crimson-hi:#d41f24;
+  --text:#f0f0f0;
+  --muted:#b8bcbc;        /* AA-safe on Rapids      */
+  --field:#2a2c2c;
+  --ok:#5fd08a; --warn:#f0b849; --err:#ff7a7f;
+  --font-head:'Epilogue',system-ui,-apple-system,sans-serif;
+  --font-body:'Alexandria',system-ui,-apple-system,sans-serif;
 }
+/* MUST come before any id-selector display rule. `[hidden]` is a plain attribute selector, so an
+   ID rule like `#modal{display:flex}` outranks the UA's `[hidden]{display:none}` and the element
+   stays on screen with `hidden` set -- which is exactly how the gateway opt-in box got stuck
+   open on load and ignored every button (2026-09-25). */
+[hidden]{display:none!important}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
-body{font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);-webkit-text-size-adjust:100%}
-.wrap{max-width:720px;margin:0 auto;padding:12px 12px 40px}
-h1{font-size:17px;margin:0;color:#fff}
-header{background:var(--gray);padding:10px 12px;position:sticky;top:0;z-index:5}
-header .sub{color:#c9cccc;font-size:12px;margin-top:2px}
-.tabs{display:flex;gap:6px;margin:10px 0 12px}
-.tab{flex:1;padding:9px 8px;border:1px solid var(--line);background:#fff;border-radius:8px;font-size:14px;font-weight:600;color:var(--muted);text-align:center;cursor:pointer}
-.tab[aria-selected="true"]{background:var(--gray);color:#fff;border-color:var(--gray)}
-.card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px}
-label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.03em}
-input[type=text],select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;font-size:16px;background:#fff}
-button{font:inherit;font-weight:600;padding:11px 14px;border-radius:8px;border:1px solid var(--gray);background:var(--gray);color:#fff;cursor:pointer}
-button.secondary{background:#fff;color:var(--gray)}
-button.danger{background:var(--crimson);border-color:var(--crimson)}
-button[disabled]{opacity:.5;cursor:default}
-button.wide{width:100%;padding:14px;font-size:16px}
-.row{display:flex;gap:8px;align-items:center}
+body{font:15px/1.5 var(--font-body);color:var(--text);background:var(--wipeout);-webkit-text-size-adjust:100%}
+.wrap{max-width:720px;margin:0 auto;padding:12px 12px 44px}
+header{background:var(--rapids);padding:12px;position:sticky;top:0;z-index:5;border-bottom:1px solid var(--line)}
+h1{font:600 17px/1.2 var(--font-head);margin:0;color:#fff;letter-spacing:.01em}
+header .sub{color:var(--muted);font-size:12px;margin-top:3px}
+.tabs{display:flex;gap:8px;margin:12px 0}
+.tab{flex:1;padding:10px 8px;border:1px solid var(--line);background:transparent;border-radius:999px;
+     font:600 12px/1 var(--font-head);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--crimson);color:#fff;border-color:var(--crimson)}
+.card{background:var(--rapids);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+label{display:block;font:600 11px/1 var(--font-head);color:var(--muted);margin:14px 0 6px;text-transform:uppercase;letter-spacing:.07em}
+input[type=text],select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;font-size:16px;
+     background:var(--field);color:var(--text);font-family:var(--font-body)}
+input[type=text]:focus,select:focus{outline:none;border-color:var(--crimson);box-shadow:0 0 0 2px rgba(236,35,41,.25)}
+input[type=checkbox]{accent-color:var(--crimson)}
+button{font:700 12px/1 var(--font-head);letter-spacing:.06em;text-transform:uppercase;padding:12px 18px;
+       border-radius:999px;border:1px solid var(--crimson);background:var(--crimson);color:#fff;cursor:pointer}
+button:active{background:var(--crimson-hi)}
+button.secondary{background:transparent;color:#fff;border-color:var(--line)}
+button[disabled]{opacity:.45;cursor:default}
+button.wide{width:100%;padding:15px;font-size:13px}
+.row{display:flex;gap:10px;align-items:center}
 .row > *{min-width:0}
-.note{font-size:12px;color:var(--muted);margin-top:6px}
-.err{color:var(--crimson)}
-.ok{color:var(--ok)}
-.warn{color:var(--warn)}
-.banner{padding:8px 10px;border-radius:8px;font-size:13px;margin-bottom:10px}
-.banner.good{background:#e7f3ec;color:var(--ok)}
-.banner.bad{background:#fdeaea;color:var(--crimson)}
-.banner.mid{background:#fdf3e3;color:var(--warn)}
-.bar{height:8px;background:#e9ecec;border-radius:99px;overflow:hidden;margin:8px 0}
-.bar > i{display:block;height:100%;background:var(--gray);width:0;transition:width .25s}
-.pill{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;background:#eceeee;color:var(--muted);margin-left:6px;vertical-align:middle}
-.pill.pub{background:#fdeaea;color:var(--crimson)}
-.pill.on{background:#e7f3ec;color:var(--ok)}
-.pill.sup{background:#fdf3e3;color:var(--warn)}
-.item{border-top:1px solid var(--line);padding:10px 0}
+.note{font-size:12.5px;color:var(--muted);margin-top:7px;line-height:1.5}
+.note a{color:var(--crimson)}
+.err{color:var(--err)} .ok{color:var(--ok)} .warn{color:var(--warn)}
+.banner{padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:12px;border:1px solid transparent}
+.banner.good{background:rgba(95,208,138,.12);border-color:rgba(95,208,138,.35);color:var(--ok)}
+.banner.bad{background:rgba(236,35,41,.14);border-color:rgba(236,35,41,.45);color:var(--err)}
+.banner.mid{background:rgba(240,184,73,.12);border-color:rgba(240,184,73,.4);color:var(--warn)}
+.bar{height:8px;background:var(--field);border-radius:999px;overflow:hidden;margin:10px 0}
+.bar > i{display:block;height:100%;background:var(--crimson);width:0;transition:width .25s}
+.pill{display:inline-block;font:700 10px/1 var(--font-head);letter-spacing:.06em;padding:4px 9px;border-radius:999px;
+      background:var(--rapids-hi);color:var(--muted);margin-left:7px;vertical-align:middle;text-transform:uppercase}
+.pill.pub{background:var(--crimson);color:#fff}
+.pill.on{background:rgba(95,208,138,.2);color:var(--ok)}
+.pill.sup{background:rgba(240,184,73,.2);color:var(--warn)}
+.item{border-top:1px solid var(--line);padding:12px 0}
 .item:first-child{border-top:0}
-.item h3{margin:0 0 2px;font-size:14px}
-.steps{list-style:none;margin:8px 0 0;padding:0;font-size:13px}
-.steps li{padding:3px 0 3px 22px;position:relative;color:var(--muted)}
+.item h3{margin:0 0 3px;font:600 14px/1.3 var(--font-head)}
+.steps{list-style:none;margin:10px 0 0;padding:0;font-size:13px}
+.steps li{padding:4px 0 4px 24px;position:relative;color:var(--muted)}
 .steps li::before{content:"○";position:absolute;left:4px}
-.steps li.done{color:var(--ink)}
+.steps li.done{color:var(--text)}
 .steps li.done::before{content:"●";color:var(--ok)}
-.steps li.now{color:var(--ink);font-weight:600}
-.steps li.now::before{content:"◐";color:var(--gray)}
-#toast{position:fixed;left:12px;right:12px;bottom:14px;background:var(--ink);color:#fff;padding:11px 13px;border-radius:9px;font-size:14px;z-index:40}
-#modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
-#modalCard{background:#fff;border-radius:12px;padding:16px;max-width:420px;width:100%}
-#modalOptInRow{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding:10px;background:#fdf3e3;border-radius:8px}
+.steps li.now{color:#fff;font-weight:600}
+.steps li.now::before{content:"◐";color:var(--crimson)}
+#toast{position:fixed;left:12px;right:12px;bottom:16px;background:var(--rapids);border:1px solid var(--line);
+       color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
+#modalCard{background:var(--rapids);border:1px solid var(--line);border-radius:14px;padding:18px;max-width:420px;width:100%}
+#modalCard b{font-family:var(--font-head)}
+#modalOptInRow{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:11px;
+               background:rgba(236,35,41,.12);border:1px solid rgba(236,35,41,.4);border-radius:8px}
 #modalOptInRow input{margin-top:3px;width:18px;height:18px;flex:none}
-.diag{font-size:11px;color:var(--muted);margin-top:10px;word-break:break-word}
-.view[hidden]{display:none}
+.diag{font-size:11px;color:var(--muted);margin-top:12px;word-break:break-word;opacity:.75}
 </style>
 </head>
 <body>
@@ -206,7 +234,7 @@ const MANIFEST_KEY = "wri_nova_manifest";
 const params = new URLSearchParams(location.search);
 const EMBEDDED = window.top !== window;
 const $ = id => document.getElementById(id);
-const state = {username:"", badToken:null, retryAt:0, mapId:null, mapTitle:"", mapData:null,
+const state = {username:"", email:"", badToken:null, retryAt:0, mapId:null, mapTitle:"", mapData:null,
                projects:[], files:[], picks:0, maxPick:0, run:null, requests:{}, orthos:[],
                timer:null, busy:new Set(), cancel:false};
 
@@ -245,6 +273,7 @@ function readExbAuth(){
   diag.record = `Session in ${from}: user ${who||"?"}, ${!isFinite(exp)?"no expiry recorded":exp>Date.now()?"expires in "+Math.round((exp-Date.now())/60000)+" min":"expired"}.`;
   if (isFinite(exp) && exp-Date.now() < 2*60000){ diag.record+=" Waiting for the app to refresh it."; return null; }
   if (state.badToken && a.token===state.badToken){ diag.record+=" ArcGIS rejected it; waiting for a refresh."; return null; }
+  state.email = a.email || "";        // the walk-away alert goes here
   return {token:a.token, username:who, source:"fieldapp"};
 }
 function readSession(){
@@ -582,6 +611,7 @@ async function runUpload(){
       nova_project_id:projectId, nova_flight_id:flightId, nova_epoch_id:epoch.epochId,
       project:(state.projects.find(p=>p.id===projectId)||{}).name||currentProject()||"unknown",
       name, image_count:files.length-failed.length, max_dim:4096,
+      notify_email:state.email||null,
       target_map_id:state.mapId, mode:"convert", gateway_public:gw?1:0,
       requested_by:state.username, requested_at:Date.now(), status:"queued", attempts:0,
     });
