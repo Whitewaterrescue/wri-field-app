@@ -20,14 +20,15 @@
   incident map from the app's served cdn/N/config.json. window.confirm() is a no-op inside the ExB
   iframe, hence confirmBox().
 
-  THE UPLOADER RUNS IN ITS OWN TAB. ExB's embed widget sandboxes this frame
-  (sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation
-  allow-popups-to-escape-sandbox"), and WebKit suppresses the Files/"Browse" document picker for
-  <input type=file> inside a sandboxed frame -- so from in here a phone can only offer Photo
-  Library, which cannot reach a mounted card or aircraft, and whose lazily-fetched files die
-  mid-upload. `allow-popups-to-escape-sandbox` means a window we open is NOT sandboxed, so the
-  upload flow moves there: same origin, same exb_auth in localStorage, full picker, real wake lock.
-  The embedded copy keeps "On the map", which needs no file picking.
+  RUNS EMBEDDED. A standalone-tab workaround was tried on 2026-09-25 because ExB sandboxes this
+  frame and WebKit hides the Files/"Browse" picker in sandboxed frames -- but Browse never appeared
+  in either context, so the extra tab bought nothing and cost a step. Photos are picked from the
+  Photo Library, and every file is fully READ before it is sent (materialise()), which is what
+  actually made that reliable: an iCloud-backed photo downloads first instead of failing mid-upload.
+
+  NO PUBLIC GATEWAY. Orthos were dropped from the gateway entirely (Cody, 2026-09-25). They could
+  not go there anyway -- AGOL refuses to share hosted DYNAMIC imagery publicly, and dynamic is what
+  makes an ortho phone-safe.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -109,9 +110,6 @@ button.wide{width:100%;padding:15px;font-size:13px}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:18px;z-index:50}
 #modalCard{background:var(--rapids);border:1px solid var(--line);border-radius:14px;padding:18px;max-width:420px;width:100%}
 #modalCard b{font-family:var(--font-head)}
-#modalOptInRow{display:flex;gap:10px;align-items:flex-start;margin-top:14px;padding:11px;
-               background:rgba(236,35,41,.12);border:1px solid rgba(236,35,41,.4);border-radius:8px}
-#modalOptInRow input{margin-top:3px;width:18px;height:18px;flex:none}
 .diag{font-size:11px;color:var(--muted);margin-top:12px;word-break:break-word;opacity:.75}
 </style>
 </head>
@@ -146,15 +144,6 @@ button.wide{width:100%;padding:15px;font-size:13px}
 
     <!-- ===================================================== UPLOAD -->
     <section id="paneUpload">
-      <div class="card" id="frameCard" hidden>
-        <b>Open the uploader in its own tab</b>
-        <div class="note">The app frame cannot reach the SD card or the aircraft — iOS only offers
-          Photo Library in here, and those photos are fetched on demand and fail part-way through a
-          big upload. Its own tab gets the full <b>Browse</b> picker and keeps the screen awake.</div>
-        <button id="btnOpenUploader" class="wide" style="margin-top:12px">Open uploader</button>
-        <div class="note">Same sign-in, same incident. Come back to this tab for <b>On the map</b>.</div>
-      </div>
-
       <div class="card" id="resumeCard" hidden>
         <b>Finish the last upload?</b>
         <div class="note" id="resumeMsg"></div>
@@ -189,13 +178,6 @@ button.wide{width:100%;padding:15px;font-size:13px}
           sent, so an iCloud-backed one downloads first instead of failing mid-upload. Tap this
           button again to add more; they all go into one flight.</div>
         <div id="fileSummary" class="note"></div>
-
-        <label style="margin-top:14px">Publish to the public gateway</label>
-        <div class="row">
-          <input type="checkbox" id="gw" style="width:18px;height:18px;flex:none">
-          <span class="note" style="margin:0">Also put this ortho on the <b>public</b> responder gateway map.
-            Off = WRI organisation only.</span>
-        </div>
 
         <button id="btnUpload" class="wide" style="margin-top:14px" disabled>Upload and put on the map</button>
         <div class="note" id="readyNote"></div>
@@ -237,11 +219,6 @@ button.wide{width:100%;padding:15px;font-size:13px}
 <div id="modal" hidden><div id="modalCard">
   <b id="modalTitle"></b>
   <div class="note" id="modalText" style="margin-top:6px"></div>
-  <div id="modalOptInRow" hidden>
-    <input type="checkbox" id="modalOptIn">
-    <span class="note" style="margin:0">Also publish to the <b>public</b> gateway map. The imagery
-      becomes readable by anyone with its link.</span>
-  </div>
   <div class="row" style="margin-top:14px;justify-content:flex-end">
     <button id="modalNo" class="secondary">Cancel</button>
     <button id="modalYes">Confirm</button>
@@ -270,15 +247,6 @@ const UP_TRIES = 4;
 const MANIFEST_KEY = "wri_nova_manifest";
 const params = new URLSearchParams(location.search);
 const EMBEDDED = window.top !== window;
-// Uploading needs a picker the sandboxed ExB frame cannot give us. Opened windows escape the
-// sandbox (allow-popups-to-escape-sandbox), so that is where the upload flow lives.
-const CAN_PICK_FILES = !EMBEDDED;
-function openUploader(){
-  const w = window.open(location.pathname + "?uploader=1", "wriDroneUploader");
-  if(!w) { toastMsg("Allow pop-ups for this site, then tap again.", 6000); return false; }
-  try { w.focus(); } catch(e){}
-  return true;
-}
 const $ = id => document.getElementById(id);
 const state = {username:"", email:"", resume:null, badToken:null, retryAt:0, mapId:null, mapTitle:"", mapData:null,
                projects:[], files:[], picks:0, maxPick:0, run:null, requests:{}, orthos:[],
@@ -288,14 +256,11 @@ const state = {username:"", email:"", resume:null, badToken:null, retryAt:0, map
 function showView(id){ for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== id; }
 let toastT = null;
 function toastMsg(msg, ms=3400){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true, ms); }
-function confirmBox(title, text, yes="Confirm", optIn=false){   // window.confirm() is inert in the ExB iframe
+function confirmBox(title, text, yes="Confirm"){   // window.confirm() is inert in the ExB iframe
   return new Promise(res => {
     $("modalTitle").textContent=title; $("modalText").textContent=text; $("modalYes").textContent=yes;
-    const row=$("modalOptInRow"), box=$("modalOptIn");
-    row.hidden=!optIn; box.checked=false;                        // never remembered between requests
     const m=$("modal"); m.hidden=false;
-    const done=v=>{ m.hidden=true; $("modalYes").onclick=$("modalNo").onclick=null;
-                    res(v?{ok:true, gateway:optIn&&box.checked}:{ok:false}); };
+    const done=v=>{ m.hidden=true; $("modalYes").onclick=$("modalNo").onclick=null; res({ok:v}); };
     $("modalYes").onclick=()=>done(true); $("modalNo").onclick=()=>done(false);
   });
 }
@@ -525,7 +490,7 @@ function refreshReady(){
     : !name ? "Give the ortho a name."
     : `Ready: ${n} photos → Nova → the incident map.`;
 }
-$("btnPick").onclick=()=>{ if(CAN_PICK_FILES) $("files").click(); else openUploader(); };
+$("btnPick").onclick=()=>$("files").click();
 $("files").onchange=e=>{
   const got=Array.from(e.target.files||[]);
   state.picks++;
@@ -604,7 +569,7 @@ function loadManifest(){
 }
 function showResume(){
   const m=state.resume;
-  $("resumeCard").hidden = !m || !CAN_PICK_FILES;   // nothing to resume with, in the frame
+  $("resumeCard").hidden = !m;
   if(!m) return;
   $("resumeMsg").innerHTML=`<b>${esc(m.name)}</b> — ${m.doneNames.length} of ${m.total} photos reached Nova before it stopped.`;
   $("resumeFiles").textContent="";
@@ -658,7 +623,7 @@ async function runUpload(opts={}){
   const res=opts.resume||null;
   const projectId=res?res.projectId:$("proj").value;
   const name=res?res.name:$("orthoName").value.trim();
-  const gw=res?!!res.gw:$("gw").checked;
+  const gw=false;                      // orthos never go on the public gateway
   // On a resume only the files Nova has NOT seen go up. imageCount was locked when the flight was
   // created, so finishing the original set is exactly what makes Nova finalise.
   const doneSet=new Set(res?res.doneNames:[]);
@@ -666,8 +631,7 @@ async function runUpload(opts={}){
   if(!files.length){ toastMsg("Nothing left to upload."); return; }
   const conf=await confirmBox(
     res ? `Resume — upload the remaining ${files.length}?` : "Upload "+files.length+" photos?",
-    gw ? `“${name}” will be processed by Nova, put on the incident map, AND published to the PUBLIC gateway map.`
-       : `“${name}” will be processed by Nova and put on the incident map (WRI organisation only).`,
+    `“${name}” will be processed by Nova and put on the incident map.`,
     res ? "Resume" : "Upload");
   if(!conf.ok) return;
 
@@ -785,7 +749,7 @@ async function runUpload(opts={}){
   }
 }
 $("btnUpload").onclick=()=>runUpload();
-$("btnResumePick").onclick=()=>{ if(CAN_PICK_FILES) $("files").click(); else openUploader(); };
+$("btnResumePick").onclick=()=>$("files").click();
 $("btnResumeDrop").onclick=async()=>{
   const c=await confirmBox("Discard the unfinished upload?",
     "The photos already in Nova stay there, but this page will forget the flight. You would have to start a new one.","Discard");
@@ -795,7 +759,7 @@ $("btnResumeDrop").onclick=async()=>{
 $("btnResumeGo").onclick=()=>runUpload({resume:state.resume});
 $("btnRunCancel").onclick=()=>{ state.cancel=true; toastMsg("Cancelling…"); };
 $("btnRunDone").onclick=()=>{ state.files=[]; state.picks=0;
-  if(!state.resume){ $("orthoName").value=""; $("gw").checked=false; }
+  if(!state.resume){ $("orthoName").value=""; }
   $("runCard").hidden=true; $("formCard").hidden=false; showResume(); refreshReady(); };
 
 /* ============================================================ ON THE MAP */
@@ -822,7 +786,8 @@ function renderOrthos(){
     const busy=state.busy.has(o.src)||(req&&(req.status==="queued"||req.status==="processing"));
     const el=document.createElement("div"); el.className="item";
     const pills=[live?'<span class="pill on">ON THE MAP</span>':"",
-                 o.access==="public"?'<span class="pill pub">PUBLIC</span>':"",
+                 // an ortho should never be public now; if one is, say so loudly
+                 o.access==="public"?'<span class="pill pub">PUBLIC — TELL CODY</span>':"",
                  req&&req.status==="held"?'<span class="pill sup">HELD</span>':""].join("");
     el.innerHTML=`<h3>${esc(o.title)}${pills}</h3>
       <div class="note">${live?"Drawing on the incident map.":"Published — not on the map."}${req&&req.message?" · "+esc(req.message).slice(0,120):""}</div>
@@ -837,20 +802,18 @@ function renderOrthos(){
   }
 }
 async function act(mode,o){
-  const gwNow=o.access==="public";
   const conf=await confirmBox(
     mode==="detach"?"Remove from the map?":"Add to the incident map?",
-    mode==="detach"?`“${o.title}” comes off the incident map${gwNow?" and off the public gateway map":""}. The imagery item is kept.`
+    mode==="detach"?`“${o.title}” comes off the incident map. The imagery item is kept.`
                    :`“${o.title}” goes onto the incident map.`,
-    mode==="detach"?"Remove":"Add",
-    mode==="attach");
+    mode==="detach"?"Remove":"Add");
   if(!conf.ok) return;
   state.busy.add(o.src); renderOrthos();
   try {
     const {gid}=await queueRow({
       source_kind:"nova", source_id:o.src,
       project:o.project||currentProject()||"unknown", name:o.title,
-      target_map_id:state.mapId, mode, gateway_public:(mode==="attach"&&conf.gateway)?1:0,
+      target_map_id:state.mapId, mode, gateway_public:0,
       requested_by:state.username, requested_at:Date.now(), status:"queued", attempts:0,
     });
     await dispatch(gid);
@@ -860,19 +823,6 @@ async function act(mode,o){
 }
 
 /* ============================================================ tabs, poll, boot */
-$("btnOpenUploader").onclick=()=>openUploader();
-function applyFrameMode(){
-  // Inside the ExB frame the upload form is a dead end -- there is no way to reach the card from
-  // here -- so show the doorway instead of a form the pilot cannot complete.
-  $("frameCard").hidden = CAN_PICK_FILES;
-  $("formCard").hidden = !CAN_PICK_FILES;
-  if(!CAN_PICK_FILES) $("resumeCard").hidden = true;
-  if(!EMBEDDED){
-    // Unmistakable, so there is never a question about which context a test ran in
-    document.title = "WRI Drone Uploader";
-    document.querySelector("header h1").textContent = "Drone Uploader";
-  }
-}
 function selectTab(which){
   const up=which==="upload";
   $("tabUpload").setAttribute("aria-selected",String(up));
@@ -915,14 +865,11 @@ async function boot(){
   if(!getAuth()){ showAuth(); return; }
   try { await verifyAuth(); } catch(e){ showAuth(); return; }
   showView("viewMain");
-  applyFrameMode();
   renderDiag();
   await currentMap();
   await novaHealth();
   await loadProjects();
   await refreshAll();
-  // The uploader tab exists to do one thing; do not make the pilot find the tab first.
-  if(!EMBEDDED && params.get("uploader")==="1") selectTab("upload");
   // a half-finished upload from a previous session: the photos are still on the card, so the
   // honest thing is to say so rather than pretend it can resume itself
   state.resume=loadManifest();
