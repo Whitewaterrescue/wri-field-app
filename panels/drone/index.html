@@ -137,6 +137,19 @@ button.wide{width:100%;padding:15px;font-size:13px}
 
     <!-- ===================================================== UPLOAD -->
     <section id="paneUpload">
+      <div class="card" id="resumeCard" hidden>
+        <b>Finish the last upload?</b>
+        <div class="note" id="resumeMsg"></div>
+        <div class="note">Add the same photos again — the ones already in Nova are skipped, so only
+          the missing ones upload. Pick them from <b>Browse</b>.</div>
+        <button id="btnResumePick" class="secondary wide" style="margin-top:10px">Add photos from the card…</button>
+        <div class="note" id="resumeFiles"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="btnResumeGo" disabled>Resume upload</button>
+          <button id="btnResumeDrop" class="secondary">Discard</button>
+        </div>
+      </div>
+
       <div class="card" id="formCard">
         <label for="proj">Nova project</label>
         <div class="row">
@@ -150,10 +163,13 @@ button.wide{width:100%;padding:15px;font-size:13px}
         <div class="note">Becomes the flight name in Nova and the layer name on the map.</div>
 
         <label>Photos</label>
-        <input type="file" id="files" multiple accept="image/jpeg,image/tiff,.jpg,.jpeg,.tif,.tiff" style="display:none">
+        <input type="file" id="files" multiple style="display:none">
         <button id="btnPick" class="secondary wide">Add photos from the card…</button>
-        <div class="note" id="pickNote">Pick from <b>Files</b> (not Photos) — browse the card at
-          <code>DCIM</code>. You can tap this again to add more; they all go into one flight.</div>
+        <div class="note" id="pickNote">In the sheet choose <b>Browse</b>, then open the aircraft or
+          card and go to <code>DCIM</code>. Tap <b>Select</b>, then the photos.<br>
+          <b>Avoid Photo Library</b> — those files are fetched on demand and can fail part-way
+          through an upload. You can tap this button again to add more; they all go into one
+          flight.</div>
         <div id="fileSummary" class="note"></div>
 
         <label style="margin-top:14px">Publish to the public gateway</label>
@@ -227,14 +243,17 @@ const REQUESTS_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/
 const NOVA_URL     = "https://wri-nova.cody-6ec.workers.dev";         // the wri-nova Cloudflare Worker
 const DISPATCH_URL = "https://script.google.com/macros/s/AKfycbxfNt0qmV37WmLTsCxBsHj873kIZJWoYZQumbY40SBu5hMjkGcjr2WMoh1WPu5gZXVw/exec";
 const POLL_MS = 10000, QUERY_TIMEOUT_MS = 30000;
-const URL_BATCH = 25;      // presigned URLs expire in ~600 s: mint a few at a time, use immediately
-const UP_PARALLEL = 4;     // Nova allows parallel uploads; client bandwidth is the bottleneck
+const URL_BATCH = 10;      // presigned URLs expire in ~600 s: mint a few at a time, use immediately.
+                           // 10 not 25 -- each one makes the Worker fan out that many upstream
+                           // calls, and a slow round trip on a phone is what times out.
+const UP_PARALLEL = 3;     // Nova allows parallel uploads; client bandwidth is the bottleneck.
+                           // 3 leaves headroom so the control-plane calls are not starved.
 const UP_TRIES = 4;
 const MANIFEST_KEY = "wri_nova_manifest";
 const params = new URLSearchParams(location.search);
 const EMBEDDED = window.top !== window;
 const $ = id => document.getElementById(id);
-const state = {username:"", email:"", badToken:null, retryAt:0, mapId:null, mapTitle:"", mapData:null,
+const state = {username:"", email:"", resume:null, badToken:null, retryAt:0, mapId:null, mapTitle:"", mapData:null,
                projects:[], files:[], picks:0, maxPick:0, run:null, requests:{}, orthos:[],
                timer:null, busy:new Set(), cancel:false};
 
@@ -340,7 +359,7 @@ function handleErr(e, where){
 }
 
 /* ============================================================ the Nova Worker */
-async function nova(path, opts={}){
+async function novaOnce(path, opts={}){
   const auth=getAuth(); if(!auth) throw new AuthError("Signed out");
   const ac=new AbortController(); const t=setTimeout(()=>ac.abort(), opts.timeout||45000);
   try {
@@ -355,6 +374,23 @@ async function nova(path, opts={}){
     }
     return j;
   } catch(e){ if(e&&e.name==="AbortError") throw new Error("Nova request timed out"); throw e; } finally { clearTimeout(t); }
+}
+// A control-plane call failing must not throw away an upload that is half done. On a phone these
+// drop for ordinary reasons -- a tunnel, a cell handover -- and Safari reports them as the
+// famously unhelpful "TypeError: Load failed". An auth failure is NOT retried: it will not fix
+// itself and the user has to sign in again.
+async function nova(path, opts={}){
+  let last=null;
+  for(let i=0;i<3;i++){
+    if(state.cancel) throw new Error("cancelled");
+    try { return await novaOnce(path, opts); }
+    catch(e){
+      if(e instanceof AuthError) throw e;
+      last=e;
+      await sleep(800*Math.pow(2,i));
+    }
+  }
+  throw new Error((last&&last.message||last)+" (after 3 tries)");
 }
 
 async function novaHealth(){
@@ -467,6 +503,12 @@ $("files").onchange=e=>{
   e.target.value="";
   toastMsg(`Added ${added} photo${added===1?"":"s"}${got.length-added?` (${got.length-added} already in the list)`:""}`);
   refreshReady(); renderDiag();
+  if(state.resume){
+    const doneSet=new Set(state.resume.doneNames);
+    const missing=state.files.filter(f=>!doneSet.has(f.name)).length;
+    $("resumeFiles").textContent=`${state.files.length} selected · ${missing} still to upload`;
+    $("btnResumeGo").disabled=missing===0;
+  }
 };
 $("orthoName").oninput=refreshReady;
 $("proj").onchange=refreshReady;
@@ -512,8 +554,29 @@ async function takeWakeLock(){
 }
 function dropWakeLock(){ try{ wakeLock&&wakeLock.release(); }catch(e){} wakeLock=null; }
 
+// The manifest records WHICH filenames landed, not just how many. That is what makes a resume
+// possible: a dropped upload used to throw away everything already sent (69 photos, died at 35).
+// Only the manifest is stored -- never the blobs. The photos are still on the card, so re-picking
+// them is cheaper and far more reliable than trying to cache ~1.5 GB in the browser.
 function saveManifest(m){ try{ localStorage.setItem(MANIFEST_KEY,JSON.stringify(m)); }catch(e){} }
-function clearManifest(){ try{ localStorage.removeItem(MANIFEST_KEY); }catch(e){} }
+function clearManifest(){ try{ localStorage.removeItem(MANIFEST_KEY); }catch(e){} state.resume=null; }
+function loadManifest(){
+  try {
+    const m=JSON.parse(localStorage.getItem(MANIFEST_KEY)||"null");
+    if(!m||!m.flightId||!Array.isArray(m.doneNames)) return null;
+    if(Date.now()-(m.at||0) > 86400000) return null;         // a day old: the incident has moved on
+    if(m.doneNames.length >= m.total) return null;           // it actually finished
+    return m;
+  } catch(e){ return null; }
+}
+function showResume(){
+  const m=state.resume;
+  $("resumeCard").hidden=!m;
+  if(!m) return;
+  $("resumeMsg").innerHTML=`<b>${esc(m.name)}</b> — ${m.doneNames.length} of ${m.total} photos reached Nova before it stopped.`;
+  $("resumeFiles").textContent="";
+  $("btnResumeGo").disabled=true;
+}
 
 async function putWithRetry(url, file){
   let last=null;
@@ -526,19 +589,34 @@ async function putWithRetry(url, file){
       if(r.ok) return true;
       last=new Error("HTTP "+r.status);
       if(r.status===403) break;          // a signature failure will not fix itself
-    } catch(e){ last=e; }
+    } catch(e){
+      last=e;
+      // "Load failed" here usually means the FILE could not be read, not that the network died --
+      // a Photo Library pick whose backing asset was never materialised. Retrying will not
+      // conjure it, so say something the pilot can act on.
+      if(/load failed|not readable|NotFoundError|NotReadableError/i.test(String(e&&e.message||e)))
+        throw new Error("could not read " + file.name + " from the phone (pick from Browse, not Photo Library)");
+    }
     await sleep(600*Math.pow(2,i)*(1+Math.random()*0.5));
   }
   throw last||new Error("upload failed");
 }
 
-async function runUpload(){
-  const projectId=$("proj").value, name=$("orthoName").value.trim();
-  const files=state.files.slice(), gw=$("gw").checked;
-  const conf=await confirmBox("Upload "+files.length+" photos?",
+async function runUpload(opts={}){
+  const res=opts.resume||null;
+  const projectId=res?res.projectId:$("proj").value;
+  const name=res?res.name:$("orthoName").value.trim();
+  const gw=res?!!res.gw:$("gw").checked;
+  // On a resume only the files Nova has NOT seen go up. imageCount was locked when the flight was
+  // created, so finishing the original set is exactly what makes Nova finalise.
+  const doneSet=new Set(res?res.doneNames:[]);
+  const files=state.files.filter(f=>!doneSet.has(f.name));
+  if(!files.length){ toastMsg("Nothing left to upload."); return; }
+  const conf=await confirmBox(
+    res ? `Resume — upload the remaining ${files.length}?` : "Upload "+files.length+" photos?",
     gw ? `“${name}” will be processed by Nova, put on the incident map, AND published to the PUBLIC gateway map.`
        : `“${name}” will be processed by Nova and put on the incident map (WRI organisation only).`,
-    "Upload");
+    res ? "Resume" : "Upload");
   if(!conf.ok) return;
 
   state.cancel=false;
@@ -550,15 +628,23 @@ async function runUpload(){
 
   try {
     /* ---- 1. flight ------------------------------------------------- */
-    step("upload","now"); runMsg("Creating the flight in Nova…"); runBar(0.02);
-    // imageCount is LOCKED at creation and is what makes Nova finalise without waiting on a
-    // timeout -- which is why the photos are chosen before this call, never after.
-    const fl=await nova("/nova/flights",{body:{projectId,name,imageCount:files.length}});
-    const flightId=fl.flightId;
-    saveManifest({projectId,flightId,name,total:files.length,done:0,at:Date.now()});
+    step("upload","now"); runBar(0.02);
+    let flightId, total, sent;
+    if(res){
+      flightId=res.flightId; total=res.total; sent=res.doneNames.slice();
+      runMsg(`Resuming — ${files.length} photos left of ${total}…`);
+    } else {
+      runMsg("Creating the flight in Nova…");
+      // imageCount is LOCKED at creation and is what makes Nova finalise without waiting on a
+      // timeout -- which is why the photos are chosen before this call, never after.
+      const fl=await nova("/nova/flights",{body:{projectId,name,imageCount:files.length}});
+      flightId=fl.flightId; total=files.length; sent=[];
+    }
+    state.resume={projectId,flightId,name,gw,total,doneNames:sent,at:Date.now()};
+    saveManifest(state.resume);
 
     /* ---- 2. upload straight to Nova's S3 --------------------------- */
-    let done=0, failed=[];
+    let done=sent.length, failed=[];
     for(let i=0;i<files.length;i+=URL_BATCH){
       if(state.cancel) throw new Error("cancelled");
       const batch=files.slice(i,i+URL_BATCH);
@@ -569,20 +655,25 @@ async function runUpload(){
         while(idx<batch.length){
           const f=batch[idx++]; const u=byName.get(f.name);
           if(!u||!u.uploadUrl){ failed.push(f.name); continue; }
-          try { await putWithRetry(u.uploadUrl,f); }
-          catch(e){ if(state.cancel) throw e; failed.push(f.name); }
+          try { await putWithRetry(u.uploadUrl,f); sent.push(f.name); }
+          catch(e){ if(state.cancel) throw e; failed.push(f.name + ": " + (e&&e.message||e)); }
           done++;
-          runBar(0.05+0.55*(done/files.length));
-          runMsg(`Uploading ${done} of ${files.length}…  keep this screen on`);
-          saveManifest({projectId,flightId,name,total:files.length,done,at:Date.now()});
+          runBar(0.05+0.55*(done/total));
+          runMsg(`Uploading ${done} of ${total}…  keep this screen on`);
+          // written after EVERY file: whatever kills the run, the next attempt starts here
+          state.resume={projectId,flightId,name,gw,total,doneNames:sent,at:Date.now()};
+          saveManifest(state.resume);
         }
       }
       await Promise.all(Array.from({length:Math.min(UP_PARALLEL,batch.length)},worker));
     }
-    if(failed.length > files.length*0.1){
-      throw new Error(`${failed.length} of ${files.length} photos failed to upload — move to better signal and start again`);
+    if(sent.length < total){
+      // Nova will not finalise until imageCount photos have landed, so stopping here and keeping
+      // the manifest is the honest outcome -- the pilot re-picks and resumes rather than losing
+      // everything already sent.
+      throw new Error(`${sent.length} of ${total} photos uploaded — ${failed[0]||"some failed"}. `
+                      + `Reopen this page to resume; the ones already sent are skipped.`);
     }
-    if(failed.length) toastMsg(`${failed.length} photo(s) failed; continuing with ${files.length-failed.length}`);
     step("upload","done");
 
     /* ---- 3. wait for the epoch ------------------------------------- */
@@ -610,13 +701,13 @@ async function runUpload(){
       source_kind:"nova", source_id:srcId,
       nova_project_id:projectId, nova_flight_id:flightId, nova_epoch_id:epoch.epochId,
       project:(state.projects.find(p=>p.id===projectId)||{}).name||currentProject()||"unknown",
-      name, image_count:files.length-failed.length, max_dim:4096,
+      name, image_count:sent.length, max_dim:4096,
       notify_email:state.email||null,
       target_map_id:state.mapId, mode:"convert", gateway_public:gw?1:0,
       requested_by:state.username, requested_at:Date.now(), status:"queued", attempts:0,
     });
     await dispatch(gid);
-    clearManifest();
+    clearManifest();                       // the flight is complete and queued; nothing to resume
 
     /* ---- 5. watch the worker --------------------------------------- */
     for(let i=0;i<120;i++){
@@ -638,12 +729,22 @@ async function runUpload(){
   } finally {
     dropWakeLock();
     $("btnRunCancel").hidden=true; $("btnRunDone").hidden=false;
+    state.resume=loadManifest();
   }
 }
 $("btnUpload").onclick=()=>runUpload();
+$("btnResumePick").onclick=()=>$("files").click();
+$("btnResumeDrop").onclick=async()=>{
+  const c=await confirmBox("Discard the unfinished upload?",
+    "The photos already in Nova stay there, but this page will forget the flight. You would have to start a new one.","Discard");
+  if(!c.ok) return;
+  clearManifest(); showResume(); toastMsg("Discarded.");
+};
+$("btnResumeGo").onclick=()=>runUpload({resume:state.resume});
 $("btnRunCancel").onclick=()=>{ state.cancel=true; toastMsg("Cancelling…"); };
-$("btnRunDone").onclick=()=>{ state.files=[]; state.picks=0; $("orthoName").value=""; $("gw").checked=false;
-  $("runCard").hidden=true; $("formCard").hidden=false; refreshReady(); };
+$("btnRunDone").onclick=()=>{ state.files=[]; state.picks=0;
+  if(!state.resume){ $("orthoName").value=""; $("gw").checked=false; }
+  $("runCard").hidden=true; $("formCard").hidden=false; showResume(); refreshReady(); };
 
 /* ============================================================ ON THE MAP */
 async function loadOrthos(){
@@ -752,13 +853,8 @@ async function boot(){
   await refreshAll();
   // a half-finished upload from a previous session: the photos are still on the card, so the
   // honest thing is to say so rather than pretend it can resume itself
-  try {
-    const m=JSON.parse(localStorage.getItem(MANIFEST_KEY)||"null");
-    if(m&&m.done<m.total&&Date.now()-m.at<86400000){
-      toastMsg(`An earlier upload of “${m.name}” stopped at ${m.done}/${m.total}. Re-pick the photos and upload again.`,8000);
-      clearManifest();
-    }
-  } catch(e){}
+  state.resume=loadManifest();
+  showResume();
 }
 boot();
 })();
