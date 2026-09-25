@@ -183,11 +183,11 @@ button.wide{width:100%;padding:15px;font-size:13px}
         <label>Photos</label>
         <input type="file" id="files" multiple style="display:none">
         <button id="btnPick" class="secondary wide">Add photos from the card…</button>
-        <div class="note" id="pickNote">In the sheet choose <b>Browse</b>, then open the aircraft or
-          card and go to <code>DCIM</code>. Tap <b>Select</b>, then the photos.<br>
-          <b>Avoid Photo Library</b> — those files are fetched on demand and can fail part-way
-          through an upload. You can tap this button again to add more; they all go into one
-          flight.</div>
+        <div class="note" id="pickNote">If the sheet offers <b>Browse</b> or <b>Choose File</b>, use it
+          and open the aircraft or card at <code>DCIM</code> — that gets the originals.
+          <b>Photo Library also works</b>: each photo is now fully read off the phone before it is
+          sent, so an iCloud-backed one downloads first instead of failing mid-upload. Tap this
+          button again to add more; they all go into one flight.</div>
         <div id="fileSummary" class="note"></div>
 
         <label style="margin-top:14px">Publish to the public gateway</label>
@@ -319,7 +319,9 @@ function readExbAuth(){
   diag.record = `Session in ${from}: user ${who||"?"}, ${!isFinite(exp)?"no expiry recorded":exp>Date.now()?"expires in "+Math.round((exp-Date.now())/60000)+" min":"expired"}.`;
   if (isFinite(exp) && exp-Date.now() < 2*60000){ diag.record+=" Waiting for the app to refresh it."; return null; }
   if (state.badToken && a.token===state.badToken){ diag.record+=" ArcGIS rejected it; waiting for a refresh."; return null; }
-  state.email = a.email || "";        // the walk-away alert goes here
+  // exb_auth.email is often the AGOL username, not an address -- only trust it if it looks
+  // like one. portals/self gives the real address in verifyAuth() below.
+  if (a.email && /.+@.+\..+/.test(a.email)) state.email = a.email;
   return {token:a.token, username:who, source:"fieldapp"};
 }
 function readSession(){
@@ -371,14 +373,18 @@ async function rest(url, fields, opts={}){
 let verified={token:null,username:""};
 async function verifyAuth(){
   const auth=getAuth(); if(!auth) throw new AuthError("Signed out");
-  if(verified.token===auth.token){ state.username=verified.username; return; }
+  if(verified.token===auth.token){ state.username=verified.username;
+    if(verified.email) state.email=verified.email; return; }
   diag.verify="Checking the session with ArcGIS…"; renderAuthDiag();
   const j=await rest(PORTAL+"/sharing/rest/portals/self",{},{label:"session check"});
   const u=j&&j.user;
   if(!u||!u.username){ dropAuth(auth.token); diag.verify="ArcGIS did not recognise the session."; renderAuthDiag(); throw new AuthError("no user"); }
   const org=u.orgId||j.id;                  // orgId, never urlKey (a JS-API sign-in reads 'www')
   if(org&&org!==ORG_ID){ dropAuth(auth.token); diag.verify=`Signed in as ${u.username}, but not in the WRI organisation.`; renderAuthDiag(); throw new AuthError("wrong org"); }
-  verified={token:auth.token,username:u.username}; state.username=u.username; diag.verify="";
+  // the authoritative address for the walk-away alert
+  const mail = (u.email && /.+@.+\..+/.test(u.email)) ? u.email : "";
+  verified={token:auth.token,username:u.username,email:mail};
+  state.username=u.username; if(mail) state.email=mail; diag.verify="";
 }
 function handleErr(e, where){
   if(e instanceof AuthError){ toastMsg("Signed out of ArcGIS. Sign in again."); showAuth(); return; }
@@ -605,6 +611,26 @@ function showResume(){
   $("btnResumeGo").disabled=true;
 }
 
+// iOS hands Photo Library files over lazily: the File object exists but its bytes may still be
+// in iCloud, and the fetch that streams it is where that surfaces -- as Safari's opaque
+// "TypeError: Load failed", halfway through an upload, with no way to tell it apart from a
+// network drop. Reading the file FIRST forces materialisation (including an iCloud download),
+// makes the failure attributable to one named photo, and makes it retryable. Cost is one
+// buffered copy of a ~3-8 MB frame at a time, which is nothing next to losing the run.
+async function materialise(file){
+  let last=null;
+  for(let i=0;i<3;i++){
+    if(state.cancel) throw new Error("cancelled");
+    try {
+      const buf=await file.arrayBuffer();
+      if(!buf || !buf.byteLength) throw new Error("empty");
+      return new Blob([buf], {type:file.type||"image/jpeg"});
+    } catch(e){ last=e; await sleep(700*(i+1)); }
+  }
+  throw new Error(`could not read ${file.name} off the phone (${last&&last.message||last}) — `
+                  + `if it came from Photo Library it may still be in iCloud; open Photos and let it download, or pick from the card`);
+}
+
 async function putWithRetry(url, file){
   let last=null;
   for(let i=0;i<UP_TRIES;i++){
@@ -612,17 +638,16 @@ async function putWithRetry(url, file){
     try {
       // The presigned URL carries its own auth; Nova's doc is explicit that the token must NOT be
       // sent here, and adding headers would also trip an S3 signature mismatch.
-      const r=await fetch(url,{method:"PUT",body:file});
+      const body=await materialise(file);       // throws with a name if the photo is not really here
+      const r=await fetch(url,{method:"PUT",body});
       if(r.ok) return true;
       last=new Error("HTTP "+r.status);
       if(r.status===403) break;          // a signature failure will not fix itself
     } catch(e){
       last=e;
-      // "Load failed" here usually means the FILE could not be read, not that the network died --
-      // a Photo Library pick whose backing asset was never materialised. Retrying will not
-      // conjure it, so say something the pilot can act on.
-      if(/load failed|not readable|NotFoundError|NotReadableError/i.test(String(e&&e.message||e)))
-        throw new Error("could not read " + file.name + " from the phone (pick from Browse, not Photo Library)");
+      // materialise() already retried the read and says which photo it was -- do not spend the
+      // upload retries on a file that is not on the device
+      if(/could not read /.test(String(e&&e.message||e))) throw e;
     }
     await sleep(600*Math.pow(2,i)*(1+Math.random()*0.5));
   }
@@ -729,7 +754,7 @@ async function runUpload(opts={}){
       nova_project_id:projectId, nova_flight_id:flightId, nova_epoch_id:epoch.epochId,
       project:(state.projects.find(p=>p.id===projectId)||{}).name||currentProject()||"unknown",
       name, image_count:sent.length, max_dim:4096,
-      notify_email:state.email||null,
+      notify_email:(/.+@.+\..+/.test(state.email||"") ? state.email : null),
       target_map_id:state.mapId, mode:"convert", gateway_public:gw?1:0,
       requested_by:state.username, requested_at:Date.now(), status:"queued", attempts:0,
     });
@@ -842,7 +867,11 @@ function applyFrameMode(){
   $("frameCard").hidden = CAN_PICK_FILES;
   $("formCard").hidden = !CAN_PICK_FILES;
   if(!CAN_PICK_FILES) $("resumeCard").hidden = true;
-  if(!EMBEDDED) document.title = "WRI Drone Uploader";
+  if(!EMBEDDED){
+    // Unmistakable, so there is never a question about which context a test ran in
+    document.title = "WRI Drone Uploader";
+    document.querySelector("header h1").textContent = "Drone Uploader";
+  }
 }
 function selectTab(which){
   const up=which==="upload";
@@ -857,6 +886,10 @@ $("btnRefresh").onclick=()=>refreshAll();
 
 function renderDiag(wake){
   const bits=[];
+  bits.push(EMBEDDED ? "in the app frame" : "own tab");
+  const ua=navigator.userAgent||"";
+  const m=ua.match(/(iPhone|iPad|Android)[^)]*/);
+  if(m) bits.push(m[0].replace(/_/g,".").slice(0,40));
   if(state.maxPick) bits.push(`largest single pick: ${state.maxPick} file(s) over ${state.picks} pick(s)`);
   if(wake!=null) bits.push("screen wake lock: "+(wake?"held":"NOT available in this frame"));
   else if(navigator.wakeLock) bits.push("screen wake lock: supported");
