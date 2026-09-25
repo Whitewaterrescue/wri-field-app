@@ -19,6 +19,15 @@
   Same-origin panel: it reads the Field App's own ArcGIS session out of `exb_auth` and finds the live
   incident map from the app's served cdn/N/config.json. window.confirm() is a no-op inside the ExB
   iframe, hence confirmBox().
+
+  THE UPLOADER RUNS IN ITS OWN TAB. ExB's embed widget sandboxes this frame
+  (sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation
+  allow-popups-to-escape-sandbox"), and WebKit suppresses the Files/"Browse" document picker for
+  <input type=file> inside a sandboxed frame -- so from in here a phone can only offer Photo
+  Library, which cannot reach a mounted card or aircraft, and whose lazily-fetched files die
+  mid-upload. `allow-popups-to-escape-sandbox` means a window we open is NOT sandboxed, so the
+  upload flow moves there: same origin, same exb_auth in localStorage, full picker, real wake lock.
+  The embedded copy keeps "On the map", which needs no file picking.
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -137,6 +146,15 @@ button.wide{width:100%;padding:15px;font-size:13px}
 
     <!-- ===================================================== UPLOAD -->
     <section id="paneUpload">
+      <div class="card" id="frameCard" hidden>
+        <b>Open the uploader in its own tab</b>
+        <div class="note">The app frame cannot reach the SD card or the aircraft — iOS only offers
+          Photo Library in here, and those photos are fetched on demand and fail part-way through a
+          big upload. Its own tab gets the full <b>Browse</b> picker and keeps the screen awake.</div>
+        <button id="btnOpenUploader" class="wide" style="margin-top:12px">Open uploader</button>
+        <div class="note">Same sign-in, same incident. Come back to this tab for <b>On the map</b>.</div>
+      </div>
+
       <div class="card" id="resumeCard" hidden>
         <b>Finish the last upload?</b>
         <div class="note" id="resumeMsg"></div>
@@ -252,6 +270,15 @@ const UP_TRIES = 4;
 const MANIFEST_KEY = "wri_nova_manifest";
 const params = new URLSearchParams(location.search);
 const EMBEDDED = window.top !== window;
+// Uploading needs a picker the sandboxed ExB frame cannot give us. Opened windows escape the
+// sandbox (allow-popups-to-escape-sandbox), so that is where the upload flow lives.
+const CAN_PICK_FILES = !EMBEDDED;
+function openUploader(){
+  const w = window.open(location.pathname + "?uploader=1", "wriDroneUploader");
+  if(!w) { toastMsg("Allow pop-ups for this site, then tap again.", 6000); return false; }
+  try { w.focus(); } catch(e){}
+  return true;
+}
 const $ = id => document.getElementById(id);
 const state = {username:"", email:"", resume:null, badToken:null, retryAt:0, mapId:null, mapTitle:"", mapData:null,
                projects:[], files:[], picks:0, maxPick:0, run:null, requests:{}, orthos:[],
@@ -492,7 +519,7 @@ function refreshReady(){
     : !name ? "Give the ortho a name."
     : `Ready: ${n} photos → Nova → the incident map.`;
 }
-$("btnPick").onclick=()=>$("files").click();
+$("btnPick").onclick=()=>{ if(CAN_PICK_FILES) $("files").click(); else openUploader(); };
 $("files").onchange=e=>{
   const got=Array.from(e.target.files||[]);
   state.picks++;
@@ -571,7 +598,7 @@ function loadManifest(){
 }
 function showResume(){
   const m=state.resume;
-  $("resumeCard").hidden=!m;
+  $("resumeCard").hidden = !m || !CAN_PICK_FILES;   // nothing to resume with, in the frame
   if(!m) return;
   $("resumeMsg").innerHTML=`<b>${esc(m.name)}</b> — ${m.doneNames.length} of ${m.total} photos reached Nova before it stopped.`;
   $("resumeFiles").textContent="";
@@ -733,7 +760,7 @@ async function runUpload(opts={}){
   }
 }
 $("btnUpload").onclick=()=>runUpload();
-$("btnResumePick").onclick=()=>$("files").click();
+$("btnResumePick").onclick=()=>{ if(CAN_PICK_FILES) $("files").click(); else openUploader(); };
 $("btnResumeDrop").onclick=async()=>{
   const c=await confirmBox("Discard the unfinished upload?",
     "The photos already in Nova stay there, but this page will forget the flight. You would have to start a new one.","Discard");
@@ -808,6 +835,15 @@ async function act(mode,o){
 }
 
 /* ============================================================ tabs, poll, boot */
+$("btnOpenUploader").onclick=()=>openUploader();
+function applyFrameMode(){
+  // Inside the ExB frame the upload form is a dead end -- there is no way to reach the card from
+  // here -- so show the doorway instead of a form the pilot cannot complete.
+  $("frameCard").hidden = CAN_PICK_FILES;
+  $("formCard").hidden = !CAN_PICK_FILES;
+  if(!CAN_PICK_FILES) $("resumeCard").hidden = true;
+  if(!EMBEDDED) document.title = "WRI Drone Uploader";
+}
 function selectTab(which){
   const up=which==="upload";
   $("tabUpload").setAttribute("aria-selected",String(up));
@@ -846,11 +882,14 @@ async function boot(){
   if(!getAuth()){ showAuth(); return; }
   try { await verifyAuth(); } catch(e){ showAuth(); return; }
   showView("viewMain");
+  applyFrameMode();
   renderDiag();
   await currentMap();
   await novaHealth();
   await loadProjects();
   await refreshAll();
+  // The uploader tab exists to do one thing; do not make the pilot find the tab first.
+  if(!EMBEDDED && params.get("uploader")==="1") selectTab("upload");
   // a half-finished upload from a previous session: the photos are still on the card, so the
   // honest thing is to say so rather than pretend it can resume itself
   state.resume=loadManifest();
