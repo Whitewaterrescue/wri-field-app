@@ -219,6 +219,7 @@ button.wide{width:100%;padding:15px;font-size:13px}
 <div id="modal" hidden><div id="modalCard">
   <b id="modalTitle"></b>
   <div class="note" id="modalText" style="margin-top:6px"></div>
+  <input type="text" id="modalInput" hidden style="margin-top:12px" maxlength="60" autocapitalize="words">
   <div class="row" style="margin-top:14px;justify-content:flex-end">
     <button id="modalNo" class="secondary">Cancel</button>
     <button id="modalYes">Confirm</button>
@@ -259,9 +260,27 @@ function toastMsg(msg, ms=3400){ const t=$("toast"); t.textContent=msg; t.hidden
 function confirmBox(title, text, yes="Confirm"){   // window.confirm() is inert in the ExB iframe
   return new Promise(res => {
     $("modalTitle").textContent=title; $("modalText").textContent=text; $("modalYes").textContent=yes;
+    $("modalInput").hidden=true;                 // shared modal: never inherit a prompt's field
     const m=$("modal"); m.hidden=false;
     const done=v=>{ m.hidden=true; $("modalYes").onclick=$("modalNo").onclick=null; res({ok:v}); };
     $("modalYes").onclick=()=>done(true); $("modalNo").onclick=()=>done(false);
+  });
+}
+// prompt()/alert()/confirm() are ALL inert inside ExB's embed iframe -- its sandbox has no
+// allow-modals -- and they fail silently, so a button just appears to do nothing. Anything that
+// needs an answer from the pilot has to be an in-page overlay.
+function promptBox(title, text, value="", yes="Create"){
+  return new Promise(res => {
+    $("modalTitle").textContent=title; $("modalText").textContent=text; $("modalYes").textContent=yes;
+    const inp=$("modalInput"); inp.hidden=false; inp.value=value;
+    const m=$("modal"); m.hidden=false;
+    setTimeout(()=>{ try{ inp.focus(); inp.select(); }catch(e){} }, 50);
+    const done=v=>{ m.hidden=true; inp.hidden=true;
+                    $("modalYes").onclick=$("modalNo").onclick=inp.onkeydown=null;
+                    res(v?inp.value.trim():null); };
+    $("modalYes").onclick=()=>done(true); $("modalNo").onclick=()=>done(false);
+    inp.onkeydown=e=>{ if(e.key==="Enter"){ e.preventDefault(); done(true); }
+                       else if(e.key==="Escape"){ done(false); } };
   });
 }
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -531,7 +550,8 @@ async function loadProjects(){
 }
 $("btnNewProj").onclick=async()=>{
   const name=($("orthoName").value.trim()||currentProject()||"").trim();
-  const want=prompt("New Nova project name:", name||"");
+  const want=await promptBox("New Nova project", "Name it after the incident so it matches the map "
+                             + "(e.g. 2609ssrt).", name||"", "Create");
   if(!want) return;
   try {
     const d=await nova("/nova/projects",{body:{name:want.trim()}});
