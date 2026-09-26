@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-<script src="pano-annot.js?v=ac9414c5b6b8"></script>
+<script src="pano-annot.js?v=bd9c436c6313"></script>
 <style>
   /* WRI 360 Annotator -- Field App panel. Draw points, lines and areas with labels ON a sphere;
      everyone who opens that sphere from the map sees them.
@@ -166,6 +166,7 @@
       <button class="tool" id="tPoint"><span class="gl">&#9679;</span>Point</button>
       <button class="tool" id="tLine"><span class="gl">&#9585;</span>Line</button>
       <button class="tool" id="tArea"><span class="gl">&#9648;</span>Area</button>
+      <button class="tool" id="tFlow"><span class="gl" style="color:#1e78ff">&#10142;</span>Flow</button>
       <button class="tool" id="tUndo"><span class="gl">&#8630;</span>Undo</button>
       <button class="tool" id="tDelete"><span class="gl">&#10005;</span>Delete</button>
     </div>
@@ -476,7 +477,8 @@ async function refreshList(){
 /* ============================================================ Draw view */
 const round2 = n => Math.round(n * 100) / 100;
 const newId = () => Math.random().toString(36).slice(2, 7);
-const MIN_PTS = {point: 1, line: 2, area: 3};
+const MIN_PTS = {point: 1, line: 2, area: 3, flow: 2};
+const wrapYaw = y => ((y + 180) % 360 + 360) % 360 - 180;
 
 function setTool(t){
   state.tool = t;
@@ -496,7 +498,12 @@ function renderHint(){
   } else if (state.tool === "point") msg = "Tap the thing you want to name. Drag to look around.";
   else if (state.tool === "line") msg = "Tap along the feature. Drag to look around.";
   else if (state.tool === "area") msg = "Tap around the area. Drag to look around.";
-  else if (state.sel) msg = "Drag a handle to move it. <b>Delete</b> removes it.";
+  else if (state.sel) {
+    const sel = state.shapes.find(x => x.id === state.sel);
+    msg = sel && sel.kind === "flow"
+      ? "Drag either end to aim and size it, or its middle to move it. <b>Delete</b> removes it."
+      : "Drag a handle to move it. <b>Delete</b> removes it.";
+  }
   else msg = state.shapes.length ? "Tap a label to edit it, or pick a tool below." : "Pick a tool below and tap on the sphere.";
   h.innerHTML = msg;
   h.hidden = false;
@@ -555,11 +562,17 @@ function onPointerDown(e){
   if (!state.overlay) return;
   if (state.tool === "select" && !state.draft) {
     const hit = state.overlay.hitTest(e.clientX, e.clientY, HIT);
-    if (hit && hit.vertex !== null && state.sel === hit.shape.id) {
-      drag = {shape: hit.shape, vertex: hit.vertex, id: e.pointerId};
-      suspendPan(true);
-      e.stopPropagation();
-      return;
+    if (hit && state.sel === hit.shape.id) {
+      if (hit.vertex !== null) {
+        drag = {shape: hit.shape, vertex: hit.vertex, id: e.pointerId};
+      } else if (hit.shape.kind === "flow") {
+        // Whole-arrow drag: flow only, matching the photo annotator's draggable-body arrows.
+        // Existing line/area shapes keep today's vertex-only editing.
+        drag = {shape: hit.shape, vertex: null, id: e.pointerId,
+                from: state.overlay.unproject(e.clientX, e.clientY),
+                orig: hit.shape.pts.map(p => p.slice())};
+      }
+      if (drag) { suspendPan(true); e.stopPropagation(); return; }
     }
   }
   down = {x: e.clientX, y: e.clientY, id: e.pointerId};
@@ -568,7 +581,13 @@ function onPointerDown(e){
 function onPointerMove(e){
   if (!drag || e.pointerId !== drag.id) return;
   const c = state.overlay.unproject(e.clientX, e.clientY);
-  drag.shape.pts[drag.vertex] = [round2(c[0]), round2(c[1])];
+  if (drag.vertex !== null) {
+    drag.shape.pts[drag.vertex] = [round2(c[0]), round2(c[1])];
+  } else {
+    const dyaw = wrapYaw(c[0] - drag.from[0]), dpitch = c[1] - drag.from[1];
+    drag.shape.pts = drag.orig.map(p =>
+      [round2(wrapYaw(p[0] + dyaw)), round2(Math.max(-90, Math.min(90, p[1] + dpitch)))]);
+  }
   state.overlay.invalidate();
   e.stopPropagation();
 }
@@ -612,6 +631,30 @@ function finishDraft(){
   state.shapes.push(d);
   state.sel = d.id;
   markDirty(); setTool("select"); redraw(); editLabel(d);
+}
+
+/**
+ * Drops a fixed-blue flow arrow straddling the current view centre, at the camera's pitch --
+ * mirrors the GRP photo annotator's "Flow" tool, which places instead of requiring tap-tap-tap.
+ * The user then drags it into position (body) or either end (aim/length), same as that tool.
+ */
+function addFlow(){
+  if (!state.overlay) return;
+  const cam = state.overlay.cam();
+  const spread = Math.max(4, Math.min(18, cam.hfov * 0.12));
+  const s = {
+    id: newId(), kind: "flow", label: "Flow",
+    pts: [
+      [round2(wrapYaw(cam.yaw - spread)), round2(cam.pitch)],
+      [round2(wrapYaw(cam.yaw + spread)), round2(cam.pitch)]
+    ]
+  };
+  state.shapes.push(s);
+  markDirty();
+  setTool("select");
+  state.sel = s.id;
+  renderHint();          // setTool() rendered the hint against the OLD selection; refresh it now
+  redraw();
 }
 
 function undo(){
@@ -718,7 +761,12 @@ async function openPano(p){
       try {
         const parsed = JSON.parse(f.attributes.annot_json || "{}");
         state.shapes = (parsed.shapes || []).filter(A.validShape)
-          .map(s => ({id: s.id || newId(), kind: s.kind, label: s.label || "", pts: s.pts}));
+          .map(s => {
+            const o = {id: s.id || newId(), kind: s.kind, label: s.label || "", pts: s.pts};
+            if (s.c) o.c = s.c;
+            if (s.note) o.note = s.note;
+            return o;
+          });
       } catch (e) { toastMsg("The saved labels could not be read; starting empty."); }
     }
   } catch (e) { handleErr(e, "labels"); }
@@ -860,6 +908,7 @@ $("tSelect").onclick = () => setTool("select");
 $("tPoint").onclick  = () => setTool("point");
 $("tLine").onclick   = () => setTool("line");
 $("tArea").onclick   = () => setTool("area");
+$("tFlow").onclick   = addFlow;
 $("tUndo").onclick   = undo;
 $("tDelete").onclick = deleteSel;
 $("btnSave").onclick = save;
