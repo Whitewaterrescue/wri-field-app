@@ -42,7 +42,6 @@ var PRECACHE = [
   './panels/trailers/index.html',
   './panels/gateway/index.html',
   './panels/livestream/index.html',
-  './panels/orthos/index.html',
   './panels/drone/index.html',
   './panels/panos/index.html',
   './panels/grp-annotator/index.html',
