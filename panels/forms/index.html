@@ -243,6 +243,18 @@
     }
   });
 
+  // P3: the GAS apps (Recon, HASP, Vessel, JSA, SSP, dashboards ...) take ?incident=.
+  // Open them on the phone's incident choice (incident gate / map chip, shared on this origin).
+  function withIncident(u) {
+    var key = '';
+    try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) key = c.key || c.id; } catch (e) {}
+    if (!key || !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(u)) return u;
+    try { var x = new URL(u); x.searchParams.set('incident', key); return x.toString(); } catch (e) { return u; }
+  }
+  // the choice can change while this page is open (gate / map chip): redraw the links
+  window.addEventListener('storage', function (e) { if (e.key === 'wri_incident_choice' && allApps) render(); });
+  window.addEventListener('message', function (e) { if (e.origin === location.origin && e.data && /^wri-incident/.test(e.data.type || '') && allApps) render(); });
+
   function loadCache() {
     try {
       var c = JSON.parse(localStorage.getItem(CACHE_KEY));
@@ -344,14 +356,14 @@
         esc(a.name) + '<span class="caret">&#9660;</span></button><div class="submenu">';
       subs.forEach(function (s) {
         h += s.url
-          ? '<a class="submenu-link" href="' + esc(s.url) + '" target="_blank" rel="noopener" data-open' +
+          ? '<a class="submenu-link" href="' + esc(withIncident(s.url)) + '" target="_blank" rel="noopener" data-open' +
             ' data-embed="' + (s.embed === false ? '0' : '1') + '" data-name="' + esc(s.name) + '">' + esc(s.name) + '</a>'
           : '<span class="submenu-link dead">' + esc(s.name) + '</span>';
       });
       return h + '</div></div>';
     }
     if (!a.url) return '';
-    return '<a class="app-btn ' + color + ' ' + width + '" href="' + esc(a.url) + '" target="_blank" rel="noopener" data-open' +
+    return '<a class="app-btn ' + color + ' ' + width + '" href="' + esc(withIncident(a.url)) + '" target="_blank" rel="noopener" data-open' +
       ' data-embed="' + (a.embed === false ? '0' : '1') + '" data-name="' + esc(a.name) + '">' + esc(a.name) + '</a>';
   }
 
