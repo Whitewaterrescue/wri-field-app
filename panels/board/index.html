@@ -239,7 +239,14 @@ function signIn(){
 }
 window.addEventListener("message", e => {
   if (e.origin !== location.origin) return;
-  const d=e.data; if(!d||d.type!=="arcgis-auth") return;
+  const d=e.data;
+  // P3: the map's Incident Picker switched incident -> the board follows
+  if (d && d.type==="wri-incident" && d.incident && d.incident.incident_id && !new URLSearchParams(location.search).get("incident")) {
+    const id = String(d.incident.incident_id);
+    if (id !== state.pick) { state.pick = id; lsSet(LS_PICK, id); state.prevSig=null; load(true); }
+    return;
+  }
+  if(!d||d.type!=="arcgis-auth") return;
   if(d.error||!d.token){ showAuthErr("ArcGIS sign-in failed"+(d.error?": "+d.error:"")); return; }
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token:String(d.token), expiresAt:Date.now()+(Number(d.expires_in)||7200)*1000})); } catch(x){}
   state.badToken=null; load(true);
@@ -293,9 +300,23 @@ function pickIncident(list){
   if (want) { const hit = list.find(i => m(i.incident_id)===want || m(i.project_key)===want || m(i.incident_name)===want);
     if (hit) return {inc:hit, pinned:true};
     return {inc:null, pinned:true}; }       // a pinned incident that isn't open: never show a different one
+  // P3: follow the map's Incident Picker (incident-scope) when it has one
+  const mapInc = mapIncidentId();
   const last = lsGet(LS_PICK);
-  return {inc: list.find(i => String(i.incident_id)===last)
+  return {inc: (mapInc && list.find(i => String(i.incident_id)===mapInc))
+            || list.find(i => String(i.incident_id)===last)
             || list.find(i => i.is_primary==="yes") || list[0] || null, pinned:false};
+}
+/* The incident the map's Incident Picker shows: window.top.__wriIncident (same
+   origin), else its remembered pick. '' when there is no picker. */
+function mapIncidentId(){
+  try { const w = window.top && window.top.__wriIncident; if (w && w.incident_id) return String(w.incident_id); } catch(x){}
+  try { const p = JSON.parse(localStorage.getItem("wri_incident_scope")||"null"); if (p && p.id) return String(p.id); } catch(x){}
+  return "";
+}
+/* Picking here moves the map too (incident-scope listens for wri-incident-pick). */
+function tellMap(id){
+  try { window.top.postMessage({type:"wri-incident-pick", incident_id:id}, location.origin); } catch(x){}
 }
 
 async function fetchBoard(){
@@ -327,7 +348,7 @@ function renderPicker(list, inc, pinned){
     sel.hidden=true; chip.hidden=!inc; chip.textContent = inc ? (inc.incident_name||inc.incident_id) : "";
   }
 }
-$("incPick").onchange = e => { state.pick = e.target.value; lsSet(LS_PICK, state.pick); state.prevSig=null; load(true); };
+$("incPick").onchange = e => { state.pick = e.target.value; lsSet(LS_PICK, state.pick); state.prevSig=null; tellMap(state.pick); load(true); };
 
 const fmtTime = ms => ms ? new Date(ms).toLocaleString([], {month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit"}) : "";
 const label = s => String(s||"").replace(/_/g," ");
