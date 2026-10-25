@@ -472,7 +472,8 @@
         "1",
         "2",
         "3",
-        "4"
+        "4",
+        "5"
       ],
       "content": {
         "0": {
@@ -566,6 +567,19 @@
         "4": {
           "type": "WIDGET",
           "widgetId": "widget_40",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {}
+        },
+        "5": {
+          "type": "WIDGET",
+          "widgetId": "widget_48",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -2826,6 +2840,27 @@
       },
       "useDataSourcesEnabled": false,
       "useDataSources": []
+    },
+    "widget_48": {
+      "id": "widget_48",
+      "uri": "widgets/incident-scope/",
+      "version": "1.0.0",
+      "label": "Incident Picker",
+      "config": {
+        "incidentsUrl": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Incident_Ops_field_view/FeatureServer/0",
+        "clientFilter": "",
+        "packs": {
+          "bnsf": "5e30a96b8bcc4d6f981ce7b7435c61c0",
+          "mtwy": "e6406c338b7c4e8598503d4e15cb9f62",
+          "up": "ecff87d286874a8d864c2a9935811ea6"
+        },
+        "position": "top-left",
+        "offsetTop": 46,
+        "zoomScale": 72000
+      },
+      "useMapWidgetIds": [
+        "widget_1"
+      ]
     }
   },
   "widgetsManifest": {},

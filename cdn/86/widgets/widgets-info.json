@@ -12159,6 +12159,39 @@
     "group": 7
   },
   {
+    "name": "incident-scope",
+    "manifest": {
+      "name": "incident-scope",
+      "label": "Incident Picker",
+      "type": "widget",
+      "version": "1.0.0",
+      "exbVersion": "1.20.0",
+      "author": "Whitewater Rescue Institute",
+      "description": "Incident picker for the incident maps. Lists the open incidents from the WRI incident registry and, on a pick, re-filters every incident-scoped layer on the live map to that incident (the same project-style filters the activation runner rewrites), adds that client's extra layers (client layer packs), zooms to the incident and tells the other widgets and panels. Deep-links with ?incident=<id or project name>; remembers the last pick per device. With one incident open it is just a name chip.",
+      "copyright": "WRI",
+      "license": "",
+      "properties": {
+        "hasSettingPage": false
+      },
+      "dependency": [
+        "jimu-arcgis"
+      ],
+      "translatedLocales": [
+        "en"
+      ],
+      "defaultSize": {
+        "width": 1,
+        "height": 1
+      }
+    },
+    "i18nLabel": {},
+    "i18nDescription": {},
+    "uri": "widgets/incident-scope/",
+    "icon": "widgets/incident-scope/icon.svg",
+    "order": 700,
+    "group": 7
+  },
+  {
     "name": "ortho-trim",
     "manifest": {
       "name": "ortho-trim",
