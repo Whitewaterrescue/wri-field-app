@@ -382,6 +382,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_24": {
+      "id": "page_24",
+      "label": "Incident QR",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_incident_qr",
+        "MEDIUM": "layout_incident_qr",
+        "SMALL": "layout_incident_qr"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -427,7 +442,8 @@
     {
       "page_22": [
         "page_5",
-        "page_9"
+        "page_9",
+        "page_24"
       ]
     }
   ],
@@ -1452,6 +1468,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_47",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_incident_qr": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_49",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -2862,6 +2911,19 @@
       "useMapWidgetIds": [
         "widget_1"
       ]
+    },
+    "widget_49": {
+      "id": "widget_49",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Incident QR",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/incident-qr/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
     }
   },
   "widgetsManifest": {},
