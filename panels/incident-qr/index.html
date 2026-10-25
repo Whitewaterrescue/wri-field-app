@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Incident QR</title>
+<!--
+  Incident QR (Phase 3, 2026-10-25) -- Field App "Ops" folder.
+  Shows a scannable code for each OPEN incident. Scanning puts the phone on that
+  incident with no question: the link carries ?incident=<project name>, and the
+  incident gate (incident-gate.js) makes it the phone's choice for the day.
+    WRI staff        -> the Field App (check-in, map, board, uploads all on that incident)
+    Staff check-in   -> wri-checkin only
+    Responders       -> wri-respond (external responder gateway; PIN as usual)
+  The open-incident list is the gateway's public 'openincidents' (no sign-in needed).
+  QR drawing: Nayuki qrcodegen (MIT), vendored beside this file -- works offline.
+-->
+<script src="qrcodegen.js"></script>
+<style>
+:root{--bg:#0f1419;--card:#1f2933;--line:#3e4c59;--txt:#f1f5f9;--mute:#9aa5b1;--red:#EC2329}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.35 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 24px)}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--mute);margin:0 0 14px;font-size:13px}
+label{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:12px 0 6px}
+select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--txt);font:600 16px/1.2 inherit}
+.tabs{display:flex;gap:6px;margin-top:12px}
+.tabs button{flex:1;padding:10px 6px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--txt);font:600 13px/1.2 inherit;cursor:pointer}
+.tabs button.on{border-color:var(--red);background:#2a1a1c}
+.qrwrap{margin-top:14px;background:#fff;border-radius:16px;padding:18px;text-align:center;color:#111;border-top:10px solid var(--band,#94a3b8)}
+.qrwrap svg{width:100%;max-width:340px;height:auto;display:block;margin:0 auto}
+.qrname{font:800 24px/1.1 inherit;margin-top:10px}
+.qrfor{font:600 14px/1.2 inherit;color:#444;margin-top:4px}
+.url{word-break:break-all;font-size:12px;color:#555;margin-top:8px}
+.row{display:flex;gap:8px;margin-top:12px}
+.row button{flex:1;padding:12px;border-radius:10px;border:0;background:var(--card);color:var(--txt);font:700 14px/1.2 inherit;cursor:pointer;border:1px solid var(--line)}
+.row button.busy{opacity:.6}
+.note{color:var(--mute);font-size:13px;margin-top:12px}
+.err{color:#fca5a5}
+@media print{body{background:#fff}main>*:not(.qrwrap){display:none}.qrwrap{border:0}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Incident QR</h1>
+  <p class="sub">Post it at the ICP or staging, or show it on your screen. Scanning puts the phone on that incident — no choosing.</p>
+  <div id="state" class="note">Loading open incidents…</div>
+  <div id="ui" hidden>
+    <label for="inc">Incident</label>
+    <select id="inc"></select>
+    <div class="tabs" role="tablist">
+      <button data-k="app" class="on" role="tab">WRI staff</button>
+      <button data-k="checkin" role="tab">Staff check-in</button>
+      <button data-k="respond" role="tab">Responders</button>
+    </div>
+    <div class="qrwrap" id="qrwrap">
+      <div id="qr"></div>
+      <div class="qrname" id="qrname"></div>
+      <div class="qrfor" id="qrfor"></div>
+      <div class="url" id="url"></div>
+    </div>
+    <div class="row">
+      <button id="btnShare">Share link</button>
+      <button id="btnCopy">Copy link</button>
+      <button id="btnPrint">Print</button>
+    </div>
+    <p class="note" id="foot"></p>
+  </div>
+</main>
+<script>
+(function(){
+"use strict";
+const API = "https://script.google.com/macros/s/AKfycbx7p4-A8F6G_VedgHsw3RDJgwJK1GKVAFcvSah1JdjIdG5g7PAcvXhHRKHk_ULIhdL0KA/exec";
+const SITE = "https://whitewaterrescue.github.io";
+const TARGETS = {
+  app:     { path: "/wri-field-app/", label: "WRI staff — opens the Field App on this incident" },
+  checkin: { path: "/wri-checkin/",   label: "Staff check-in for this incident" },
+  respond: { path: "/wri-respond/",   label: "Outside responders — check in to this incident" }
+};
+const COLORS = { bnsf: "#F47A20", up: "#FFC72C", mtwy: "#2E7DD7", wri: "#EC2329" };
+const LABELS = { bnsf: "BNSF", up: "UP", mtwy: "MT/WY Coop", wri: "WRI" };
+const $ = id => document.getElementById(id);
+let list = [], tab = "app";
+
+function choiceId(){
+  try { const c = JSON.parse(localStorage.getItem("wri_incident_choice") || "null"); if (c && c.id && c.expires > Date.now()) return String(c.id); } catch (e) {}
+  return "";
+}
+function svgFor(text){
+  const qr = window.qrcodegen.QrCode.encodeText(text, window.qrcodegen.QrCode.Ecc.MEDIUM);
+  const n = qr.size, b = 4, parts = [];
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.getModule(x, y)) parts.push(`M${x + b},${y + b}h1v1h-1z`);
+  return `<svg viewBox="0 0 ${n + b * 2} ${n + b * 2}" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">` +
+    `<rect width="100%" height="100%" fill="#fff"/><path d="${parts.join("")}" fill="#000"/></svg>`;
+}
+function current(){ return list.find(r => r.incident_id === $("inc").value) || null; }
+function link(){
+  const r = current(); if (!r) return "";
+  return SITE + TARGETS[tab].path + "?incident=" + encodeURIComponent(r.project_key || r.incident_id);
+}
+function render(){
+  const r = current(); if (!r) return;
+  const u = link();
+  $("qr").innerHTML = svgFor(u);
+  $("qrname").textContent = r.project_key || r.incident_name;
+  const cl = String(r.client || "").toLowerCase();
+  $("qrfor").textContent = (LABELS[cl] ? LABELS[cl] + " · " : "") + TARGETS[tab].label;
+  $("qrwrap").style.setProperty("--band", COLORS[cl] || "#94a3b8");
+  $("url").textContent = u;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.k === tab));
+  $("foot").textContent = tab === "respond"
+    ? "Responders still enter the gateway PIN. The link only decides which incident they check in to."
+    : "The phone stays on this incident until 3 am, or until someone picks another one on the map.";
+}
+function busy(btn, on){ btn.disabled = on; btn.classList.toggle("busy", on); }
+$("btnCopy").onclick = async e => {
+  const b = e.currentTarget; busy(b, true);
+  try { await navigator.clipboard.writeText(link()); b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy link", 1500); }
+  catch (x) { prompt("Copy this link", link()); }
+  busy(b, false);
+};
+$("btnShare").onclick = async e => {
+  const b = e.currentTarget, r = current(); busy(b, true);
+  try {
+    if (navigator.share) await navigator.share({ title: "Incident " + (r.project_key || ""), text: TARGETS[tab].label, url: link() });
+    else { await navigator.clipboard.writeText(link()); b.textContent = "Link copied"; setTimeout(() => b.textContent = "Share link", 1500); }
+  } catch (x) { /* share sheet dismissed */ }
+  busy(b, false);
+};
+$("btnPrint").onclick = () => window.print();
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.k; render(); });
+$("inc").onchange = render;
+
+fetch(API + "?api=openincidents&ts=" + Date.now(), { redirect: "follow" })
+  .then(r => r.json())
+  .then(j => {
+    if (!j || !j.ok) throw new Error((j && j.error && j.error.message) || "bad response");
+    list = (j.data && j.data.incidents) || [];
+    if (!list.length) { $("state").textContent = "No incident is open."; return; }
+    const pick = choiceId();
+    $("inc").innerHTML = list.map(r => `<option value="${r.incident_id}">${(r.project_key || r.incident_name).replace(/</g, "&lt;")}` +
+      `${r.client ? " · " + (LABELS[String(r.client).toLowerCase()] || r.client) : ""}${r.is_primary ? " (primary)" : ""}</option>`).join("");
+    $("inc").value = list.some(r => r.incident_id === pick) ? pick : list[0].incident_id;
+    $("state").hidden = true; $("ui").hidden = false;
+    render();
+  })
+  .catch(e => { $("state").innerHTML = '<span class="err">Could not load the open incidents (' + String(e.message || e) + '). Check the connection and reopen this page.</span>'; });
+})();
+</script>
+</body>
+</html>
