@@ -9,7 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-<script src="pano-annot.js?v=bc5b36eb103c"></script>
+<script src="pano-annot.js?v=9af68d128524"></script>
 <style>
   /* WRI 360 Annotator -- Field App panel. Draw points, lines and areas with labels ON a sphere;
      everyone who opens that sphere from the map sees them.
@@ -198,6 +198,15 @@ const ANNOT_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/ser
 // The incident sphere set, pinned first in the picker because it is the one used during a response.
 const PANO_LAYER_ID   = "wri_incident_panos";
 const PANO_SOURCE_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRIIncident360Panoramas/FeatureServer/0";
+/* P3 (several incidents open at once): the incident the map's Incident Picker
+   (incident-scope) shows on this device -- window.top.__wriIncident, same origin.
+   It overrides the web map's own 360 filter (that is the PRIMARY incident), so a
+   sphere goes to the incident the crew is working. null = no picker. */
+const CLIENT_LABEL = {bnsf: "BNSF", up: "UP", mtwy: "MT/WY Coop", wri: "WRI"};
+function pickedIncident(){
+  try { const w = window.top && window.top.__wriIncident; if (w && w.project_key) return w; } catch (e) {}
+  return null;
+}
 const CLIENTS = {"5e30a96b8bcc4d6f981ce7b7435c61c0": "BNSF", "ecff87d286874a8d864c2a9935811ea6": "UP",
                  "e6406c338b7c4e8598503d4e15cb9f62": "MT/WY Coop", "373f7625cfc74c87a8523fbaf7ad9691": "WRI"};
 
@@ -276,7 +285,11 @@ function signIn(){
 }
 window.addEventListener("message", e => {
   if (e.origin !== location.origin) return;
-  const d = e.data; if (!d || d.type !== "arcgis-auth") return;
+  const d = e.data;
+  // P3: the map's Incident Picker switched incident -> reload against it
+  // (only from the sphere list -- never pull someone out of a sphere they are annotating)
+  if (d && d.type === "wri-incident" && d.incident && d.incident.project_key !== state.project && getAuth() && !$("viewPick").hidden) { try { sessionStorage.removeItem("wri_pano_sources"); } catch (x) {} boot(); return; }
+  if (!d || d.type !== "arcgis-auth") return;
   if (d.error || !d.token) { showAuthErr("ArcGIS sign-in failed" + (d.error ? ": " + d.error : "")); return; }
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token: String(d.token), username: String(d.username || ""), expiresAt: Date.now() + (Number(d.expires_in) || 7200) * 1000})); } catch (x) {}
   state.badToken = null; boot();
@@ -354,6 +367,8 @@ async function currentMap(){
     const de = layer && ((layer.layerDefinition || {}).definitionExpression || "");
     const m = /project_name\s*=\s*'([^']+)'/i.exec(de || "");
     state.project = m ? m[1] : null;
+    const picked = pickedIncident();
+    if (picked) { state.project = picked.project_key; state.client = CLIENT_LABEL[picked.client] || state.client; }
     $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b>` +
       (state.project ? ` · project <b>${esc(state.project)}</b>` : " · no project filter on the 360 layer") +
       (state.client ? ` · ${esc(state.client)}` : "");
