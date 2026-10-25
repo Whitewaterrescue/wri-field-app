@@ -2856,6 +2856,7 @@
         },
         "position": "top-left",
         "offsetTop": 46,
+        "phonePosition": "",
         "zoomScale": 72000
       },
       "useMapWidgetIds": [
