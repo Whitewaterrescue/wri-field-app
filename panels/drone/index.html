@@ -326,7 +326,7 @@ window.addEventListener("message", e => {
   if (e.origin !== location.origin) return;
   const d=e.data;
   // P3: the map's Incident Picker switched incident -> project default + "on the map" list follow
-  if (d && d.type==="wri-incident" && d.incident && state.projects) { loadProjects(); loadTargetMap().then(()=>{ try { renderOrthos(); } catch(x){} }); return; }
+  if (d && (d.type==="wri-incident" || d.type==="wri-incident-choice") && state.projects) { loadProjects(); loadTargetMap().then(()=>{ incidentBanner(); try { renderOrthos(); } catch(x){} }); return; }
   if(!d||d.type!=="arcgis-auth") return;
   if(d.error||!d.token){ showAuthErr("ArcGIS sign-in failed"+(d.error?": "+d.error:"")); return; }
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token:String(d.token), username:String(d.username||""), expiresAt:Date.now()+(Number(d.expires_in)||7200)*1000})); } catch(x){}
@@ -455,6 +455,7 @@ async function currentMap(){
   state.mapData=await rest(PORTAL+"/sharing/rest/content/items/"+state.mapId+"/data",{},{label:"map data"});
   $("mapline").innerHTML=`Incident map: <b>${esc(state.mapTitle)}</b>`;
   await loadTargetMap();
+  incidentBanner();
 }
 /* P3: the map a picked incident's orthos go on (its client's stable map). "On the map" states
    are read from it; null when it is this app's own map. */
@@ -479,7 +480,32 @@ function currentProject(){
    shows on this device -- window.top.__wriIncident, same origin. null = no picker. */
 function pickedIncident(){
   try { const w=window.top&&window.top.__wriIncident; if(w&&w.project_key) return w; } catch(e){}
+  // the phone's incident choice (incident gate / map chip), even when the map page was never opened
+  try {
+    const c=JSON.parse(localStorage.getItem("wri_incident_choice")||"null");
+    if(c&&c.id&&c.expires>Date.now()) return {incident_id:c.id,project_key:c.key,incident_name:c.name,client:c.client,webmap_id:""};
+  } catch(e){}
   return null;
+}
+const CLIENT_LABEL={bnsf:"BNSF",up:"UP",mtwy:"MT/WY Coop",wri:"WRI"};
+const CLIENT_COLOR={bnsf:"#F47A20",up:"#FFC72C",mtwy:"#2E7DD7",wri:"#EC2329"};
+/* Big, unmissable "where does this go" line (P3: two incidents can be open). The ortho is
+   FILED to the incident (wri_project tag + map) whatever the Nova project is called. */
+function incidentBanner(){
+  let el=document.getElementById("incBanner");
+  if(!el){
+    el=document.createElement("div"); el.id="incBanner";
+    el.style.cssText="margin:10px 0 6px;padding:10px 12px;border-radius:10px;background:#1f2933;border-left:6px solid #94a3b8;font:600 15px/1.3 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#f1f5f9";
+    const a=document.getElementById("mapline"); a.parentNode.insertBefore(el,a);
+  }
+  const picked=pickedIncident(), proj=currentProject();
+  const cl=String((picked&&picked.client)||"").toLowerCase();
+  el.style.borderLeftColor=CLIENT_COLOR[cl]||"#94a3b8";
+  const mapName=cl?(CLIENT_LABEL[cl]||cl.toUpperCase())+" incident map":"the incident map";
+  el.innerHTML=proj
+    ? `Orthos go to <b style="font-size:18px">${esc(proj)}</b>${cl?" · "+esc(CLIENT_LABEL[cl]||cl.toUpperCase()):""}`+
+      `<div style="font-weight:500;font-size:13px;opacity:.8;margin-top:2px">Published onto the ${esc(mapName)}${picked?"":" (primary incident)"}. Change it with the incident chip on the map.</div>`
+    : `<span style="color:#fca5a5">No incident to file to — open the Incident Map and pick one.</span>`;
 }
 // each client's stable incident map (wri-incident-setup/clients.json): an ortho for a picked
 // incident is published onto THAT incident's map, not whichever map this app happens to run on
@@ -574,8 +600,8 @@ async function loadProjects(){
     // matches one exactly -- pick it rather than making the pilot hunt.
     const hit=state.projects.find(p=>guess&&p.name.toLowerCase()===guess.toLowerCase());
     if(hit) sel.value=hit.id;
-    $("projNote").textContent = hit ? `Matched the incident ${pickedIncident() ? "picked on the map" : "on the map"} (${guess}).`
-      : guess ? `No Nova project called “${guess}” — pick one or create it.` : "";
+    $("projNote").textContent = hit ? `Matched the incident ${pickedIncident() ? "picked on this phone" : "on the map"} (${guess}).`
+      : guess ? `No Nova project called “${guess}” — pick one or create it. Either way the ortho is filed to ${guess}.` : "";
   } catch(e){ $("proj").innerHTML='<option value="">— could not load —</option>'; handleErr(e,"Nova projects"); }
   refreshReady();
 }
@@ -767,7 +793,8 @@ async function runUpload(opts={}){
     const {gid}=await queueRow({
       source_kind:"nova", source_id:srcId,
       nova_project_id:projectId, nova_flight_id:flightId, nova_epoch_id:epoch.epochId,
-      project:(state.projects.find(p=>p.id===projectId)||{}).name||currentProject()||"unknown",
+      // P3: filed to the INCIDENT (tag + map), not to whatever the Nova project is called
+      project:currentProject()||(state.projects.find(p=>p.id===projectId)||{}).name||"unknown",
       name, image_count:sent.length, max_dim:4096,
       notify_email:(/.+@.+\..+/.test(state.email||"") ? state.email : null),
       target_map_id:targetMapId(), mode:"convert", gateway_public:gw?1:0,
