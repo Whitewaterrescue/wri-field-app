@@ -67,9 +67,38 @@
               expires: next3am(), how: how || 'picked' };
     try { localStorage.setItem(KEY, JSON.stringify(c)); } catch (e) {}
     announce(c);
+    pointDashboards(c);
     return c;
   }
   function clear() { try { localStorage.removeItem(KEY); } catch (e) {} }
+
+  // The GAS dashboards (Sit Stat, Ops, Resource Manager ...) take ?incident=: point every
+  // dashboard link / embed in this app at the phone's choice, including ones rendered later.
+  var GAS_RE = /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/, gasValue = '', gasObs = null;
+  function withIncident(u) {
+    try {
+      var x = new URL(u);
+      if (!GAS_RE.test(x.origin + x.pathname) || !gasValue || x.searchParams.get('incident') === gasValue) return u;
+      x.searchParams.set('incident', gasValue);
+      return x.toString();
+    } catch (e) { return u; }
+  }
+  function patchGas() {
+    document.querySelectorAll('a[href*="script.google.com/macros/s/"]').forEach(function (a) { var n = withIncident(a.href); if (n !== a.href) a.href = n; });
+    document.querySelectorAll('iframe[src*="script.google.com/macros/s/"]').forEach(function (f) { var n = withIncident(f.src); if (n !== f.src) f.src = n; });
+  }
+  function pointDashboards(c) {
+    gasValue = c && c.key ? c.key : '';
+    if (!gasValue) return;
+    whenBody(function () {
+      patchGas();
+      if (!gasObs && window.MutationObserver) {
+        var t = null;
+        gasObs = new MutationObserver(function () { if (t) return; t = setTimeout(function () { t = null; patchGas(); }, 250); });
+        gasObs.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['href', 'src'] });
+      }
+    });
+  }
 
   var loadedId = (read() || {}).id || '';
   var openList = null;
@@ -249,6 +278,7 @@
     }
     var cur = read();
     if (cur && list.some(function (r) { return String(r.incident_id) === cur.id; })) {
+      pointDashboards(cur);
       setTimeout(mismatchCheck, 4000);
       setInterval(function () { if (document.visibilityState === 'visible') mismatchCheck(); }, 900000);
       return;
