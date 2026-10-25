@@ -196,7 +196,10 @@ function signIn(){
 }
 window.addEventListener("message", e => {
   if (e.origin !== location.origin) return;
-  const d = e.data; if (!d || d.type !== "arcgis-auth") return;
+  const d = e.data;
+  // P3: the map's Incident Picker switched incident -> spheres + uploads follow it
+  if (d && d.type === "wri-incident" && d.incident && d.incident.project_key !== state.project && getAuth()) { boot(); return; }
+  if (!d || d.type !== "arcgis-auth") return;
   if (d.error || !d.token) { showAuthErr("ArcGIS sign-in failed" + (d.error ? ": " + d.error : "")); return; }
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token: String(d.token), username: String(d.username || ""), expiresAt: Date.now() + (Number(d.expires_in) || 7200) * 1000})); } catch (x) {}
   state.badToken = null; boot();
@@ -245,6 +248,15 @@ function handleErr(e, where){
 }
 
 /* ============================================================ The incident map */
+/* P3 (several incidents open at once): the incident the map's Incident Picker
+   (incident-scope) shows on this device -- window.top.__wriIncident, same origin.
+   It overrides the web map's own 360 filter (that is the PRIMARY incident), so a
+   sphere goes to the incident the crew is working. null = no picker. */
+const CLIENT_LABEL = {bnsf: "BNSF", up: "UP", mtwy: "MT/WY Coop", wri: "WRI"};
+function pickedIncident(){
+  try { const w = window.top && window.top.__wriIncident; if (w && w.project_key) return w; } catch (e) {}
+  return null;
+}
 function walk(layers, out=[]){ for (const l of layers || []) { out.push(l); if (l.layerType === "GroupLayer") walk(l.layers, out); } return out; }
 
 async function currentMap(){
@@ -270,6 +282,9 @@ async function currentMap(){
   const de = layer && ((layer.layerDefinition || {}).definitionExpression || "");
   const m = /project_name\s*=\s*'([^']+)'/i.exec(de || "");
   state.project = m ? m[1] : null;
+  const picked = pickedIncident();
+  if (picked) { state.project = picked.project_key; state.client = CLIENT_LABEL[picked.client] || state.client; }
+  state.picked = !!picked;
 
   if (!layer) {
     $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> — this map has never carried the 360 layer. ` +
@@ -279,7 +294,7 @@ async function currentMap(){
       `could not be scoped. Re-run the incident activation.`;
   } else {
     $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> · project <b>${esc(state.project)}</b>` +
-      (state.client ? ` · ${esc(state.client)}` : "");
+      (state.client ? ` · ${esc(state.client)}` : "") + (state.picked ? " · picked on the map" : "");
   }
 }
 
