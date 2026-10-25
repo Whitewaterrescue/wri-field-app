@@ -135,12 +135,12 @@
     '.wg-meta{opacity:.75;font-size:13px;margin-top:2px}' +
     '.wg-tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:#3e4c59;margin-left:6px;vertical-align:2px}' +
     '.wg-tag.near{background:#166534}' +
-    '.wg-go{width:100%;border:0;border-radius:14px;background:#EC2329;color:#fff;font:800 17px/1.2 inherit;padding:16px;margin-top:8px;cursor:pointer}' +
+    '.wg-go{width:100%;border:0;border-radius:14px;background:#EC2329;color:#fff;font:800 17px/1.2 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;padding:16px;margin-top:8px;cursor:pointer}' +
     '.wg-go:disabled{opacity:.5}' +
     '.wg-f{opacity:.65;font-size:13px;text-align:center;margin-top:14px}' +
     '.wg-ban{position:fixed;left:0;right:0;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:2147482000;display:flex;justify-content:center;padding:0 10px;pointer-events:none;font:600 14px/1.3 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}' +
     '.wg-ban>div{pointer-events:auto;display:flex;gap:10px;align-items:center;background:#4a3a12;color:#f0e2c0;border:1px solid #B8791B;border-radius:12px;padding:10px 12px;box-shadow:0 6px 20px rgba(0,0,0,.5);max-width:560px}' +
-    '.wg-ban button{border:0;border-radius:999px;padding:8px 12px;font:700 13px/1 inherit;cursor:pointer}' +
+    '.wg-ban button{border:0;border-radius:999px;padding:8px 12px;font:700 13px/1 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;cursor:pointer}' +
     '.wg-ban .y{background:#EC2329;color:#fff}.wg-ban .n{background:#5b4a1e;color:#f0e2c0}';
   function style() {
     if (document.getElementById('wg-css')) return;
