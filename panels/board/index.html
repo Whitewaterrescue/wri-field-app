@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Incident Board</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!--
+  Incident Board (Phase 2, 2026-10-24). One phone page with what a field tech
+  needs from the four dashboards: the status card (208, air alarm, headcount,
+  205 channels, 206 hospital), work assignments, resources, 213-RR requests.
+
+  Reads AGOL only — WRI_Incident_Ops_field_view (query-only, org-shared),
+  which the ops dashboard's COP publisher (ops-dashboard CopPublish.js) keeps
+  current from the sheets every ~3 min. The user's own Field App sign-in
+  (exb_auth, same origin) is the token; standalone it falls back to the
+  popup sign-in. Last good board is kept in localStorage for dead zones.
+
+  ?incident=<id|project_key> pins an incident (QR / TV); otherwise the last
+  pick on this device, then the primary, then the newest open incident.
+-->
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  :root{
+    --bg:#171919;--surface:#2a2c2c;--surface-alt:#3A3C3C;
+    --accent:#EC2329;
+    --text:#f0f0f0;--text-dim:#b8bcbc;--text-muted:#9a9e9e;
+    --border:#4a4d4d;--success:#22c55e;--warning:#f59e0b;--danger:#ef4444;--info:#38bdf8;
+    --font:'Alexandria',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  }
+  html,body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;min-height:100vh}
+  button{font-family:var(--font)}
+  .topbar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:8px;
+    padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border)}
+  .topbar h1{font-size:17px;font-weight:700;flex:1;font-family:'Epilogue','Alexandria',system-ui,sans-serif;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .chip{padding:7px 12px;border-radius:20px;font-size:13px;font-weight:600;background:var(--surface-alt);
+    color:var(--text);border:1px solid var(--border);white-space:nowrap;max-width:46vw;overflow:hidden;text-overflow:ellipsis}
+  select.chip{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:28px;
+    background:var(--surface-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23b8bcbc'/%3E%3C/svg%3E") no-repeat right 11px center}
+  .iconbtn{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--surface);
+    color:var(--text);font-size:17px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex:none}
+  .iconbtn[disabled]{opacity:.6;cursor:default}
+  .spin{display:inline-block;width:15px;height:15px;border:2px solid var(--text-dim);border-top-color:transparent;
+    border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .banner{display:none;padding:8px 14px;font-size:13px;text-align:center}
+  .banner.show{display:block}
+  .banner.warn{background:#3b2a08;color:var(--warning)}
+  .banner.err{background:#3b0d0d;color:#fca5a5}
+  #content{padding:12px 14px 60px;max-width:720px;margin:0 auto}
+  .asof{font-size:12px;color:var(--text-muted);margin:0 2px 10px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+  .card b{font-weight:600}
+  .note{color:var(--text-dim);font-size:13px;line-height:1.45;margin-top:6px}
+  .note.err{color:#fca5a5}
+  .diag{color:var(--text-muted);font-size:11px;margin-top:8px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{padding:10px 16px;border-radius:10px;border:1px solid var(--accent);background:var(--accent);color:#fff;
+    font-size:14px;font-weight:600;cursor:pointer}
+  .btn.secondary{background:var(--surface-alt);border-color:var(--border)}
+  .btn[disabled]{opacity:.6;cursor:default}
+  .alarm{display:flex;align-items:center;gap:10px;border-radius:12px;padding:12px 14px;margin-bottom:12px;font-weight:600}
+  .alarm.red{background:#4a0f0f;border:1px solid var(--danger);color:#fecaca}
+  .alarm.amber{background:#3b2a08;border:1px solid var(--warning);color:#fde68a}
+  .alarm.green{background:#0f2e1a;border:1px solid #166534;color:#bbf7d0}
+  .alarm .dot{width:12px;height:12px;border-radius:50%;flex:none;background:currentColor}
+  .alarm small{display:block;font-weight:400;font-size:12px;opacity:.9;margin-top:2px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
+  .stat .n{font-size:22px;font-weight:700;font-family:'Epilogue',sans-serif}
+  .stat .l{font-size:11px;color:var(--text-dim);margin-top:2px;letter-spacing:.3px}
+  .stat.bad .n{color:var(--danger)}
+  .section-title{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);
+    margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
+  .section-title .count{background:var(--surface-alt);border-radius:10px;padding:1px 8px;font-size:11px;letter-spacing:0}
+  .msg{white-space:pre-wrap;line-height:1.45;font-size:14px}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid #353838;font-size:14px}
+  .kv:first-child{border-top:0}
+  .kv span:first-child{color:var(--text-dim)}
+  a{color:var(--info)}
+  .item{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:11px 13px;margin-bottom:8px}
+  .item .t{font-weight:600;font-size:14.5px;line-height:1.35}
+  .item .m{font-size:12.5px;color:var(--text-dim);margin-top:4px;line-height:1.4}
+  .item .d{font-size:13px;color:var(--text);margin-top:6px;white-space:pre-wrap;line-height:1.4}
+  .item .acts{margin-top:8px;display:flex;gap:8px}
+  .item .acts a{font-size:13px;font-weight:600;text-decoration:none;padding:6px 12px;border-radius:8px;
+    background:var(--surface-alt);border:1px solid var(--border);color:var(--text)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-right:4px;
+    background:var(--surface-alt);color:var(--text-dim);vertical-align:1px}
+  .badge.high{background:#4a0f0f;color:#fecaca}
+  .badge.in_progress,.badge.deployed{background:#0c3346;color:#bae6fd}
+  .badge.complete,.badge.received{background:#0f2e1a;color:#bbf7d0}
+  .badge.planned,.badge.new,.badge.pending{background:#33302a;color:#fde68a}
+  .group{font-size:13px;font-weight:600;color:var(--text);margin:12px 2px 6px}
+  .tabs{display:flex;gap:6px;margin:4px 0 6px;overflow-x:auto}
+  .tab{padding:8px 14px;border-radius:20px;font-size:13px;font-weight:600;white-space:nowrap;cursor:pointer;
+    background:var(--surface);color:var(--text-dim);border:1px solid var(--border)}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .empty{color:var(--text-muted);font-size:13px;padding:8px 2px}
+  .toggle{font-size:12.5px;color:var(--text-dim);display:flex;align-items:center;gap:6px;margin:2px 2px 8px}
+  .res-sum{display:flex;flex-wrap:wrap;gap:6px;margin:0 2px 8px}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0c3346;color:#e0f2fe;
+    border:1px solid #0369a1;padding:10px 16px;border-radius:10px;font-size:14px;z-index:30;max-width:90vw;
+    box-shadow:0 6px 20px rgba(0,0,0,.4);display:none}
+  .toast.show{display:block}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Incident Board</h1>
+  <select id="incPick" class="chip" aria-label="Incident" hidden></select>
+  <span id="incChip" class="chip" hidden></span>
+  <button id="btnRefresh" class="iconbtn" aria-label="Refresh" title="Refresh">&#x21bb;</button>
+</div>
+<div id="bnOffline" class="banner warn">Offline: showing the last board saved on this device.</div>
+<div id="bnStale" class="banner warn"></div>
+<div id="bnErr" class="banner err"></div>
+
+<div id="content">
+  <div id="viewLoading" class="card"><span class="spin"></span>&nbsp; Loading the board…</div>
+
+  <div id="viewAuth" class="card" hidden>
+    <b>ArcGIS sign-in needed</b>
+    <div id="authEmbedded" class="note">Open the <b>Incident Map</b> tab and sign in, then come back.</div>
+    <div id="authStandalone" class="note" hidden>Sign in with your WRI ArcGIS account.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnAuthRetry" class="btn secondary">Check again</button>
+      <button id="btnSignIn" class="btn">Sign in</button>
+    </div>
+    <div id="authErr" class="note err" hidden></div>
+    <div id="authDiag" class="diag"></div>
+  </div>
+
+  <div id="viewNone" class="card" hidden>
+    <b>No open incident</b>
+    <div class="note">The board fills in when an incident is activated.</div>
+  </div>
+
+  <div id="viewMain" hidden>
+    <div id="asof" class="asof"></div>
+    <div id="alarm" class="alarm" hidden></div>
+    <div class="stats">
+      <div class="stat"><div class="n" id="stHead">–</div><div class="l">ON SCENE</div></div>
+      <div class="stat"><div class="n" id="stHasp">–</div><div class="l">HASP SIGNED</div></div>
+      <div class="stat" id="stNmBox"><div class="n" id="stNm">–</div><div class="l">OPEN NEAR MISSES</div></div>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <div class="tab active" data-tab="status" role="tab">Safety &amp; comms</div>
+      <div class="tab" data-tab="work" role="tab">Assignments <span id="cntWork"></span></div>
+      <div class="tab" data-tab="res" role="tab">Resources <span id="cntRes"></span></div>
+      <div class="tab" data-tab="req" role="tab">Requests <span id="cntReq"></span></div>
+    </div>
+
+    <div data-pane="status">
+      <div class="section-title">ICS 208 safety message</div>
+      <div class="card"><div id="msg208" class="msg"></div></div>
+      <div class="section-title">Comms &amp; medical</div>
+      <div class="card" id="kvComms"></div>
+      <div class="section-title">On scene by organization</div>
+      <div class="card" id="kvOrgs"></div>
+    </div>
+
+    <div data-pane="work" hidden>
+      <div class="tabs" id="workFilter"></div>
+      <div id="listWork"></div>
+    </div>
+
+    <div data-pane="res" hidden>
+      <div class="res-sum" id="resSum"></div>
+      <label class="toggle"><input type="checkbox" id="chkPending"> Show resources still in RM review</label>
+      <div id="listRes"></div>
+    </div>
+
+    <div data-pane="req" hidden>
+      <label class="toggle"><input type="checkbox" id="chkClosed"> Show received / closed</label>
+      <div id="listReq"></div>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast"></div>
+
+<script>
+"use strict";
+const PORTAL       = "https://wrienviro.maps.arcgis.com";
+const ORG_ID       = "Ji79lWGR5B33LhY7";
+const OAUTH_CLIENT = "zXmBr5FFTyHWfh24";
+const CALLBACK_URL = "https://whitewaterrescue.github.io/wri-respond/oauth-callback-201.html";
+const SESSION_KEY  = "wri_board_auth";
+const SVC          = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Incident_Ops_field_view/FeatureServer";
+const OPEN_STATUSES = ["activating","active","standby"];
+const POLL_MS = 60000, STALE_MS = 12*60000, QUERY_TIMEOUT_MS = 25000;
+const LS_PICK = "wri_board_incident", LS_CACHE = "wri_board_cache_v1";
+const EMBEDDED = window.top !== window;
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const state = { badToken:null, layers:null, incidents:[], pick:"", board:null, tab:"status", workFilter:"all", busy:false, prevSig:null };
+
+function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
+function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
+function toast(msg, ms){ const t=$("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"), ms||4000); }
+function show(id){ ["viewLoading","viewAuth","viewNone","viewMain"].forEach(v => $(v).hidden = v!==id); }
+function banner(id, text){ const b=$(id); b.textContent=text||""; b.classList.toggle("show", !!text); }
+
+/* ============================================================ Auth ladder (drone/annotator pattern) */
+class AuthError extends Error {}
+const diag = {record:"", verify:""};
+function renderAuthDiag(){ const el=$("authDiag"); if (el) el.textContent=[diag.record,diag.verify].filter(Boolean).join(" "); }
+function readExbAuth(){
+  let raw=null, from="localStorage";
+  try { raw=localStorage.getItem("exb_auth"); if(!raw){ raw=sessionStorage.getItem("exb_auth"); from="sessionStorage"; } }
+  catch(e){ diag.record="Storage is blocked in this frame: "+(e.message||e); return null; }
+  if(!raw){ diag.record="No Field App session record in this frame yet."; return null; }
+  let a; try { a=JSON.parse(raw); } catch(e){ diag.record="The session record is not readable."; return null; }
+  if(!a||!a.token){ diag.record="The session record has no token."; return null; }
+  const exp = a.expires!=null && a.expires!=="" ? new Date(a.expires).getTime() : NaN;
+  diag.record = `Session in ${from}: ${!isFinite(exp)?"no expiry recorded":exp>Date.now()?"expires in "+Math.round((exp-Date.now())/60000)+" min":"expired"}.`;
+  if (isFinite(exp) && exp-Date.now() < 2*60000){ diag.record+=" Waiting for the app to refresh it."; return null; }
+  if (state.badToken && a.token===state.badToken){ diag.record+=" ArcGIS rejected it; waiting for a refresh."; return null; }
+  return {token:a.token, source:"fieldapp"};
+}
+function readSession(){
+  try { const a=JSON.parse(sessionStorage.getItem(SESSION_KEY)||"null");
+    if(!a||!a.token||!(a.expiresAt-Date.now()>60000)) return null;
+    if(state.badToken && a.token===state.badToken) return null;
+    return {token:a.token, source:"popup"}; } catch(e){ return null; }
+}
+function getAuth(){ return readExbAuth() || readSession(); }
+function dropAuth(token){ state.badToken=token||null; try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){} }
+function signIn(){
+  const url = PORTAL+"/sharing/rest/oauth2/authorize?client_id="+encodeURIComponent(OAUTH_CLIENT)+"&response_type=token&expiration=720&redirect_uri="+encodeURIComponent(CALLBACK_URL);
+  const w = window.open(url,"agolAuth","width=480,height=640");   // synchronous: iOS blocks popups after an await
+  if(!w){ showAuthErr("Popup blocked. Allow popups for this site and try again."); return; }
+  $("authErr").hidden=true;
+}
+window.addEventListener("message", e => {
+  if (e.origin !== location.origin) return;
+  const d=e.data; if(!d||d.type!=="arcgis-auth") return;
+  if(d.error||!d.token){ showAuthErr("ArcGIS sign-in failed"+(d.error?": "+d.error:"")); return; }
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token:String(d.token), expiresAt:Date.now()+(Number(d.expires_in)||7200)*1000})); } catch(x){}
+  state.badToken=null; load(true);
+});
+function showAuthErr(msg){ const el=$("authErr"); el.textContent=msg; el.hidden=false; }
+let authPoll=null;
+function showAuth(){
+  show("viewAuth"); $("authEmbedded").hidden=!EMBEDDED; $("authStandalone").hidden=EMBEDDED;
+  clearInterval(authPoll); renderAuthDiag();
+  authPoll=setInterval(()=>{ renderAuthDiag(); if(getAuth()){ clearInterval(authPoll); load(true); } },2000);
+}
+window.addEventListener("storage", e => { if(e.key==="exb_auth" && !$("viewAuth").hidden && getAuth()){ clearInterval(authPoll); load(true); } });
+$("btnAuthRetry").onclick=()=>{ if(getAuth()) load(true); else { renderAuthDiag(); toast("Not signed in yet. Open the Incident Map tab and sign in."); } };
+$("btnSignIn").onclick=signIn;
+
+async function rest(url, fields, label){
+  const auth=getAuth(); if(!auth) throw new AuthError("Signed out");
+  const ac=new AbortController(); const t=setTimeout(()=>ac.abort(), QUERY_TIMEOUT_MS);
+  try {
+    const p=new URLSearchParams(); for(const [k,v] of Object.entries(fields||{})) if(v!=null) p.set(k,String(v));
+    p.set("f","json"); p.set("token",auth.token);
+    const r=await fetch(url,{method:"POST", body:p, signal:ac.signal});
+    let j; try { j=await r.json(); } catch(e){ throw new Error((label||"request")+": HTTP "+r.status); }
+    if(j&&j.error){ const code=Number(j.error.code);
+      if(code===498||code===499){ dropAuth(auth.token); throw new AuthError(j.error.message||"Session expired"); }
+      if(code===403||code===400&&/permission/i.test(j.error.message||"")) throw new Error("Your account can't read the incident board yet (ask Cody to share it).");
+      throw new Error(j.error.message||((label||"request")+" error "+code)); }
+    return j;
+  } catch(e){ if(e&&e.name==="AbortError") throw new Error((label||"request")+" timed out"); throw e; } finally { clearTimeout(t); }
+}
+
+/* ============================================================ Data */
+async function layerIds(){
+  if (state.layers) return state.layers;
+  const j = await rest(SVC, {}, "service");
+  const ids = {}; (j.layers||[]).concat(j.tables||[]).forEach(l => ids[l.name]=l.id);
+  for (const n of ["Incidents","Work_Assignments","Incident_Resources","Resource_Requests","Incident_Status"])
+    if (ids[n]==null) throw new Error("The board service is missing "+n);
+  return (state.layers = ids);
+}
+async function query(name, where, extra){
+  const ids = await layerIds();
+  const j = await rest(`${SVC}/${ids[name]}/query`, Object.assign({where, outFields:"*", returnGeometry:"false", resultRecordCount:2000}, extra||{}), name);
+  return (j.features||[]).map(f => f.geometry && isFinite(f.geometry.x) ? Object.assign(f.attributes, {_g:f.geometry}) : f.attributes);
+}
+const q = s => "'" + String(s).replace(/'/g,"''") + "'";
+
+function pickIncident(list){
+  const want = (new URLSearchParams(location.search).get("incident") || "").trim().toLowerCase();
+  const m = v => String(v||"").toLowerCase();
+  if (want) { const hit = list.find(i => m(i.incident_id)===want || m(i.project_key)===want || m(i.incident_name)===want);
+    if (hit) return {inc:hit, pinned:true};
+    return {inc:null, pinned:true}; }       // a pinned incident that isn't open: never show a different one
+  const last = lsGet(LS_PICK);
+  return {inc: list.find(i => String(i.incident_id)===last)
+            || list.find(i => i.is_primary==="yes") || list[0] || null, pinned:false};
+}
+
+async function fetchBoard(){
+  const incs = await query("Incidents", "incident_status IN ("+OPEN_STATUSES.map(q).join(",")+")",
+    {outFields:"incident_id,incident_name,client,project_key,incident_status,is_primary,current_op_period,date_opened", orderByFields:"date_opened DESC"});
+  incs.forEach(i => i.incident_id = String(i.incident_id));
+  state.incidents = incs;
+  const {inc, pinned} = state.pick ? {inc: incs.find(i => i.incident_id===state.pick) || pickIncident(incs).inc, pinned:false} : pickIncident(incs);
+  renderPicker(incs, inc, pinned);
+  if (!inc) return null;
+  state.pick = inc.incident_id;
+  const w = "incident_id = " + q(inc.incident_id);
+  const [status, work, res, req] = await Promise.all([
+    query("Incident_Status", w, {orderByFields:"op_period DESC, as_of DESC", resultRecordCount:1}),
+    query("Work_Assignments", w, {returnGeometry:"true", outSR:"4326"}),
+    query("Incident_Resources", w, {outFields:"resource_id,organization_code,resource_kind,resource_type,identification,specification,status,branch,division,tf_unit_id,quantity,eta,boom_ft,recovery_edrc,liquid_storage,review_status"}),
+    query("Resource_Requests", w)
+  ]);
+  return { incident: inc, status: status[0] || null, work, res, req, fetchedAt: Date.now() };
+}
+
+/* ============================================================ Render */
+function renderPicker(list, inc, pinned){
+  const sel=$("incPick"), chip=$("incChip");
+  if (list.length > 1 && !pinned) {
+    sel.innerHTML = list.map(i => `<option value="${esc(i.incident_id)}"${inc&&i.incident_id===inc.incident_id?" selected":""}>${esc(i.incident_name||i.incident_id)}</option>`).join("");
+    sel.hidden=false; chip.hidden=true;
+  } else {
+    sel.hidden=true; chip.hidden=!inc; chip.textContent = inc ? (inc.incident_name||inc.incident_id) : "";
+  }
+}
+$("incPick").onchange = e => { state.pick = e.target.value; lsSet(LS_PICK, state.pick); state.prevSig=null; load(true); };
+
+const fmtTime = ms => ms ? new Date(ms).toLocaleString([], {month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit"}) : "";
+const label = s => String(s||"").replace(/_/g," ");
+function badge(v){ return v ? `<span class="badge ${esc(String(v).toLowerCase().replace(/\s+/g,"_"))}">${esc(label(v))}</span>` : ""; }
+function dirLink(g){ return g ? `<a target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g.y.toFixed(6)},${g.x.toFixed(6)}">Directions</a>` : ""; }
+function telLink(p){ const d=String(p||"").replace(/[^0-9+]/g,""); return d ? `<a href="tel:${esc(d)}">${esc(p)}</a>` : esc(p); }
+
+function render(){
+  const b = state.board; if (!b) return;
+  const s = b.status || {};
+  show("viewMain");
+  const asOf = s.as_of || 0;
+  $("asof").textContent = (asOf ? "Board as of "+fmtTime(asOf) : "Board not published yet") +
+    (b.cached ? " · saved copy" : "") + (b.incident.current_op_period ? " · Op period "+b.incident.current_op_period : "");
+  banner("bnStale", asOf && Date.now()-asOf > STALE_MS && !b.cached ? "Board data is more than "+Math.round((Date.now()-asOf)/60000)+" min old. The publisher may be paused." : "");
+
+  const al=$("alarm"), st=s.air_alarm_state||"none";
+  al.hidden = st==="none";
+  al.className = "alarm "+st;
+  al.innerHTML = `<span class="dot"></span><div>Air monitoring: ${st==="red"?"ACTION LEVEL EXCEEDED":st==="amber"?"Elevated readings":"Readings normal"}`+
+    (s.air_alarm_detail?`<small>${esc(s.air_alarm_detail)}</small>`:"")+`<small>Last 12 h of HASP air readings</small></div>`;
+  $("stHead").textContent = s.headcount_total ?? "–";
+  $("stHasp").textContent = s.hasp_ack_pct==null ? "–" : Math.round(s.hasp_ack_pct)+"%";
+  $("stNm").textContent = s.near_miss_open ?? "–";
+  $("stNmBox").classList.toggle("bad", Number(s.near_miss_open)>0);
+
+  $("msg208").textContent = s.safety_message || "No ICS 208 posted for this incident yet.";
+  const kv = [];
+  if (s.comms_primary) kv.push(["Radio (205)", esc(s.comms_primary).replace(/; /g,"<br>")]);
+  if (s.hospital_name) kv.push(["Hospital (206)", esc(s.hospital_name)+(s.hospital_phone?"<br>"+telLink(s.hospital_phone):"")]);
+  if (s.weather_summary) kv.push(["Weather (HASP)", esc(s.weather_summary)]);
+  $("kvComms").innerHTML = kv.length ? kv.map(([k,v]) => `<div class="kv"><span>${k}</span><span style="text-align:right">${v}</span></div>`).join("")
+    : `<div class="empty">No 205 / 206 posted yet.</div>`;
+  let orgs = {}; try { orgs = JSON.parse(s.headcount_by_org||"{}"); } catch(e){}
+  const ok = Object.entries(orgs).sort((a,b)=>b[1]-a[1]);
+  $("kvOrgs").innerHTML = ok.length ? ok.map(([o,n]) => `<div class="kv"><span>${esc(o)}</span><span>${n}</span></div>`).join("")
+    : `<div class="empty">Nobody checked in.</div>`;
+
+  renderWork(b); renderRes(b); renderReq(b);
+}
+
+function detail(w){
+  const d = String(w.description||"").trim(), t = String(w.title||"").trim();
+  return d.indexOf(t)===0 ? d.slice(t.length).trim() : d;
+}
+function renderWork(b){
+  const order = {in_progress:0, assigned:1, planned:2, complete:3, cancelled:4};
+  const groups = {};
+  b.work.forEach(w => { const k = w.division || w.branch || "Unassigned"; (groups[k]=groups[k]||[]).push(w); });
+  const keys = Object.keys(groups).sort();
+  const open = b.work.filter(w => w.wa_status!=="complete" && w.wa_status!=="cancelled").length;
+  $("cntWork").textContent = b.work.length ? "("+open+")" : "";
+  const f = keys.indexOf(state.workFilter)>=0 ? state.workFilter : "all";
+  $("workFilter").innerHTML = keys.length>1 ? ["all"].concat(keys).map(k => `<div class="tab${k===f?" active":""}" data-wf="${esc(k)}">${k==="all"?"All":esc(k)}</div>`).join("") : "";
+  const show = f==="all" ? keys : [f];
+  $("listWork").innerHTML = !b.work.length ? `<div class="empty">No work assignments yet.</div>` : show.map(k =>
+    (keys.length>1&&f==="all"?`<div class="group">${esc(k)}</div>`:"") +
+    groups[k].sort((a,c)=>(order[a.wa_status]??9)-(order[c.wa_status]??9)).map(w => `<div class="item">
+      <div class="t">${badge(w.wa_status)}${w.priority==="high"?badge("high"):""}${esc(w.title||w.location_name||"Work assignment")}</div>
+      <div class="m">${[w.location_name, w.branch&&w.division?w.branch+" / "+w.division:(w.branch||""), w.assigned_to,
+        w.start_time?fmtTime(w.start_time)+(w.end_time?" – "+new Date(w.end_time).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):""):""].filter(Boolean).map(esc).join(" · ")}</div>
+      ${detail(w) ? `<div class="d">${esc(detail(w))}</div>` : ""}
+      ${w._g ? `<div class="acts">${dirLink(w._g)}</div>` : ""}
+    </div>`).join("")).join("");
+  document.querySelectorAll("[data-wf]").forEach(el => el.onclick = () => { state.workFilter = el.dataset.wf; renderWork(state.board); });
+}
+
+function renderRes(b){
+  const showPending = $("chkPending").checked;
+  const rows = b.res.filter(r => showPending || String(r.review_status||"").toLowerCase()!=="pending");
+  $("cntRes").textContent = rows.length ? "("+rows.length+")" : "";
+  const byStatus = {}; rows.forEach(r => byStatus[r.status||"Unknown"]=(byStatus[r.status||"Unknown"]||0)+1);
+  $("resSum").innerHTML = Object.entries(byStatus).map(([k,n]) => `<span class="badge">${esc(k)} ${n}</span>`).join("");
+  const groups = {}; rows.forEach(r => { const k = r.division || r.branch || "Not assigned to a division"; (groups[k]=groups[k]||[]).push(r); });
+  const pend = b.res.length - b.res.filter(r => String(r.review_status||"").toLowerCase()!=="pending").length;
+  $("listRes").innerHTML = !rows.length ? `<div class="empty">No reviewed resources yet${pend&&!showPending?" ("+pend+" waiting for RM review)":""}.</div>` :
+    Object.keys(groups).sort().map(k => `<div class="group">${esc(k)}</div>` + groups[k].map(r => {
+      const caps = [r.boom_ft?r.boom_ft+" ft boom":"", r.recovery_edrc?r.recovery_edrc+" bbl/d EDRC":"", r.liquid_storage?r.liquid_storage+" bbl storage":"",
+        r.quantity?"qty "+r.quantity:""].filter(Boolean);
+      return `<div class="item"><div class="t">${badge(r.status)}${esc(r.identification||r.resource_kind||"Resource")}</div>
+        <div class="m">${[r.resource_kind, r.specification, r.organization_code, caps.join(", "), r.eta?"ETA "+fmtTime(r.eta):"",
+          String(r.review_status||"").toLowerCase()==="pending"?"in RM review":""].filter(Boolean).map(esc).join(" · ")}</div></div>`;
+    }).join("")).join("");
+}
+
+function renderReq(b){
+  const done = ["received","cancelled","rejected","closed"];
+  const showClosed = $("chkClosed").checked;
+  const rows = b.req.filter(r => showClosed || done.indexOf(r.request_status)<0)
+    .sort((a,c)=>(c.requested_at||0)-(a.requested_at||0));
+  $("cntReq").textContent = rows.length ? "("+rows.length+")" : "";
+  $("listReq").innerHTML = !rows.length ? `<div class="empty">No open 213-RR requests.</div>` : rows.map(r => `<div class="item">
+      <div class="t">${badge(r.request_status)}${r.priority==="high"?badge("high"):""}${esc((r.quantity?r.quantity+" "+(r.uom||"")+" ":"")+(r.item||"Request"))}</div>
+      <div class="m">${[r.request_id, r.lsc_number, r.deliver_to?"to "+r.deliver_to:"", r.eta?"ETA "+fmtTime(r.eta):"", r.supplier, r.requested_by?"by "+r.requested_by:""]
+        .filter(Boolean).map(esc).join(" · ")}</div>
+    </div>`).join("");
+}
+$("chkPending").onchange = () => renderRes(state.board);
+$("chkClosed").onchange = () => renderReq(state.board);
+document.querySelectorAll(".tabs [data-tab]").forEach(el => el.onclick = () => {
+  state.tab = el.dataset.tab;
+  document.querySelectorAll(".tabs [data-tab]").forEach(t => t.classList.toggle("active", t===el));
+  document.querySelectorAll("[data-pane]").forEach(p => p.hidden = p.dataset.pane!==state.tab);
+});
+
+/* ============================================================ Load / poll */
+function signature(b){
+  const s=b.status||{};
+  return { work: b.work.map(w=>w.assignment_id).sort().join("|"), alarm: s.air_alarm_state||"none", msg: s.safety_message||"" };
+}
+function notifyChanges(b){
+  const sig = signature(b), prev = state.prevSig;
+  state.prevSig = sig;
+  if (!prev) return;
+  const was = new Set(prev.work.split("|")), added = sig.work.split("|").filter(x => x && !was.has(x)).length;
+  const rank = {none:0, green:0, amber:1, red:2};
+  if (rank[sig.alarm] > rank[prev.alarm]) toast("Air monitoring is now "+sig.alarm.toUpperCase()+". Check the board.", 8000);
+  else if (added) toast(added+" new work assignment"+(added>1?"s":""), 6000);
+  else if (sig.msg !== prev.msg && sig.msg) toast("The ICS 208 safety message was updated.", 6000);
+}
+
+async function load(manual){
+  if (state.busy) return;
+  state.busy = true;
+  const btn=$("btnRefresh"); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
+  try {
+    if (!getAuth()) { renderAuthDiag(); if (!restoreCache()) showAuth(); return; }
+    const b = await fetchBoard();
+    banner("bnErr",""); banner("bnOffline","");
+    if (!b) { show("viewNone"); return; }
+    state.board = b;
+    lsSet(LS_CACHE, JSON.stringify(b));
+    notifyChanges(b);
+    render();
+  } catch(e) {
+    if (e instanceof AuthError) { if (!restoreCache()) showAuth(); else toast("Signed out of ArcGIS. Open the Incident Map tab to sign in."); return; }
+    const offline = !navigator.onLine || /fetch|network|timed out/i.test(e.message||"");
+    if (offline && restoreCache()) banner("bnOffline", "Offline: showing the board saved "+fmtTime(state.board.fetchedAt)+".");
+    else { banner("bnErr", "Couldn't load the board: "+(e.message||e)); if (!state.board && !restoreCache()) show("viewLoading"); }
+  } finally {
+    state.busy = false; btn.disabled=false; btn.innerHTML="&#x21bb;";
+  }
+}
+function restoreCache(){
+  if (state.board) { render(); return true; }
+  try { const b = JSON.parse(lsGet(LS_CACHE)||"null"); if (b && b.incident) { b.cached=true; state.board=b; render(); return true; } } catch(e){}
+  return false;
+}
+$("btnRefresh").onclick = () => load(true);
+setInterval(() => { if (!document.hidden) load(false); }, POLL_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden && state.board && Date.now()-(state.board.fetchedAt||0) > 30000) load(false); });
+window.addEventListener("online", () => load(false));
+load(false);
+</script>
+</body>
+</html>
