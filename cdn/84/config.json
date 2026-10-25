@@ -367,11 +367,29 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_23": {
+      "id": "page_23",
+      "label": "Incident Board",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_board",
+        "MEDIUM": "layout_board",
+        "SMALL": "layout_board"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
     {
       "page_10": []
+    },
+    {
+      "page_23": []
     },
     {
       "page_3": []
@@ -1410,6 +1428,39 @@
       "type": "FIXED",
       "order": [],
       "content": {}
+    },
+    "layout_board": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_47",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
     }
   },
   "sections": {},
@@ -2758,6 +2809,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/pano-annotator/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_47": {
+      "id": "widget_47",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Incident Board",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/board/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
