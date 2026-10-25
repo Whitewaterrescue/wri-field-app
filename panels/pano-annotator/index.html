@@ -205,7 +205,28 @@ const PANO_SOURCE_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/re
 const CLIENT_LABEL = {bnsf: "BNSF", up: "UP", mtwy: "MT/WY Coop", wri: "WRI"};
 function pickedIncident(){
   try { const w = window.top && window.top.__wriIncident; if (w && w.project_key) return w; } catch (e) {}
+  // the phone's incident choice (incident gate / map chip), even when the map page was never opened
+  try {
+    const c = JSON.parse(localStorage.getItem("wri_incident_choice") || "null");
+    if (c && c.id && c.expires > Date.now()) return {incident_id: c.id, project_key: c.key, incident_name: c.name, client: c.client, webmap_id: ""};
+  } catch (e) {}
   return null;
+}
+const CLIENT_COLOR = {bnsf: "#F47A20", up: "#FFC72C", mtwy: "#2E7DD7", wri: "#EC2329"};
+/* Big, unmissable "where does this go" line (P3: two incidents can be open). */
+function incidentBanner(verb, project, clientCode, extra){
+  let el = document.getElementById("incBanner");
+  if (!el) {
+    el = document.createElement("div"); el.id = "incBanner";
+    el.style.cssText = "margin:10px 0 6px;padding:10px 12px;border-radius:10px;background:#1f2933;border-left:6px solid #94a3b8;font:600 15px/1.3 -apple-system,system-ui,'Segoe UI',Roboto,sans-serif;color:#f1f5f9";
+    const anchor = document.getElementById("mapline"); anchor.parentNode.insertBefore(el, anchor);
+  }
+  const cl = String(clientCode || "").toLowerCase();
+  el.style.borderLeftColor = CLIENT_COLOR[cl] || "#94a3b8";
+  el.innerHTML = project
+    ? `${verb} <b style="font-size:18px">${esc(project)}</b>${cl ? " · " + esc((CLIENT_LABEL[cl] || cl.toUpperCase())) : ""}` +
+      (extra ? `<div style="font-weight:500;font-size:13px;opacity:.8;margin-top:2px">${extra}</div>` : "")
+    : `<span style="color:#fca5a5">No incident to file to — open the Incident Map and pick one.</span>`;
 }
 const CLIENTS = {"5e30a96b8bcc4d6f981ce7b7435c61c0": "BNSF", "ecff87d286874a8d864c2a9935811ea6": "UP",
                  "e6406c338b7c4e8598503d4e15cb9f62": "MT/WY Coop", "373f7625cfc74c87a8523fbaf7ad9691": "WRI"};
@@ -288,7 +309,8 @@ window.addEventListener("message", e => {
   const d = e.data;
   // P3: the map's Incident Picker switched incident -> reload against it
   // (only from the sphere list -- never pull someone out of a sphere they are annotating)
-  if (d && d.type === "wri-incident" && d.incident && d.incident.project_key !== state.project && getAuth() && !$("viewPick").hidden) { try { sessionStorage.removeItem("wri_pano_sources"); } catch (x) {} boot(); return; }
+  if (d && ((d.type === "wri-incident" && d.incident && d.incident.project_key !== state.project) ||
+            (d.type === "wri-incident-choice" && d.choice && d.choice.key !== state.project)) && getAuth() && !$("viewPick").hidden) { try { sessionStorage.removeItem("wri_pano_sources"); } catch (x) {} boot(); return; }
   if (!d || d.type !== "arcgis-auth") return;
   if (d.error || !d.token) { showAuthErr("ArcGIS sign-in failed" + (d.error ? ": " + d.error : "")); return; }
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token: String(d.token), username: String(d.username || ""), expiresAt: Date.now() + (Number(d.expires_in) || 7200) * 1000})); } catch (x) {}
@@ -369,6 +391,7 @@ async function currentMap(){
     state.project = m ? m[1] : null;
     const picked = pickedIncident();
     if (picked) { state.project = picked.project_key; state.client = CLIENT_LABEL[picked.client] || state.client; }
+    incidentBanner("Spheres of", state.project, picked ? picked.client : Object.keys(CLIENT_LABEL).find(k => CLIENT_LABEL[k] === state.client), "");
     $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b>` +
       (state.project ? ` · project <b>${esc(state.project)}</b>` : " · no project filter on the 360 layer") +
       (state.client ? ` · ${esc(state.client)}` : "");
