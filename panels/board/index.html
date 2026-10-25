@@ -311,6 +311,8 @@ function pickIncident(list){
    origin), else its remembered pick. '' when there is no picker. */
 function mapIncidentId(){
   try { const w = window.top && window.top.__wriIncident; if (w && w.incident_id) return String(w.incident_id); } catch(x){}
+  // the phone's incident choice (incident-gate.js)
+  try { const c = JSON.parse(localStorage.getItem("wri_incident_choice")||"null"); if (c && c.id && c.expires > Date.now()) return String(c.id); } catch(x){}
   try { const p = JSON.parse(localStorage.getItem("wri_incident_scope")||"null"); if (p && p.id) return String(p.id); } catch(x){}
   return "";
 }
