@@ -324,7 +324,10 @@ function signIn(){
 }
 window.addEventListener("message", e => {
   if (e.origin !== location.origin) return;
-  const d=e.data; if(!d||d.type!=="arcgis-auth") return;
+  const d=e.data;
+  // P3: the map's Incident Picker switched incident -> project default + "on the map" list follow
+  if (d && d.type==="wri-incident" && d.incident && state.projects) { loadProjects(); loadTargetMap().then(()=>{ try { renderOrthos(); } catch(x){} }); return; }
+  if(!d||d.type!=="arcgis-auth") return;
   if(d.error||!d.token){ showAuthErr("ArcGIS sign-in failed"+(d.error?": "+d.error:"")); return; }
   try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({token:String(d.token), username:String(d.username||""), expiresAt:Date.now()+(Number(d.expires_in)||7200)*1000})); } catch(x){}
   state.badToken=null; boot();
@@ -451,12 +454,40 @@ async function currentMap(){
   state.mapTitle=item.title||state.mapTitle;
   state.mapData=await rest(PORTAL+"/sharing/rest/content/items/"+state.mapId+"/data",{},{label:"map data"});
   $("mapline").innerHTML=`Incident map: <b>${esc(state.mapTitle)}</b>`;
+  await loadTargetMap();
+}
+/* P3: the map a picked incident's orthos go on (its client's stable map). "On the map" states
+   are read from it; null when it is this app's own map. */
+async function loadTargetMap(){
+  const t=targetMapId();
+  state.targetData=null;
+  if(!t||t===state.mapId) return;
+  try {
+    state.targetData=await rest(PORTAL+"/sharing/rest/content/items/"+t+"/data",{},{label:"incident map data"});
+    const picked=pickedIncident();
+    $("mapline").innerHTML=`Incident: <b>${esc(picked?picked.project_key:"")}</b> · orthos publish to its ${esc((picked&&picked.client||"").toUpperCase())} map`;
+  } catch(e){ state.targetData=null; }
 }
 function walk(layers,out=[]){ for(const l of layers||[]){ out.push(l); if(l.layerType==="GroupLayer") walk(l.layers,out); } return out; }
-function onMap(srcId){ return walk(state.mapData&&state.mapData.operationalLayers).find(l=>l.id==="ortho_"+srcId)||null; }
+function onMap(srcId){ const d=state.targetData||state.mapData; return walk(d&&d.operationalLayers).find(l=>l.id==="ortho_"+srcId)||null; }
 function currentProject(){
+  const picked=pickedIncident(); if(picked) return picked.project_key;
   for(const l of walk(state.mapData&&state.mapData.operationalLayers)) if(l.wriOrtho&&l.wriOrtho.project) return l.wriOrtho.project;
   return "";
+}
+/* P3 (several incidents open at once): the incident the map's Incident Picker (incident-scope)
+   shows on this device -- window.top.__wriIncident, same origin. null = no picker. */
+function pickedIncident(){
+  try { const w=window.top&&window.top.__wriIncident; if(w&&w.project_key) return w; } catch(e){}
+  return null;
+}
+// each client's stable incident map (wri-incident-setup/clients.json): an ortho for a picked
+// incident is published onto THAT incident's map, not whichever map this app happens to run on
+const CLIENT_MAPS={bnsf:"5e30a96b8bcc4d6f981ce7b7435c61c0",up:"ecff87d286874a8d864c2a9935811ea6",
+                   mtwy:"e6406c338b7c4e8598503d4e15cb9f62",wri:"373f7625cfc74c87a8523fbaf7ad9691"};
+function targetMapId(){
+  const picked=pickedIncident();
+  return (picked&&(picked.webmap_id||CLIENT_MAPS[picked.client]))||state.mapId;
 }
 let lastSync="";
 function syncLiveMap(){
@@ -543,7 +574,7 @@ async function loadProjects(){
     // matches one exactly -- pick it rather than making the pilot hunt.
     const hit=state.projects.find(p=>guess&&p.name.toLowerCase()===guess.toLowerCase());
     if(hit) sel.value=hit.id;
-    $("projNote").textContent = hit ? `Matched the incident on the map (${guess}).`
+    $("projNote").textContent = hit ? `Matched the incident ${pickedIncident() ? "picked on the map" : "on the map"} (${guess}).`
       : guess ? `No Nova project called “${guess}” — pick one or create it.` : "";
   } catch(e){ $("proj").innerHTML='<option value="">— could not load —</option>'; handleErr(e,"Nova projects"); }
   refreshReady();
@@ -739,7 +770,7 @@ async function runUpload(opts={}){
       project:(state.projects.find(p=>p.id===projectId)||{}).name||currentProject()||"unknown",
       name, image_count:sent.length, max_dim:4096,
       notify_email:(/.+@.+\..+/.test(state.email||"") ? state.email : null),
-      target_map_id:state.mapId, mode:"convert", gateway_public:gw?1:0,
+      target_map_id:targetMapId(), mode:"convert", gateway_public:gw?1:0,
       requested_by:state.username, requested_at:Date.now(), status:"queued", attempts:0,
     });
     await dispatch(gid);
@@ -833,7 +864,7 @@ async function act(mode,o){
     const {gid}=await queueRow({
       source_kind:"nova", source_id:o.src,
       project:o.project||currentProject()||"unknown", name:o.title,
-      target_map_id:state.mapId, mode, gateway_public:0,
+      target_map_id:targetMapId(), mode, gateway_public:0,
       requested_by:state.username, requested_at:Date.now(), status:"queued", attempts:0,
     });
     await dispatch(gid);
