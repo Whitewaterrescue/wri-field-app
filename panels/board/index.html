@@ -194,7 +194,8 @@ const SESSION_KEY  = "wri_board_auth";
 const SVC          = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Incident_Ops_field_view/FeatureServer";
 const OPEN_STATUSES = ["activating","active","standby"];
 const POLL_MS = 60000, STALE_MS = 12*60000, QUERY_TIMEOUT_MS = 25000;
-const LS_PICK = "wri_board_incident", LS_CACHE = "wri_board_cache_v1";
+// P4: one saved board per incident ({incident_id: board}), so offline you see YOUR incident's last board
+const LS_PICK = "wri_board_incident", LS_CACHE = "wri_board_cache_v2";
 const EMBEDDED = window.top !== window;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -482,27 +483,44 @@ async function load(manual){
     banner("bnErr",""); banner("bnOffline","");
     if (!b) { show("viewNone"); return; }
     state.board = b;
-    lsSet(LS_CACHE, JSON.stringify(b));
+    saveCache(b);
     notifyChanges(b);
     render();
   } catch(e) {
     if (e instanceof AuthError) { if (!restoreCache()) showAuth(); else toast("Signed out of ArcGIS. Open the Incident Map tab to sign in."); return; }
     const offline = !navigator.onLine || /fetch|network|timed out/i.test(e.message||"");
-    if (offline && restoreCache()) banner("bnOffline", "Offline: showing the board saved "+fmtTime(state.board.fetchedAt)+".");
+    if (offline && restoreCache()) banner("bnOffline", "Offline — showing the board as of "+hhmm(state.board.fetchedAt)+". It refreshes when you have signal.");
     else { banner("bnErr", "Couldn't load the board: "+(e.message||e)); if (!state.board && !restoreCache()) show("viewLoading"); }
   } finally {
     state.busy = false; btn.disabled=false; btn.innerHTML="&#x21bb;";
   }
 }
+function cacheMap(){ try { return JSON.parse(lsGet(LS_CACHE)||"null") || {}; } catch(e){ return {}; } }
+function saveCache(b){
+  if (!b || !b.incident) return;
+  const m = cacheMap(), id = String(b.incident.incident_id), now = Date.now();
+  m[id] = b;
+  // keep at most 4 incidents, drop anything older than 7 days (localStorage is small)
+  Object.keys(m).sort((x,y) => (m[y].fetchedAt||0)-(m[x].fetchedAt||0)).forEach((k,i) => { if (i>=4 || now-(m[k].fetchedAt||0) > 7*864e5) delete m[k]; });
+  try { lsSet(LS_CACHE, JSON.stringify(m)); } catch(e){}
+}
+/* The saved board for the incident this phone is on (the pick, the map's / gate's
+   choice, the last pick). Never shows another incident's board. */
 function restoreCache(){
-  if (state.board) { render(); return true; }
-  try { const b = JSON.parse(lsGet(LS_CACHE)||"null"); if (b && b.incident) { b.cached=true; state.board=b; render(); return true; } } catch(e){}
+  const want = state.pick || mapIncidentId() || lsGet(LS_PICK) || "";
+  if (state.board && (!want || String(state.board.incident.incident_id)===want)) { render(); return true; }
+  const m = cacheMap();
+  const b = want ? m[want] : Object.values(m).sort((x,y) => (y.fetchedAt||0)-(x.fetchedAt||0))[0];
+  if (b && b.incident) { b.cached=true; state.board=b; render(); return true; }
   return false;
 }
+function hhmm(t){ try { return new Date(t).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); } catch(e){ return ""; } }
 $("btnRefresh").onclick = () => load(true);
 setInterval(() => { if (!document.hidden) load(false); }, POLL_MS);
 document.addEventListener("visibilitychange", () => { if (!document.hidden && state.board && Date.now()-(state.board.fetchedAt||0) > 30000) load(false); });
 window.addEventListener("online", () => load(false));
+// P4: show the saved board at once (no wait on a dead network), then refresh it
+if (restoreCache()) banner("bnOffline", navigator.onLine ? "" : "Offline — showing the board as of "+hhmm(state.board.fetchedAt)+". It refreshes when you have signal.");
 load(false);
 </script>
 </body>
