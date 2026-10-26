@@ -76,6 +76,10 @@
   .section-title{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);
     margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
   .section-title .count{background:var(--surface-alt);border-radius:10px;padding:1px 8px;font-size:11px;letter-spacing:0}
+  .btn-log{display:block;text-align:center;background:var(--accent);color:#fff;font-weight:700;text-decoration:none;
+    border-radius:10px;padding:12px;margin:4px 0 6px;font-size:15px}
+  .section-title select{margin-left:auto;background:var(--surface);color:var(--text);border:1px solid var(--border);
+    border-radius:8px;padding:4px 8px;font-size:13px;text-transform:none;letter-spacing:0}
   .msg{white-space:pre-wrap;line-height:1.45;font-size:14px}
   .kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid #353838;font-size:14px}
   .kv:first-child{border-top:0}
@@ -154,6 +158,7 @@
       <div class="tab" data-tab="work" role="tab">Assignments <span id="cntWork"></span></div>
       <div class="tab" data-tab="res" role="tab">Resources <span id="cntRes"></span></div>
       <div class="tab" data-tab="req" role="tab">Requests <span id="cntReq"></span></div>
+      <div class="tab" data-tab="log" role="tab">214 Log</div>
     </div>
 
     <div data-pane="status">
@@ -180,6 +185,19 @@
       <label class="toggle"><input type="checkbox" id="chkClosed"> Show received / closed</label>
       <div id="listReq"></div>
     </div>
+
+    <div data-pane="log" hidden>
+      <a class="btn-log" id="lnkLog" target="_blank" rel="noopener">+ Log a 214 entry</a>
+      <div class="section-title">My log (ICS 214A) <span id="logWho" class="m"></span></div>
+      <div id="listMine"></div>
+      <div class="section-title">Unit log (ICS 214)
+        <select id="secPick" aria-label="Unit log">
+          <option value="command">Command</option><option value="operations">Operations</option>
+          <option value="planning">Planning</option><option value="logistics">Logistics</option>
+          <option value="finance">Finance</option><option value="safety">Safety</option>
+        </select></div>
+      <div id="listUnit"></div>
+    </div>
   </div>
 </div>
 <div id="toast" class="toast"></div>
@@ -196,6 +214,10 @@ const OPEN_STATUSES = ["activating","active","standby"];
 const POLL_MS = 60000, STALE_MS = 12*60000, QUERY_TIMEOUT_MS = 25000;
 // P4: one saved board per incident ({incident_id: board}), so offline you see YOUR incident's last board
 const LS_PICK = "wri_board_incident", LS_CACHE = "wri_board_cache_v2";
+// 214 (2026-10-26): shared ICS214_Log; who I am comes from my ArcGIS sign-in
+const LS_ME = "wri_board_me", LS_SEC = "wri_board_214_section";
+const FORMS_URL = "https://whitewaterrescue.github.io/wri-recon/";
+const SECTIONS = {command:"Command", operations:"Operations", planning:"Planning", logistics:"Logistics", finance:"Finance", safety:"Safety"};
 const EMBEDDED = window.top !== window;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -332,13 +354,16 @@ async function fetchBoard(){
   if (!inc) return null;
   state.pick = inc.incident_id;
   const w = "incident_id = " + q(inc.incident_id);
-  const [status, work, res, req] = await Promise.all([
+  const has214 = (await layerIds()).ICS214_Log != null;
+  const [status, work, res, req, log] = await Promise.all([
     query("Incident_Status", w, {orderByFields:"op_period DESC, as_of DESC", resultRecordCount:1}),
     query("Work_Assignments", w, {returnGeometry:"true", outSR:"4326"}),
     query("Incident_Resources", w, {outFields:"resource_id,organization_code,resource_kind,resource_type,identification,specification,status,branch,division,tf_unit_id,quantity,eta,boom_ft,recovery_edrc,liquid_storage,review_status"}),
-    query("Resource_Requests", w)
+    query("Resource_Requests", w),
+    has214 ? query("ICS214_Log", w, {outFields:"entry_id,section,person_name,person_email,position,entry_time,activity,on_unit_log,entry_source", orderByFields:"entry_time DESC"}) : [],
+    whoAmI()
   ]);
-  return { incident: inc, status: status[0] || null, work, res, req, fetchedAt: Date.now() };
+  return { incident: inc, status: status[0] || null, work, res, req, log, fetchedAt: Date.now() };
 }
 
 /* ============================================================ Render */
@@ -390,8 +415,44 @@ function render(){
   $("kvOrgs").innerHTML = ok.length ? ok.map(([o,n]) => `<div class="kv"><span>${esc(o)}</span><span>${n}</span></div>`).join("")
     : `<div class="empty">Nobody checked in.</div>`;
 
-  renderWork(b); renderRes(b); renderReq(b);
+  renderWork(b); renderRes(b); renderReq(b); renderLog(b);
 }
+
+/* ============================================================ 214 log */
+async function whoAmI(){
+  if (state.me) return state.me;
+  try { const j = await rest(PORTAL+"/sharing/rest/community/self", {}, "who am I");
+    state.me = {name:String(j.fullName||j.username||""), email:String(j.email||"").toLowerCase(), user:String(j.username||"")};
+    lsSet(LS_ME, JSON.stringify(state.me));
+  } catch(e){ if (e instanceof AuthError) throw e; try { state.me = JSON.parse(lsGet(LS_ME)||"null"); } catch(x){} }
+  return state.me;
+}
+function isMine(r, me){
+  if (!me) return false;
+  const n = s => String(s||"").trim().toLowerCase();
+  return (me.email && n(r.person_email)===me.email) || (me.name && n(r.person_name)===n(me.name));
+}
+function logItem(r, showWho){
+  return `<div class="item"><div class="t">${esc(fmtTime(r.entry_time))}${r.on_unit_log==="yes"&&!showWho?" "+badge("unit log"):""}</div>
+    <div class="d">${esc(r.activity||"")}</div>
+    <div class="m">${[showWho?(r.person_name||"Automatic"):"", r.position, showWho?"":SECTIONS[r.section]||""].filter(Boolean).map(esc).join(" · ")}</div></div>`;
+}
+function renderLog(b){
+  if (!state.me) { try { state.me = JSON.parse(lsGet(LS_ME)||"null"); } catch(x){} }
+  const me = state.me, rows = b.log || [];
+  const mine = rows.filter(r => isMine(r, me));
+  $("logWho").textContent = me && me.name ? "— " + me.name : "";
+  // my unit = the section of my newest entry, else the last one picked here
+  const sec = (state.secPick || lsGet(LS_SEC) || (mine[0] && mine[0].section) || "operations");
+  $("secPick").value = SECTIONS[sec] ? sec : "operations";
+  const unit = rows.filter(r => r.section===$("secPick").value && r.on_unit_log==="yes");
+  $("lnkLog").href = FORMS_URL + "?incident=" + encodeURIComponent(b.incident.incident_id) + "#214";
+  $("listMine").innerHTML = mine.length ? mine.slice(0,100).map(r => logItem(r,false)).join("")
+    : `<div class="empty">${me ? "No 214 entries from you on this incident yet." : "Sign in to see your own log."}</div>`;
+  $("listUnit").innerHTML = unit.length ? unit.slice(0,150).map(r => logItem(r,true)).join("")
+    : `<div class="empty">Nothing on the ${esc(SECTIONS[$("secPick").value])} unit log yet.</div>`;
+}
+$("secPick").onchange = e => { state.secPick = e.target.value; lsSet(LS_SEC, state.secPick); if (state.board) renderLog(state.board); };
 
 function detail(w){
   const d = String(w.description||"").trim(), t = String(w.title||"").trim();
