@@ -511,7 +511,11 @@ function restoreCache(){
   if (state.board && (!want || String(state.board.incident.incident_id)===want)) { render(); return true; }
   const m = cacheMap();
   const b = want ? m[want] : Object.values(m).sort((x,y) => (y.fetchedAt||0)-(x.fetchedAt||0))[0];
-  if (b && b.incident) { b.cached=true; state.board=b; render(); return true; }
+  if (b && b.incident) {
+    b.cached=true; state.board=b;
+    if (!state.incidents.length) renderPicker([b.incident], b.incident, false);   // offline: at least name the incident shown
+    render(); return true;
+  }
   return false;
 }
 function hhmm(t){ try { return new Date(t).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); } catch(e){ return ""; } }
