@@ -111,6 +111,19 @@
     box-shadow:0 6px 20px rgba(0,0,0,.4);display:none}
   .toast.show{display:block}
   [hidden]{display:none!important}
+  /* In-app window (same as the Forms page): forms open here, not in a new tab,
+     so the crew never leaves the Field App. */
+  .overlay{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg)}
+  .overlay[hidden]{display:none}
+  .overlay-bar{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);
+    border-bottom:1px solid var(--border);min-height:48px}
+  .ov-back{display:flex;align-items:center;gap:4px;padding:9px 14px;border-radius:8px;border:none;background:var(--accent);
+    color:#fff;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .ov-title{flex:1;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ov-newtab{padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;white-space:nowrap;color:var(--text-dim);
+    text-decoration:none;border:1px solid var(--border)}
+  .ov-frame-wrap{position:relative;flex:1;background:var(--bg)}
+  .ov-frame-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 </style>
 </head>
 <body>
@@ -187,7 +200,7 @@
     </div>
 
     <div data-pane="log" hidden>
-      <a class="btn-log" id="lnkLog" target="_blank" rel="noopener">+ Log a 214 entry</a>
+      <a class="btn-log" id="lnkLog" data-embed="1" data-name="Log a 214 entry" target="_blank" rel="noopener">+ Log a 214 entry</a>
       <div class="section-title">My log (ICS 214A) <span id="logWho" class="m"></span></div>
       <div id="listMine"></div>
       <div class="section-title">Unit log (ICS 214)
@@ -201,9 +214,54 @@
   </div>
 </div>
 <div id="toast" class="toast"></div>
+<div id="overlay" class="overlay" hidden>
+  <div class="overlay-bar">
+    <button class="ov-back" onclick="closeOverlay()">&#8249; Back</button>
+    <div class="ov-title" id="ovTitle"></div>
+    <a class="ov-newtab" id="ovNewTab" href="#" target="_blank" rel="noopener">Open in tab &#8599;</a>
+  </div>
+  <div class="ov-frame-wrap"></div>
+</div>
 
 <script>
 "use strict";
+// In-app window for a[data-embed] links (the Forms page pattern): a fresh iframe
+// per open + one history entry, so the phone's Back button closes the window
+// instead of leaving the Field App. Refresh the board on close (a new 214 entry).
+let overlayOpen = false;
+function openOverlay(url, name){
+  const old = document.getElementById("ovFrame"); if (old) old.remove();
+  const f = document.createElement("iframe");
+  f.id = "ovFrame"; f.title = name || "Form";
+  f.setAttribute("allow", "geolocation; camera; microphone"); f.setAttribute("allowfullscreen", "");
+  f.src = url;
+  document.getElementById("ovTitle").textContent = name || "";
+  document.getElementById("ovNewTab").href = url;
+  document.querySelector(".ov-frame-wrap").appendChild(f);
+  document.getElementById("overlay").hidden = false;
+  document.body.style.overflow = "hidden";
+  overlayOpen = true;
+  try { history.pushState({ wriOverlay: 1 }, ""); } catch (e) {}
+}
+function dismissOverlay(){
+  const f = document.getElementById("ovFrame"); if (f) f.remove();
+  document.getElementById("overlay").hidden = true;
+  document.body.style.overflow = "";
+  const was = overlayOpen; overlayOpen = false;
+  if (was && typeof load === "function") { try { load(false); } catch (e) {} }
+}
+function closeOverlay(){
+  const had = overlayOpen && history.state && history.state.wriOverlay;
+  dismissOverlay();
+  if (had) { try { history.back(); } catch (e) {} }
+}
+window.addEventListener("popstate", () => { if (overlayOpen) dismissOverlay(); });
+document.addEventListener("click", ev => {
+  const a = ev.target.closest ? ev.target.closest("a[data-embed]") : null;
+  if (!a || !a.href || a.getAttribute("href") === "#") return;
+  ev.preventDefault();
+  openOverlay(a.href, a.getAttribute("data-name") || a.textContent.trim());
+});
 const PORTAL       = "https://wrienviro.maps.arcgis.com";
 const ORG_ID       = "Ji79lWGR5B33LhY7";
 const OAUTH_CLIENT = "zXmBr5FFTyHWfh24";
