@@ -397,6 +397,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_25": {
+      "id": "page_25",
+      "label": "Drone Photos",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_drone_photos",
+        "MEDIUM": "layout_drone_photos",
+        "SMALL": "layout_drone_photos"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -423,6 +438,7 @@
       "page_19": [
         "page_13",
         "page_14",
+        "page_25",
         "page_15",
         "page_17"
       ]
@@ -1501,6 +1517,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_49",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_drone_photos": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_50",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -2920,6 +2969,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/incident-qr/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_50": {
+      "id": "widget_50",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Drone Photos",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-recon/#drone</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
