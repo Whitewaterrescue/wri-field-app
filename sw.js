@@ -20,7 +20,7 @@
  *  - No skipWaiting: new versions activate when all tabs close.
  */
 var CDN = '94';
-var STAMP = '20261026-191908';
+var STAMP = '20261027-board214';
 // The cdn cache is keyed to the BUILD, not the deploy stamp, so a config-only
 // redeploy reuses the ~25 MB a device already warmed. That also means patching
 // a file in place inside an already-published cdn/<N> is invisible to anyone
