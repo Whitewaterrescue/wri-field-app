@@ -832,15 +832,17 @@ async function mountViewer(p){
   // Strip the filename off the PATH, never off href: ?tiles=tiles/0045 puts a slash in the query
   // string, so a regex over the whole href cuts in the wrong place.
   const base = url.origin + url.pathname.replace(/[^/]*$/, "");
+  // tiles is tiles/<id> beside pano.html (Pages) or an absolute R2 folder (2026-10-28)
+  const tilesAt = tiles ? new URL(tiles.replace(/\/$/, ""), base).href : "";
   const common = {autoLoad: true, showZoomCtrl: true, showFullscreenCtrl: false, compass: false,
                   yaw: 0, pitch: 0, hfov: 100, friction: 0.18};
   let cfg;
   if (tiles) {
-    const r = await fetch(base + tiles.replace(/\/$/, "") + "/config.json", {cache: "default"});
+    const r = await fetch(tilesAt + "/config.json", {cache: "default"});
     if (!r.ok) throw new Error("tile config " + r.status);
     const j = await r.json();
     const mr = j.multiRes || {};
-    mr.basePath = base + tiles.replace(/\/$/, "");
+    mr.basePath = tilesAt;
     // One level down on phones: this is a WebGL context inside an app with a documented iPhone
     // memory history, and the top level buys nothing at annotation zoom.
     if (COARSE && mr.maxLevel > 2) mr.maxLevel = mr.maxLevel - 1;
