@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drone Video</title>
+<!--
+  WRI drone live video panel (WRI Drone Cloud P5, 2026-10-28). Used by the Field App's Live Stream
+  page and the "Drone Video" button on the response viewers (BNSF / UP / WRI / MT-WY).
+
+  Frames https://drone.whitewaterrescue.com/live?embed=1 and hands it, by postMessage to that origin
+  only, the app's own ArcGIS sign-in (exb_auth, same origin as every viewer on this Pages site) and
+  the incident the map's Incident Picker shows (window.top.__wriIncident). The drone server checks the
+  token is a WRI-org sign-in and shows that incident's drones, view only. Crew controls (start/stop,
+  client links) stay on the full page behind the incident PIN.
+
+  Video stops 3 s after the page is hidden (same rule as the Live Stream panel) so a parked panel
+  doesn't keep pulling video over a phone connection.
+-->
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{background:#151718;color:#eef1f2;font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;overflow:hidden}
+  #host{height:100%}
+  #host iframe{width:100%;height:100%;border:0;display:block}
+  #off{height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;text-align:center}
+  #off.on{display:flex}
+  #off p{color:#c7cacb;max-width:460px;font-size:15px}
+  .btn{padding:12px 20px;border-radius:10px;background:#EC2329;color:#fff;font:700 15px/1.2 inherit;border:0;cursor:pointer;font-family:inherit}
+</style>
+</head>
+<body>
+  <div id="host"></div>
+  <div id="off"><p id="offMsg"></p><button class="btn" id="resume" type="button">Show drone video</button></div>
+<script>
+(function () {
+  var SERVER = 'https://drone.whitewaterrescue.com';
+  var TEARDOWN_MS = 3000;
+  var host = document.getElementById('host'), off = document.getElementById('off');
+  var frame = null, hiddenSince = null;
+
+  function exbToken() {
+    var raw = null;
+    try { raw = localStorage.getItem('exb_auth') || sessionStorage.getItem('exb_auth'); } catch (e) { return null; }
+    try {
+      var a = JSON.parse(raw || 'null');
+      if (!a || !a.token) return null;
+      var exp = a.expires != null && a.expires !== '' ? new Date(a.expires).getTime() : NaN;
+      return isFinite(exp) && exp < Date.now() ? null : a.token;
+    } catch (e) { return null; }
+  }
+  // the incident the map's picker shows on this device, else the phone's incident choice
+  function incident() {
+    try { var w = window.top && window.top.__wriIncident; if (w && w.incident_id) return String(w.incident_id); } catch (e) {}
+    try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) return String(c.id); } catch (e) {}
+    return '';
+  }
+  function send() {
+    if (!frame || !frame.contentWindow) return;
+    frame.contentWindow.postMessage({ type: 'wri-live-auth', agol_token: exbToken(), incident: incident() }, SERVER);
+  }
+
+  function mount() {
+    if (frame) return;
+    frame = document.createElement('iframe');
+    frame.title = 'WRI drone live video';
+    frame.setAttribute('allow', 'autoplay; fullscreen');
+    frame.setAttribute('allowfullscreen', '');
+    frame.src = SERVER + '/live?embed=1';
+    host.appendChild(frame);
+    off.classList.remove('on'); host.style.display = '';
+  }
+  function unmount(m) {
+    if (frame) { try { frame.src = 'about:blank'; } catch (e) {} frame.remove(); frame = null; }
+    host.style.display = 'none'; off.classList.add('on');
+    document.getElementById('offMsg').textContent = m || '';
+  }
+
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d) return;
+    if (e.origin === SERVER && d.type === 'wri-live-ready') send();
+    // Incident Picker switched incidents (posted by the map to same-origin panels)
+    if (e.origin === location.origin && (d.type === 'wri-incident' || d.type === 'wri-incident-choice')) send();
+  });
+  // the app refreshes its sign-in now and then: pass the new one on (the page ignores an unchanged one)
+  setInterval(send, 60e3);
+
+  function isHidden() {
+    if (document.visibilityState === 'hidden') return true;
+    try { var fe = window.frameElement; if (fe) { var r = fe.getBoundingClientRect(); return r.width === 0 || r.height === 0; } } catch (e) {}
+    return window.innerWidth === 0 || window.innerHeight === 0;
+  }
+  function check() {
+    if (!frame) return;
+    if (isHidden()) {
+      if (hiddenSince === null) hiddenSince = Date.now();
+      else if (Date.now() - hiddenSince >= TEARDOWN_MS) { hiddenSince = null; unmount('Video stopped when you left the page.'); }
+    } else hiddenSince = null;
+  }
+  document.getElementById('resume').addEventListener('click', mount);
+  document.addEventListener('visibilitychange', check);
+  window.addEventListener('resize', check);
+  if (window.ResizeObserver) new ResizeObserver(check).observe(document.documentElement);
+  setInterval(check, 1000);
+  window.addEventListener('pagehide', function () { unmount(''); });
+  mount();
+})();
+</script>
+</body>
+</html>
