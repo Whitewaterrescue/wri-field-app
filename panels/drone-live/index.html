@@ -11,11 +11,14 @@
   Frames https://drone.whitewaterrescue.com/live?embed=1 and hands it, by postMessage to that origin
   only, the app's own ArcGIS sign-in (exb_auth, same origin as every viewer on this Pages site) and
   the incident the map's Incident Picker shows (window.top.__wriIncident). The drone server checks the
-  token is a WRI-org sign-in and shows that incident's drones, view only. Crew controls (start/stop,
-  client links) stay on the full page behind the incident PIN.
+  token is a WRI-org sign-in and shows that incident's drones, view only. With no ArcGIS sign-in (most
+  Field App phones) the drone page asks for a PIN instead: the incident's Gateway PIN = watch only,
+  the WRI crew PIN = watch + crew controls (start/stop video, camera + gimbal, client links). Check-out
+  is the pilot's alone (sign out in Pilot 2).
 
   Video stops 3 s after the page is hidden (same rule as the Live Stream panel) so a parked panel
-  doesn't keep pulling video over a phone connection.
+  doesn't keep pulling video over a phone connection, except while the Upload tab is sending a
+  video to Dropbox (the page says so with 'wri-live-busy'). Recorded / Upload tabs: P5b.
 -->
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
@@ -37,7 +40,7 @@
   var SERVER = 'https://drone.whitewaterrescue.com';
   var TEARDOWN_MS = 3000;
   var host = document.getElementById('host'), off = document.getElementById('off');
-  var frame = null, hiddenSince = null;
+  var frame = null, hiddenSince = null, uploading = false;
 
   function exbToken() {
     var raw = null;
@@ -80,6 +83,7 @@
     var d = e.data;
     if (!d) return;
     if (e.origin === SERVER && d.type === 'wri-live-ready') send();
+    if (e.origin === SERVER && d.type === 'wri-live-busy') uploading = !!d.on;   // a video upload: never unload mid-way
     // Incident Picker switched incidents (posted by the map to same-origin panels)
     if (e.origin === location.origin && (d.type === 'wri-incident' || d.type === 'wri-incident-choice')) send();
   });
@@ -92,7 +96,7 @@
     return window.innerWidth === 0 || window.innerHeight === 0;
   }
   function check() {
-    if (!frame) return;
+    if (!frame || uploading) return;
     if (isHidden()) {
       if (hiddenSince === null) hiddenSince = Date.now();
       else if (Date.now() - hiddenSince >= TEARDOWN_MS) { hiddenSince = null; unmount('Video stopped when you left the page.'); }
