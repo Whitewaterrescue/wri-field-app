@@ -512,9 +512,17 @@ function renderLog(b){
 }
 $("secPick").onchange = e => { state.secPick = e.target.value; lsSet(LS_SEC, state.secPick); if (state.board) renderLog(state.board); };
 
+// a drone mission's assignment (WRI Drone Cloud) carries a signed link to its mission page
+const MISSION_RE = /(?:^|\n)Mission: (https:\/\/drone\.whitewaterrescue\.com\/m\/[0-9a-f-]{36}\?k=[A-Za-z0-9_-]{24})\s*/;
+function missionLink(w){ const m = String(w.description||"").match(MISSION_RE); return m ? m[1] : ""; }
 function detail(w){
-  const d = String(w.description||"").trim(), t = String(w.title||"").trim();
+  const d = String(w.description||"").replace(MISSION_RE, "\n").trim(), t = String(w.title||"").trim();
   return d.indexOf(t)===0 ? d.slice(t.length).trim() : d;
+}
+// "Mine": assignments that name me (Ownership / assigned_to; drone missions list their pilots there)
+function isMyWork(w, me){
+  const n = me && String(me.name||"").trim().toLowerCase();
+  return !!n && String(w.assigned_to||"").toLowerCase().split(/\s*[,\/]\s*/).indexOf(n) >= 0;
 }
 function renderWork(b){
   const order = {in_progress:0, assigned:1, planned:2, complete:3, cancelled:4};
@@ -523,8 +531,11 @@ function renderWork(b){
   const keys = Object.keys(groups).sort();
   const open = b.work.filter(w => w.wa_status!=="complete" && w.wa_status!=="cancelled").length;
   $("cntWork").textContent = b.work.length ? "("+open+")" : "";
-  const f = keys.indexOf(state.workFilter)>=0 ? state.workFilter : "all";
-  $("workFilter").innerHTML = keys.length>1 ? ["all"].concat(keys).map(k => `<div class="tab${k===f?" active":""}" data-wf="${esc(k)}">${k==="all"?"All":esc(k)}</div>`).join("") : "";
+  const mine = b.work.filter(w => isMyWork(w, state.me));
+  if (mine.length) groups["\__mine__"] = mine;
+  const tabs = (mine.length ? ["\__mine__"] : []).concat(keys);
+  const f = tabs.indexOf(state.workFilter)>=0 ? state.workFilter : "all";
+  $("workFilter").innerHTML = tabs.length>1 || mine.length ? ["all"].concat(tabs).map(k => `<div class="tab${k===f?" active":""}" data-wf="${esc(k)}">${k==="all"?"All":k==="\__mine__"?"Mine ("+mine.length+")":esc(k)}</div>`).join("") : "";
   const show = f==="all" ? keys : [f];
   $("listWork").innerHTML = !b.work.length ? `<div class="empty">No work assignments yet.</div>` : show.map(k =>
     (keys.length>1&&f==="all"?`<div class="group">${esc(k)}</div>`:"") +
@@ -533,7 +544,7 @@ function renderWork(b){
       <div class="m">${[w.location_name, w.branch&&w.division?w.branch+" / "+w.division:(w.branch||""), w.assigned_to,
         w.start_time?fmtTime(w.start_time)+(w.end_time?" – "+new Date(w.end_time).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):""):""].filter(Boolean).map(esc).join(" · ")}</div>
       ${detail(w) ? `<div class="d">${esc(detail(w))}</div>` : ""}
-      ${w._g ? `<div class="acts">${dirLink(w._g)}</div>` : ""}
+      ${w._g || missionLink(w) ? `<div class="acts">${w._g ? dirLink(w._g) : ""}${missionLink(w) ? `<a data-embed="1" data-name="Drone mission" href="${esc(missionLink(w))}" target="_blank" rel="noopener">Open mission</a>` : ""}</div>` : ""}
     </div>`).join("")).join("");
   document.querySelectorAll("[data-wf]").forEach(el => el.onclick = () => { state.workFilter = el.dataset.wf; renderWork(state.board); });
 }
