@@ -2955,7 +2955,17 @@
         "position": "top-left",
         "offsetTop": 46,
         "phonePosition": "",
-        "zoomScale": 72000
+        "zoomScale": 72000,
+        "packSkip": {
+          "bnsf": [
+            "wri_incident_ops_bnsf_board_view",
+            "wdoe_grps_public_release",
+            "msu_duluth_strategies_erma",
+            "globeville_erap",
+            "globeville_emergency_contacts",
+            "bnsf_assets_2025_v2"
+          ]
+        }
       },
       "useMapWidgetIds": [
         "widget_1"
