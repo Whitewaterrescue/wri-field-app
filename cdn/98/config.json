@@ -1101,7 +1101,8 @@
         "0",
         "1",
         "2",
-        "3"
+        "3",
+        "4"
       ],
       "content": {
         "0": {
@@ -1203,6 +1204,31 @@
             "hCenter": false
           },
           "isPending": false
+        },
+        "4": {
+          "type": "WIDGET",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "1px",
+            "height": "1px"
+          },
+          "setting": {
+            "autoProps": {
+              "left": true,
+              "right": false,
+              "top": true,
+              "bottom": false,
+              "width": "CUSTOM",
+              "height": "CUSTOM"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false,
+          "widgetId": "widget_51"
         }
       }
     },
@@ -2996,6 +3022,20 @@
       },
       "useDataSourcesEnabled": false,
       "useDataSources": []
+    },
+    "widget_51": {
+      "id": "widget_51",
+      "uri": "widgets/ics214-fab/",
+      "version": "1.0.0",
+      "label": "ICS 214 Button",
+      "config": {
+        "formsUrl": "https://whitewaterrescue.github.io/wri-recon/",
+        "hidePages": [
+          "page_10"
+        ],
+        "left": 12,
+        "bottom": 84
+      }
     }
   },
   "widgetsManifest": {},
