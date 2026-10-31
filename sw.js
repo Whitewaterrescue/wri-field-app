@@ -19,8 +19,8 @@
  *  - Everything else same-scope: network-first (8s race) + cache fallback.
  *  - No skipWaiting: new versions activate when all tabs close.
  */
-var CDN = '94';
-var STAMP = '20261027-board214';
+var CDN = '95';
+var STAMP = '20261030-212541';
 // The cdn cache is keyed to the BUILD, not the deploy stamp, so a config-only
 // redeploy reuses the ~25 MB a device already warmed. That also means patching
 // a file in place inside an already-published cdn/<N> is invisible to anyone
@@ -42,16 +42,12 @@ var PRECACHE = [
   './panels/trailers/index.html',
   './panels/gateway/index.html',
   './panels/livestream/index.html',
-  './panels/board/index.html',
   './panels/drone/index.html',
   './panels/panos/index.html',
   './panels/grp-annotator/index.html',
   './panels/grp-office/index.html',
   './panels/pano-annotator/index.html',
   './panels/pano-annotator/pano-annot.js',
-  './panels/incident-qr/index.html',
-  './panels/incident-qr/qrcodegen.js',
-  './incident-gate.js',
   './cdn/' + CDN + '/config.json',
   './cdn/' + CDN + '/jimu-core/init.js'
 ];
