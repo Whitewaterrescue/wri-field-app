@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WRI</title>
+<!--
+  wri-apps (wri-field-app/apps/): opens a WRI Apps Script web app full-screen
+  inside this GitHub Pages page, so the desktop response viewers' links don't land on the bare script
+  page with Google's "created by a Google Apps Script user" bar (that bar only
+  shows when script.google.com is the top page).
+
+    ?app=ops  Ops Dashboard     (default ?page=v2)
+    ?app=rm   Resource Manager  (default ?role=wri_icp)
+
+  Every other query parameter (page, role, incident, ...) is passed to the app
+  unchanged. With no ?incident=, the incident the viewer picked on this device
+  is used (incident-scope widget keys; same github.io origin as the viewers).
+  The app is told it is wrapped (wrap=wri-apps) so the Ops nav switches pages
+  through this page instead of navigating the whole tab to the script URL.
+
+  The Ops Live Map asks window.top for an ArcGIS token: answered from the ExB
+  sign-in saved on this origin (exb_auth), the Field App root's bridge verbatim;
+  silence means the map falls back to its own sign-in.
+
+  The frame has NO sandbox on purpose: the apps use window.open (print, PDFs,
+  ArcGIS sign-in popup), confirm/prompt, file pickers and downloads. `allow`
+  passes through location (RM unit locate), camera and clipboard.
+-->
+<style>
+  html, body { margin: 0; height: 100%; background: #171919; overflow: hidden; }
+  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+  #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #ccc; font: 15px/1.4 Arial, sans-serif; text-align: center; padding: 24px; }
+  #msg a { color: #EC2329; }
+</style>
+</head>
+<body>
+<div id="msg">Loading…</div>
+<script>
+(function () {
+  'use strict';
+  var APPS = {
+    ops: { title: 'WRI Ops Dashboard', defaults: { page: 'v2' },
+      url: 'https://script.google.com/macros/s/AKfycbytFBip-cbr-ohGpVGFoFBQ3spMLCswlbP26B4Syw0rrDs_x2hO4FqpdFzR6Mb3h9Ke/exec' },
+    rm: { title: 'WRI Resource Manager', defaults: { role: 'wri_icp' },
+      url: 'https://script.google.com/macros/s/AKfycbzsxpfqbV7di4yTHRiTr7bg-RwojLuesrLhPoaFVM8foedbzhxMMyC-lPcBPPyLtjtm/exec' }
+  };
+  var msg = document.getElementById('msg');
+  var params = new URLSearchParams(location.search);
+  var key = (params.get('app') || '').toLowerCase();
+  var app = APPS[key];
+  if (!app) {
+    msg.innerHTML = 'Unknown app. Use <code>?app=ops</code> or <code>?app=rm</code>.';
+    return;
+  }
+  params.delete('app');
+  Object.keys(app.defaults).forEach(function (k) { if (!params.get(k)) params.set(k, app.defaults[k]); });
+
+  // The viewer's incident pick (incident-scope widget): the active choice, else the last pick.
+  if (!params.get('incident')) {
+    var id = '';
+    try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) id = String(c.id); } catch (e) {}
+    if (!id) try { var p = JSON.parse(localStorage.getItem('wri_incident_scope') || 'null'); if (p && p.id) id = String(p.id); } catch (e) {}
+    if (id) params.set('incident', id);
+  }
+
+  var frame = document.createElement('iframe');
+  frame.title = app.title;
+  frame.setAttribute('allow', 'geolocation; camera; microphone; clipboard-read; clipboard-write; fullscreen; web-share; autoplay');
+  frame.setAttribute('allowfullscreen', '');
+  frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+  frame.addEventListener('load', function () { msg.style.display = 'none'; });
+
+  function load() {
+    var q = new URLSearchParams(params);
+    q.set('wrap', 'wri-apps');
+    frame.src = app.url + '?' + q.toString();
+    document.title = app.title;
+    var shown = new URLSearchParams(params);
+    shown.set('app', key);
+    history.replaceState(null, '', '?' + shown.toString());
+  }
+  load();
+  document.body.appendChild(frame);
+
+  // ArcGIS token bridge (same as the Field App root index.html).
+  window.addEventListener('message', function (e) {
+    if (!e.data || e.data.type !== 'wri-agol-token-request' || !e.source) return;
+    var ok = false;
+    try { ok = /\.googleusercontent\.com$/.test(new URL(e.origin).hostname); } catch (x) {}
+    if (!ok) return;
+    var raw = null;
+    try { raw = localStorage.getItem('exb_auth') || sessionStorage.getItem('exb_auth'); } catch (x) {}
+    if (!raw) return;
+    try {
+      var a = JSON.parse(raw);
+      if (!a || !a.token) return;
+      e.source.postMessage({ type: 'wri-agol-token', token: a.token, username: a.email || '',
+        expiresAt: new Date(a.expires).getTime() || Date.now() + 1200000 }, e.origin);
+    } catch (x) {}
+  });
+
+  // Ops nav inside the wrapper (V2Scripts wireWrapperNav_): switch the framed page.
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.type !== 'wri-apps-nav' || key !== 'ops') return;
+    var ok = false;
+    try { ok = /\.googleusercontent\.com$/.test(new URL(e.origin).hostname); } catch (err) {}
+    if (!ok || !/^v2(-[a-z0-9]+)?$/.test(String(d.page || ''))) return;
+    params.set('page', d.page);
+    load();
+  });
+})();
+</script>
+</body>
+</html>
