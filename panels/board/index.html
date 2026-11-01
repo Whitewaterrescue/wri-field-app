@@ -50,6 +50,8 @@
   .banner.show{display:block}
   .banner.warn{background:#3b2a08;color:var(--warning)}
   .banner.err{background:#3b0d0d;color:#fca5a5}
+  /* same box the printed ICS 201 carries on a drill/exercise */
+  .banner.drill{background:#fff;color:#c00;border:3px solid #c00;font:bold 15px Arial,sans-serif;letter-spacing:1px;margin:8px 14px 0}
   #content{padding:12px 14px 60px;max-width:720px;margin:0 auto}
   .asof{font-size:12px;color:var(--text-muted);margin:0 2px 10px}
   .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:12px}
@@ -135,6 +137,7 @@
   <span id="incChip" class="chip" hidden></span>
   <button id="btnRefresh" class="iconbtn" aria-label="Refresh" title="Refresh">&#x21bb;</button>
 </div>
+<div id="bnDrill" class="banner drill"></div>
 <div id="bnOffline" class="banner warn">Offline: showing the last board saved on this device.</div>
 <div id="bnStale" class="banner warn"></div>
 <div id="bnErr" class="banner err"></div>
@@ -408,7 +411,7 @@ function tellMap(id){
 
 async function fetchBoard(){
   const incs = await query("Incidents", "incident_status IN ("+OPEN_STATUSES.map(q).join(",")+")",
-    {outFields:"incident_id,incident_name,client,project_key,incident_status,is_primary,current_op_period,date_opened", orderByFields:"date_opened DESC"});
+    {outFields:"incident_id,incident_name,client,project_key,incident_status,incident_type,is_primary,current_op_period,date_opened", orderByFields:"date_opened DESC"});
   incs.forEach(i => i.incident_id = String(i.incident_id));
   state.incidents = incs;
   const {inc, pinned} = state.pick ? {inc: incs.find(i => i.incident_id===state.pick) || pickIncident(incs).inc, pinned:false} : pickIncident(incs);
@@ -450,6 +453,7 @@ function render(){
   const b = state.board; if (!b) return;
   const s = b.status || {};
   show("viewMain");
+  banner("bnDrill", /^(exercise|drill)$/i.test(b.incident.incident_type||"") ? "EXERCISE / DRILL - THIS IS NOT A REAL INCIDENT" : "");
   const asOf = s.as_of || 0;
   $("asof").textContent = (asOf ? "Board as of "+fmtTime(asOf) : "Board not published yet") +
     (b.cached ? " · saved copy" : "") + (b.incident.current_op_period ? " · Op period "+b.incident.current_op_period : "");
