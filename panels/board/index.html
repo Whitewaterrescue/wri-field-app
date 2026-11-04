@@ -156,7 +156,7 @@
 
   <div id="viewAuth" class="card" hidden>
     <b>ArcGIS sign-in needed</b>
-    <div id="authEmbedded" class="note">Open the <b>Incident Map</b> tab and sign in, then come back.</div>
+    <div id="authEmbedded" class="note">Your WRI sign-in has run out on this phone. Tap <b>Sign in</b> to sign in again.</div>
     <div id="authStandalone" class="note" hidden>Sign in with your WRI ArcGIS account.</div>
     <div class="row" style="margin-top:10px">
       <button id="btnAuthRetry" class="btn secondary">Check again</button>
@@ -308,7 +308,7 @@ function banner(id, text){ const b=$(id); b.textContent=text||""; b.classList.to
 /* ============================================================ Auth ladder (drone/annotator pattern) */
 class AuthError extends Error {}
 const diag = {record:"", verify:""};
-function renderAuthDiag(){ const el=$("authDiag"); if (el) el.textContent=[diag.record,diag.verify].filter(Boolean).join(" "); }
+function renderAuthDiag(){ const el=$("authDiag"); if (el) el.textContent=/[?&]debug\b/.test(location.search) ? [diag.record,diag.verify].filter(Boolean).join(" ") : ""; }
 function readExbAuth(){
   let raw=null, from="localStorage";
   try { raw=localStorage.getItem("exb_auth"); if(!raw){ raw=sessionStorage.getItem("exb_auth"); from="sessionStorage"; } }
@@ -358,7 +358,7 @@ function showAuth(){
   authPoll=setInterval(()=>{ renderAuthDiag(); if(getAuth()){ clearInterval(authPoll); load(true); } },2000);
 }
 window.addEventListener("storage", e => { if(e.key==="exb_auth" && !$("viewAuth").hidden && getAuth()){ clearInterval(authPoll); load(true); } });
-$("btnAuthRetry").onclick=()=>{ if(getAuth()) load(true); else { renderAuthDiag(); toast("Not signed in yet. Open the Incident Map tab and sign in."); } };
+$("btnAuthRetry").onclick=()=>{ if(getAuth()) load(true); else { renderAuthDiag(); toast("Not signed in yet. Tap Sign in."); } };
 $("btnSignIn").onclick=signIn;
 
 async function rest(url, fields, label){

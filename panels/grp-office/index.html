@@ -79,7 +79,7 @@
   <section class="view" id="viewAuth" hidden>
     <div class="auth">
       <h2 style="font-family:var(--head)">Sign in needed</h2>
-      <p id="authEmbedded" hidden>Open the <b>Incident Map</b> tab and sign in to ArcGIS. This page picks the session up automatically.</p>
+      <p id="authEmbedded" hidden>Your WRI sign-in has run out on this phone. Tap <b>Sign in</b> to sign in again.</p>
       <p id="authStandalone" hidden>Sign in with your WRI ArcGIS account.</p>
       <div style="display:flex;gap:8px"><button class="btn primary" id="btnSignIn">Sign in</button><button class="btn" id="btnAuthRetry">Check again</button></div>
       <div class="err" id="authErr" hidden></div>
@@ -133,7 +133,7 @@ function fmtWhen(ms){ if (!ms) return ""; const d = new Date(ms); return d.toLoc
 /* ============================================================ Auth ladder (annotator / orthos pattern) */
 class AuthError extends Error {}
 const diag = {record: "", verify: ""};
-function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = [diag.record, diag.verify].filter(Boolean).join(" "); }
+function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = /[?&]debug\b/.test(location.search) ? [diag.record, diag.verify].filter(Boolean).join(" ") : ""; }
 function readExbAuth(){
   let raw = null, from = "localStorage";
   try { raw = localStorage.getItem("exb_auth"); if (!raw) { raw = sessionStorage.getItem("exb_auth"); from = "sessionStorage"; } }
@@ -178,7 +178,7 @@ function showAuth(){
 }
 window.addEventListener("storage", e => { if (e.key === "exb_auth" && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
-$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); } };
+$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Tap Sign in."); } };
 $("btnSignIn").onclick = signIn;
 
 async function rest(url, fields, opts = {}){

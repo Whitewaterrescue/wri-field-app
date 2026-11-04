@@ -254,6 +254,8 @@
 
   function init() {
     flushPending();   // ticks saved while the outbox scripts couldn't load
+    loadHaspPpe();
+    fetchHaspPpe();
     var cached = loadCache();
     if (cached) { roles = cached; render(); }
     fetch(API + '?api=tasks')
@@ -274,6 +276,46 @@
         else document.getElementById('content').innerHTML =
           '<div class="empty">Could not load the checklist.<br>Check your connection and reload.</div>';
       });
+  }
+
+  // 2026-11-04 (batch 7): the PPE check names the HASP's ONE PPE list (same ?api=hasp + cache as the
+  // HASP page), so the checklist and the plan can't disagree. No HASP summary = the sheet's wording.
+  var HASP_CACHE = 'wri_hasp_cache', haspPpe = null;
+  // 2026-11-04 (batch 7): the crew's incident, read like panels/board: ?incident= on the panel,
+  // the map's picker (same origin), the phone's pick (incident-gate.js), the last map scope. '' = none.
+  function haspPick() {
+    try { var q = new URLSearchParams(location.search).get('incident'); if (q) return { id: q, label: q }; } catch (e) {}
+    try { var w = window.top && window.top.__wriIncident; if (w && w.incident_id) return { id: String(w.incident_id), label: w.project_key || w.incident_name || String(w.incident_id) }; } catch (e) {}
+    try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) return { id: String(c.id), label: c.key || c.name || String(c.id) }; } catch (e) {}
+    try { var p = JSON.parse(localStorage.getItem('wri_incident_scope') || 'null'); if (p && p.id) return { id: String(p.id), label: p.key || p.name || String(p.id) }; } catch (e) {}
+    return { id: '', label: '' };
+  }
+  var PICK = haspPick();
+  var HASP_API = API + '?api=hasp' + (PICK.id ? '&incident=' + encodeURIComponent(PICK.id) : '');
+  function ppeFrom(d) {
+    var p = d && d.summary && d.summary.ppe;
+    return p && p.items && p.items.length ? p : null;
+  }
+  function loadHaspPpe() {
+    try { var c = JSON.parse(localStorage.getItem(HASP_CACHE)); if (c && String(c.incident || '') === PICK.id) haspPpe = ppeFrom(c.data); } catch (e) {}
+  }
+  function fetchHaspPpe() {
+    fetch(HASP_API)
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok && d.hasp && d.hasp.noHaspForIncident) { haspPpe = null; render(); return; }   // checklist wording
+        if (!(d && d.ok && d.hasp && !d.hasp.error)) return;
+        try { localStorage.setItem(HASP_CACHE, JSON.stringify({ ts: Date.now(), incident: PICK.id, data: d })); } catch (e) {}
+        haspPpe = ppeFrom(d);
+        render();
+      })
+      .catch(function () {});
+  }
+  function taskLabel(t) {
+    if (haspPpe && /^PPE check\b/i.test(t.label || '')) {
+      return 'PPE check (from the HASP' + (haspPpe.level ? ', ' + haspPpe.level : '') + '): ' + haspPpe.items.join(', ');
+    }
+    return t.label;
   }
 
   // ids the Mission Hub label map doesn't name (it returns the id itself)
@@ -513,7 +555,7 @@
         if (isDone) checked++;
         body += '<div class="task' + (isDone ? ' done' : '') + '">' +
           '<button class="task-check" onclick="toggleTask(\'' + roleId + '\',\'' + esc(t.id) + '\')">&#10003;</button>' +
-          '<div class="task-label">' + esc(t.label) +
+          '<div class="task-label">' + esc(taskLabel(t)) +
           (isCheckIn(t) && checkedInName() ? '<div class="task-note">Checked in as ' + esc(checkedInName()) + '</div>' : '') +
           (isDone && loggedNow(roleId, t) ? '<div class="task-note t214">In your 214</div>' : '') + '</div>';
         if (t.url && /^page:/.test(t.url)) {   // a Field App page: switch the shell to it (no reload)

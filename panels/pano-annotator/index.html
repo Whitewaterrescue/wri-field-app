@@ -272,7 +272,7 @@ const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
 /* ============================================================ Auth ladder (annotator pattern) */
 class AuthError extends Error {}
 const diag = {record: "", verify: ""};
-function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = [diag.record, diag.verify].filter(Boolean).join(" "); }
+function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = /[?&]debug\b/.test(location.search) ? [diag.record, diag.verify].filter(Boolean).join(" ") : ""; }
 function readExbAuth(){
   let raw = null, from = "localStorage";
   try { raw = localStorage.getItem("exb_auth"); if (!raw) { raw = sessionStorage.getItem("exb_auth"); from = "sessionStorage"; } }
@@ -325,7 +325,7 @@ function showAuth(){
 }
 window.addEventListener("storage", e => { if (e.key === "exb_auth" && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
-$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); } };
+$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Tap Sign in."); } };
 $("btnSignIn").onclick = signIn;
 
 async function rest(url, fields, opts = {}){
