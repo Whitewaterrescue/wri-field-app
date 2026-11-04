@@ -2995,7 +2995,8 @@
             "globeville_emergency_contacts",
             "bnsf_assets_2025_v2"
           ]
-        }
+        },
+        "keyPlaces": true
       },
       "useMapWidgetIds": [
         "widget_1"
