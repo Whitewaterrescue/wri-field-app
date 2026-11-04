@@ -70,6 +70,7 @@
   }
   .task.done .task-check{background:var(--success);border-color:var(--success);color:#171919}
   .task-label{flex:1;font-size:14px;line-height:1.35}
+  .task-note{font-size:12px;color:#86efac;margin-top:2px;text-decoration:none}
   .task-link{
     padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;white-space:nowrap;
     color:#fff;text-decoration:none;background:#3A3C3C;
@@ -214,6 +215,20 @@
     if (overlayOpen) dismissOverlay();
   });
 
+  // page:<id> task links: the shell (same origin) changes page on popstate, as ExB's own menu does
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest ? ev.target.closest('a[data-page]') : null;
+    if (!a) return;
+    ev.preventDefault();
+    try {
+      var top = window.top, q = new URLSearchParams(top.location.search);
+      q.set('page', a.getAttribute('data-page'));
+      top.history.pushState(null, '', top.location.pathname + '?' + q.toString());
+      top.dispatchEvent(new top.PopStateEvent('popstate', { state: null }));
+    } catch (e) { window.open('/wri-field-app/?page=' + encodeURIComponent(a.getAttribute('data-page')), '_top'); }
+  });
+  window.addEventListener('storage', function (e) { if (e.key === 'wri_checkin_state') render(); });
+
   document.addEventListener('click', function (ev) {
     var a = ev.target.closest ? ev.target.closest('a[data-open]') : null;
     if (!a) return;
@@ -283,10 +298,27 @@
   function getDone(role) {
     try { return JSON.parse(localStorage.getItem(doneKey(role))) || {}; } catch (e) { return {}; }
   }
+  // A tick holds its time (old ticks are 1). Daily tasks start fresh each day at 3 am, like the
+  // incident pick; Initial and Demob ticks stay until Reset.
+  function lastReset() { var d = new Date(); d.setHours(3, 0, 0, 0); if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1); return d.getTime(); }
+  function isDone(done, t, phase) {
+    if (isCheckIn(t) && checkedInName()) return true;
+    var v = done[t.id];
+    return !!v && (phase !== 'daily' || v > lastReset());
+  }
+  // "Check in" rows follow the phone's check-in (wri-checkin writes wri_checkin_state on this origin)
+  function isCheckIn(t) {
+    return (t.url === 'page:page_10' || /^check in and out app$/i.test(t.linkLabel || '')) && /^check in\b/i.test(t.label) && !/check out/i.test(t.label);
+  }
+  function checkedInName() {
+    try { var s = JSON.parse(localStorage.getItem('wri_checkin_state') || 'null'); return s && s.name ? String(s.name) : ''; } catch (e) { return ''; }
+  }
+
+  function isDone_(done, t) { return isDone(done, t, currentPhase); }
 
   function toggleTask(role, taskId) {
     var done = getDone(role);
-    if (done[taskId]) delete done[taskId]; else done[taskId] = 1;
+    if (done[taskId] && (currentPhase !== 'daily' || done[taskId] > lastReset())) delete done[taskId]; else done[taskId] = Date.now();
     try { localStorage.setItem(doneKey(role), JSON.stringify(done)); } catch (e) {}
     render();
   }
@@ -364,12 +396,16 @@
       if (sec.title) body += '<div class="section-title">' + esc(sec.title) + '</div>';
       tasks.forEach(function (t) {
         total++;
-        var isDone = !!done[t.id];
+        var isDone = isDone_(done, t);
         if (isDone) checked++;
         body += '<div class="task' + (isDone ? ' done' : '') + '">' +
           '<button class="task-check" onclick="toggleTask(\'' + roleId + '\',\'' + esc(t.id) + '\')">&#10003;</button>' +
-          '<div class="task-label">' + esc(t.label) + '</div>';
-        if (t.url) {
+          '<div class="task-label">' + esc(t.label) +
+          (isCheckIn(t) && checkedInName() ? '<div class="task-note">Checked in as ' + esc(checkedInName()) + '</div>' : '') + '</div>';
+        if (t.url && /^page:/.test(t.url)) {   // a Field App page: switch the shell to it (no reload)
+          body += '<a class="task-link ' + esc((t.buttonColor || 'slate').toLowerCase()) + '" href="#" data-page="' + esc(t.url.slice(5)) + '">' +
+            esc(t.linkLabel || 'Open') + '</a>';
+        } else if (t.url) {
           var c = (t.buttonColor || 'slate').toLowerCase();
           body += '<a class="task-link ' + esc(c) + '" href="' + esc(t.url) + '" target="_blank" rel="noopener" data-open' +
             ' data-name="' + esc(t.label) + '">' + esc(t.linkLabel || 'Open') + '</a>';
