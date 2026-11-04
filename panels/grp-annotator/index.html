@@ -342,7 +342,7 @@ function confirmBox(title, text, yes="Confirm"){
    ============================================================ */
 class AuthError extends Error {}
 const diag = {record: "", verify: ""};     // what the sign-in card reports; never the token itself
-function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = [diag.record, diag.verify].filter(Boolean).join(" "); }
+function renderAuthDiag(){ const el = $("authDiag"); if (el) el.textContent = /[?&]debug\b/.test(location.search) ? [diag.record, diag.verify].filter(Boolean).join(" ") : ""; }
 function readExbAuth(){
   let raw = null, from = "localStorage";
   try {
@@ -413,7 +413,7 @@ function showAuth(){
 }
 window.addEventListener("storage", e => { if (e.key === "exb_auth" && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
 document.addEventListener("visibilitychange", () => { if (!document.hidden && !$("viewAuth").hidden && getAuth()) { clearInterval(authPoll); boot(); } });
-$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Open the Incident Map tab and sign in."); } };
+$("btnAuthRetry").onclick = () => { state.retryAt = 0; if (getAuth()) boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Tap Sign in."); } };
 $("btnSignIn").onclick = signIn;
 
 /* ============================================================
