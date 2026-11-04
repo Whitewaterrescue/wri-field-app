@@ -14,13 +14,16 @@
     Responders       -> wri-respond (external responder gateway; PIN as usual)
   The open-incident list is the gateway's public 'openincidents' (no sign-in needed).
   QR drawing: Nayuki qrcodegen (MIT), vendored beside this file -- works offline.
+  2026-11-04 (Jordan walkthrough): Responders first and the default (a contractor can't tell which
+  one they are), each option says who it's for, the PIN step is explained, and "Hand over" locks the
+  screen to the code so the person holding the phone can't change the incident.
 -->
 <script src="qrcodegen.js"></script>
 <style>
 :root{--bg:#0f1419;--card:#1f2933;--line:#3e4c59;--txt:#f1f5f9;--mute:#9aa5b1;--red:#EC2329}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.35 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif}
-main{max-width:520px;margin:0 auto;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 24px)}
+main{max-width:520px;margin:0 auto;padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 110px)}
 h1{font-size:20px;margin:0 0 4px}
 .sub{color:var(--mute);margin:0 0 14px;font-size:13px}
 label{display:block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:12px 0 6px}
@@ -38,6 +41,15 @@ select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);b
 .row button.busy{opacity:.6}
 .note{color:var(--mute);font-size:13px;margin-top:12px}
 .err{color:#fca5a5}
+.tabs button small{display:block;font-weight:500;color:var(--mute);margin-top:3px;font-size:11px}
+.hand{width:100%;margin-top:12px;padding:15px;border-radius:12px;border:0;background:var(--red);color:#fff;font:800 16px/1.2 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;cursor:pointer}
+.lock{position:fixed;inset:0;z-index:100;background:#fff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center}
+.lock[hidden]{display:none}
+.lock svg{width:min(88vw,62vh);height:auto}
+.lock .n{font:800 26px/1.1 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;margin-top:10px}
+.lock .f{font:600 15px/1.3 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;color:#333;margin-top:6px;max-width:420px}
+.lock .un{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 18px);left:50%;transform:translateX(-50%);padding:12px 20px;border-radius:24px;border:2px solid #999;background:#f3f4f6;color:#333;font:700 14px/1 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;user-select:none;-webkit-user-select:none;touch-action:none}
+.lock .un.hold{background:#d1d5db}
 @media print{body{background:#fff}main>*:not(.qrwrap){display:none}.qrwrap{border:0}}
 </style>
 </head>
@@ -50,9 +62,9 @@ select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);b
     <label for="inc">Incident</label>
     <select id="inc"></select>
     <div class="tabs" role="tablist">
-      <button data-k="app" class="on" role="tab">WRI staff</button>
-      <button data-k="checkin" role="tab">Staff check-in</button>
-      <button data-k="respond" role="tab">Responders</button>
+      <button data-k="respond" class="on" role="tab">Everyone arriving<small>contractors, agencies</small></button>
+      <button data-k="app" role="tab">WRI staff app<small>WRI crew only</small></button>
+      <button data-k="checkin" role="tab">WRI check-in<small>WRI crew only</small></button>
     </div>
     <div class="qrwrap" id="qrwrap">
       <div id="qr"></div>
@@ -65,23 +77,30 @@ select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);b
       <button id="btnCopy">Copy link</button>
       <button id="btnPrint">Print</button>
     </div>
+    <button class="hand" id="btnHand" type="button">Hand over: lock the screen to this code</button>
     <p class="note" id="foot"></p>
   </div>
 </main>
+<div class="lock" id="lock" hidden>
+  <div id="lockQr"></div>
+  <div class="n" id="lockName"></div>
+  <div class="f" id="lockFor"></div>
+  <button class="un" id="btnUnlock" type="button">Hold 2 s to unlock</button>
+</div>
 <script>
 (function(){
 "use strict";
 const API = "https://script.google.com/macros/s/AKfycbx7p4-A8F6G_VedgHsw3RDJgwJK1GKVAFcvSah1JdjIdG5g7PAcvXhHRKHk_ULIhdL0KA/exec";
 const SITE = "https://whitewaterrescue.github.io";
 const TARGETS = {
-  app:     { path: "/wri-field-app/", label: "WRI staff — opens the Field App on this incident" },
-  checkin: { path: "/wri-checkin/",   label: "Staff check-in for this incident" },
-  respond: { path: "/wri-respond/",   label: "Outside responders — check in to this incident" }
+  respond: { path: "/wri-respond/",   label: "Everyone arriving: scan to check in to this incident" },
+  app:     { path: "/wri-field-app/", label: "WRI staff only: opens the Field App on this incident" },
+  checkin: { path: "/wri-checkin/",   label: "WRI staff only: check in to this incident" }
 };
 const COLORS = { bnsf: "#F47A20", up: "#FFC72C", mtwy: "#2E7DD7", wri: "#EC2329" };
 const LABELS = { bnsf: "BNSF", up: "UP", mtwy: "MT/WY Coop", wri: "WRI" };
 const $ = id => document.getElementById(id);
-let list = [], tab = "app";
+let list = [], tab = "respond";
 
 function choiceId(){
   try { const c = JSON.parse(localStorage.getItem("wri_incident_choice") || "null"); if (c && c.id && c.expires > Date.now()) return String(c.id); } catch (e) {}
@@ -110,9 +129,26 @@ function render(){
   $("url").textContent = u;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.k === tab));
   $("foot").textContent = tab === "respond"
-    ? "Responders still enter the gateway PIN. The link only decides which incident they check in to."
+    ? "After scanning they're asked for the incident PIN. Tell it to them out loud (the Incident Commander or Safety Officer has it); don't write it on a posted sign. The code only picks the incident."
     : "The phone stays on this incident until 3 am, or until someone picks another one on the map.";
 }
+// hand-over: only the code on screen; holding the button 2 s brings the page back
+$("btnHand").onclick = () => {
+  const r = current(); if (!r) return;
+  $("lockQr").innerHTML = svgFor(link());
+  $("lockName").textContent = r.project_key || r.incident_name;
+  $("lockFor").textContent = TARGETS[tab].label;
+  $("lock").hidden = false;
+  try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {}
+};
+let holdT = null;
+const holdStart = e => { e.preventDefault(); $("btnUnlock").classList.add("hold"); holdT = setTimeout(() => {
+  $("lock").hidden = true; $("btnUnlock").classList.remove("hold");
+  try { document.fullscreenElement && document.exitFullscreen(); } catch (x) {}
+}, 2000); };
+const holdEnd = () => { clearTimeout(holdT); $("btnUnlock").classList.remove("hold"); };
+$("btnUnlock").addEventListener("pointerdown", holdStart);
+["pointerup", "pointercancel", "pointerleave"].forEach(ev => $("btnUnlock").addEventListener(ev, holdEnd));
 function busy(btn, on){ btn.disabled = on; btn.classList.toggle("busy", on); }
 $("btnCopy").onclick = async e => {
   const b = e.currentTarget; busy(b, true);

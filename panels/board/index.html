@@ -93,7 +93,14 @@
   .item .t{font-weight:600;font-size:14.5px;line-height:1.35}
   .item .m{font-size:12.5px;color:var(--text-dim);margin-top:4px;line-height:1.4}
   .item .d{font-size:13px;color:var(--text);margin-top:6px;white-space:pre-wrap;line-height:1.4}
-  .item .acts{margin-top:8px;display:flex;gap:8px}
+  .item .acts{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .item.wa{cursor:pointer}
+  .item.wa .chev{float:right;color:var(--text-dim);font-size:18px;line-height:1;transition:transform .15s}
+  .item.wa.open .chev{transform:rotate(90deg)}
+  .item.wa .more{display:none}
+  .item.wa.open .more{display:block}
+  .item .nomap{font-size:12.5px;color:var(--text-dim)}
+  #workFilter{flex-wrap:wrap;overflow:visible}
   .item .acts a{font-size:13px;font-weight:600;text-decoration:none;padding:6px 12px;border-radius:8px;
     background:var(--surface-alt);border:1px solid var(--border);color:var(--text)}
   .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;margin-right:4px;
@@ -290,7 +297,7 @@ const SECTIONS = {command:"Command", operations:"Operations", planning:"Planning
 const EMBEDDED = window.top !== window;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const state = { badToken:null, layers:null, incidents:[], pick:"", board:null, tab:"status", workFilter:"all", busy:false, prevSig:null };
+const state = { badToken:null, layers:null, incidents:[], pick:"", board:null, tab:"status", workFilter:"", busy:false, prevSig:null };
 
 function lsGet(k){ try { return localStorage.getItem(k); } catch(e){ return null; } }
 function lsSet(k,v){ try { localStorage.setItem(k,v); } catch(e){} }
@@ -423,16 +430,17 @@ async function fetchBoard(){
   if (!inc) return null;
   state.pick = inc.incident_id;
   const w = "incident_id = " + q(inc.incident_id);
-  const has214 = (await layerIds()).ICS214_Log != null;
-  const [status, work, res, req, log] = await Promise.all([
+  const has214 = (await layerIds()).ICS214_Log != null, hasPeople = (await layerIds()).Incident_Personnel != null;
+  const [status, work, res, req, log, , people] = await Promise.all([
     query("Incident_Status", w, {orderByFields:"op_period DESC, as_of DESC", resultRecordCount:1}),
     query("Work_Assignments", w, {returnGeometry:"true", outSR:"4326"}),
     query("Incident_Resources", w, {outFields:"resource_id,organization_code,resource_kind,resource_type,identification,specification,status,branch,division,tf_unit_id,quantity,eta,boom_ft,recovery_edrc,liquid_storage,review_status"}),
     query("Resource_Requests", w),
     has214 ? query("ICS214_Log", w, {outFields:"entry_id,section,person_name,person_email,position,entry_time,activity,on_unit_log,entry_source", orderByFields:"entry_time DESC"}) : [],
-    whoAmI()
+    whoAmI(),
+    hasPeople ? query("Incident_Personnel", w, {outFields:"person_name,tf_unit_id,tf_group,branch,ics_position"}).catch(() => []) : []
   ]);
-  return { incident: inc, status: status[0] || null, work, res, req, log, fetchedAt: Date.now() };
+  return { incident: inc, status: status[0] || null, work, res, req, log, people, fetchedAt: Date.now() };
 }
 
 /* ============================================================ Render */
@@ -543,10 +551,23 @@ function detail(w){
   const d = String(w.description||"").replace(MISSION_RE, "\n").trim(), t = String(w.title||"").trim();
   return d.indexOf(t)===0 ? d.slice(t.length).trim() : d;
 }
-// "Mine": assignments that name me (Ownership / assigned_to; drone missions list their pilots there)
-function isMyWork(w, me){
-  const n = me && String(me.name||"").trim().toLowerCase();
-  return !!n && String(w.assigned_to||"").toLowerCase().split(/\s*[,\/]\s*/).indexOf(n) >= 0;
+// "Mine": assignments that name me (Ownership / assigned_to; drone missions list their pilots there), or that
+// went to my task force on the work chart (Riley 2026-11-04: a TF leader's TF work never showed under Mine).
+// Me = my ArcGIS name and the name I checked in with (the Field App's check-in, same origin).
+function myNames(me){
+  let ci = ""; try { ci = (JSON.parse(lsGet("wri_checkin_state")||"null")||{}).name || ""; } catch(e){}
+  return [me && me.name, ci].map(n => String(n||"").trim().toLowerCase()).filter(Boolean);
+}
+function myUnits(b, names){
+  const u = {ids:{}, groups:{}};
+  (b.people||[]).forEach(p => { if (names.indexOf(String(p.person_name||"").trim().toLowerCase()) < 0) return;
+    if (p.tf_unit_id) u.ids[p.tf_unit_id] = 1; if (p.tf_group) u.groups[String(p.tf_group).toLowerCase()] = 1; });
+  return u;
+}
+function isMyWork(w, names, units){
+  const who = String(w.assigned_to||"").toLowerCase().split(/\s*[,\/]\s*/);
+  if (names.some(n => who.indexOf(n) >= 0)) return true;
+  return !!units && ((w.tf_unit_id && units.ids[w.tf_unit_id]) || (w.division && units.groups[String(w.division).toLowerCase()]));
 }
 function renderWork(b){
   const order = {in_progress:0, assigned:1, planned:2, complete:3, cancelled:4};
@@ -555,26 +576,34 @@ function renderWork(b){
   const keys = Object.keys(groups).sort();
   const open = b.work.filter(w => w.wa_status!=="complete" && w.wa_status!=="cancelled").length;
   $("cntWork").textContent = b.work.length ? "("+open+" open)" : "";
-  // Mine is always offered (2026-11-03 walkthrough: hidden at 0, a crew lead concluded it didn't exist)
-  const mine = b.work.filter(w => isMyWork(w, state.me));
+  // Mine is always offered (2026-11-03 walkthrough: hidden at 0, a crew lead concluded it didn't exist),
+  // and opens first when it has anything (2026-11-04)
+  const names = myNames(state.me), units = myUnits(b, names);
+  const mine = b.work.filter(w => isMyWork(w, names, units));
   groups["\__mine__"] = mine;
   const tabs = ["\__mine__"].concat(keys);
-  const f = tabs.indexOf(state.workFilter)>=0 ? state.workFilter : "all";
+  const f = state.workFilter==="all" || tabs.indexOf(state.workFilter)>=0 ? state.workFilter : (mine.length ? "\__mine__" : "all");
   $("workFilter").innerHTML = ["all"].concat(tabs).map(k => `<div class="tab${k===f?" active":""}" data-wf="${esc(k)}">${k==="all"?"All":k==="\__mine__"?"Mine ("+mine.length+")":esc(k)}</div>`).join("");
   const show = f==="all" ? keys : [f];
-  const myName = state.me && state.me.name;
+  const myName = (state.me && state.me.name) || names[0];
   $("listWork").innerHTML = f==="\__mine__" && !mine.length
     ? `<div class="empty">${myName ? "Nothing assigned to "+esc(myName)+" yet. An assignment shows here when its Assigned to names you." : "Sign in to see the work assigned to you."}</div>`
     : !b.work.length ? `<div class="empty">No work assignments yet.</div>` : show.map(k =>
     (keys.length>1&&f==="all"?`<div class="group">${esc(k)}</div>`:"") +
-    groups[k].sort((a,c)=>(order[a.wa_status]??9)-(order[c.wa_status]??9)).map(w => `<div class="item">
-      <div class="t">${badge(w.wa_status)}${w.priority==="high"?badge("high"):""}${esc(w.title||w.location_name||"Work assignment")}</div>
+    groups[k].sort((a,c)=>(order[a.wa_status]??9)-(order[c.wa_status]??9)).map(w => `<div class="item wa${state.waOpen===w.assignment_id?" open":""}" data-wa="${esc(w.assignment_id||"")}">
+      <div class="t">${badge(w.wa_status)}${w.priority==="high"?badge("high"):""}${esc(w.title||w.location_name||"Work assignment")}<span class="chev">›</span></div>
       <div class="m">${[w.location_name, w.branch&&w.division?w.branch+" / "+w.division:(w.branch||""), w.assigned_to,
         w.start_time?fmtTime(w.start_time)+(w.end_time?" – "+new Date(w.end_time).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):""):""].filter(Boolean).map(esc).join(" · ")}</div>
       ${detail(w) ? `<div class="d">${esc(detail(w))}</div>` : ""}
-      ${w._g || missionLink(w) ? `<div class="acts">${w._g ? dirLink(w._g) : ""}${missionLink(w) ? `<a data-embed="1" data-name="Drone mission" href="${esc(missionLink(w))}" target="_blank" rel="noopener">Open mission</a>` : ""}</div>` : ""}
+      <div class="more">${w.special_instructions ? `<div class="d"><b>Special instructions:</b> ${esc(w.special_instructions)}</div>` : ""}
+        <div class="acts">${w._g ? dirLink(w._g) : `<span class="nomap">No map location on this assignment: ask your supervisor where.</span>`}${missionLink(w) ? `<a data-embed="1" data-name="Drone mission" href="${esc(missionLink(w))}" target="_blank" rel="noopener">Open mission</a>` : ""}</div></div>
     </div>`).join("")).join("");
   document.querySelectorAll("[data-wf]").forEach(el => el.onclick = () => { state.workFilter = el.dataset.wf; renderWork(state.board); });
+  document.querySelectorAll("[data-wa]").forEach(el => el.onclick = ev => {
+    if (ev.target.closest("a")) return;
+    state.waOpen = el.classList.contains("open") ? "" : el.dataset.wa;
+    document.querySelectorAll("[data-wa]").forEach(x => x.classList.toggle("open", x === el && !!state.waOpen));
+  });
 }
 
 function renderRes(b){
@@ -595,6 +624,8 @@ function renderRes(b){
     }).join("")).join("");
 }
 
+// the requester's needed-by: Logistics' offline API puts "Needed by <x>." first in the notes (2026-11-04)
+function neededBy(r){ const m = /(?:^|\s)Needed by ([^.]{1,40})\./.exec(String(r.notes||"")); return m ? m[1].trim() : ""; }
 function renderReq(b){
   const done = ["received","cancelled","rejected","closed"];
   const showClosed = $("chkClosed").checked;
@@ -603,7 +634,7 @@ function renderReq(b){
   $("cntReq").textContent = rows.length ? "("+rows.length+")" : "";
   $("listReq").innerHTML = !rows.length ? `<div class="empty">No open 213-RR requests. A new request shows here within about 5 minutes of being sent.</div>` : rows.map(r => `<div class="item">
       <div class="t">${badge(r.request_status)}${r.priority==="high"?badge("high"):""}${esc((r.quantity?r.quantity+" "+(r.uom||"")+" ":"")+(r.item||"Request"))}</div>
-      <div class="m">${[r.request_id, r.lsc_number, r.deliver_to?"to "+r.deliver_to:"", r.eta?"ETA "+fmtTime(r.eta):"", r.supplier, r.requested_by?"by "+r.requested_by:""]
+      <div class="m">${[r.request_id, r.lsc_number, r.deliver_to?"to "+r.deliver_to:"", neededBy(r)?"needed by "+neededBy(r):"", r.eta?"ETA "+fmtTime(r.eta):"", r.supplier, r.requested_by?"by "+r.requested_by:""]
         .filter(Boolean).map(esc).join(" · ")}</div>
     </div>`).join("");
 }
