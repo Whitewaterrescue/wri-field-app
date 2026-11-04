@@ -70,6 +70,9 @@
   }
   .task.done .task-check{background:var(--success);border-color:var(--success);color:#171919}
   .task-label{flex:1;font-size:14px;line-height:1.35}
+  .toast{position:fixed;left:12px;right:12px;bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:60;background:#111;color:#fff;border:1px solid #55595a;border-radius:12px;padding:12px 14px;font-size:14px;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+  .toast button{margin-left:10px;min-height:44px;background:#EC2329;color:#fff;border:0;border-radius:8px;padding:8px 16px;font-weight:700;font-size:15px}
+  .t214{color:#93c5fd}
   .task-note{font-size:12px;color:#86efac;margin-top:2px;text-decoration:none}
   .task-link{
     padding:10px 14px;border-radius:8px;font-size:13px;font-weight:700;white-space:nowrap;
@@ -129,6 +132,7 @@
   </div>
   <div id="offline" class="offline-banner">Offline &mdash; showing last saved checklist</div>
   <div id="content"><div class="loading"><div class="spin"></div>Loading&hellip;</div></div>
+  <div id="toast" class="toast" hidden></div>
 
   <div id="overlay" class="overlay" hidden>
     <div class="overlay-bar">
@@ -249,6 +253,7 @@
   }
 
   function init() {
+    flushPending();   // ticks saved while the outbox scripts couldn't load
     var cached = loadCache();
     if (cached) { roles = cached; render(); }
     fetch(API + '?api=tasks')
@@ -320,10 +325,115 @@
   function isDone_(done, t) { return isDone(done, t, currentPhase); }
 
   function toggleTask(role, taskId) {
-    var done = getDone(role);
-    if (done[taskId] && (currentPhase !== 'daily' || done[taskId] > lastReset())) delete done[taskId]; else done[taskId] = Date.now();
+    var done = getDone(role), t = findTask(role, taskId);
+    var undoing = done[taskId] && (currentPhase !== 'daily' || done[taskId] > lastReset());
+    if (undoing) delete done[taskId]; else done[taskId] = Date.now();
     try { localStorage.setItem(doneKey(role), JSON.stringify(done)); } catch (e) {}
+    if (t && logs214(t)) { if (undoing) unlog214(role, t); else log214(role, t); }
     render();
+  }
+  function findTask(role, id) {
+    var hit = null;
+    ((roles[role] && roles[role].sections) || []).forEach(function (s) { (s.tasks || []).forEach(function (t) { if (t.id === id) hit = t; }); });
+    return hit;
+  }
+
+  // ---------- a ticked daily task goes in the person's 214 (Cody, 2026-11-03) ----------
+  // Same origin as WRI Field Forms (/wri-recon/), so the entry joins ITS outbox: saved on the phone,
+  // uploaded with the incident PIN when there's signal, idempotent by id. The entry waits HOLD_MS so a
+  // mis-tap can be unticked before it uploads. With no signal the Field Forms scripts may not load here,
+  // so a tick is first kept in PENDING (localStorage); this page, or Field Forms when it next opens,
+  // moves it into the outbox. Not logged: the self-ticking check-in row and rows that ARE the 214 log.
+  var PENDING = 'wri_214_pending', LOGGED = 'wri_tasks_214_', HOLD_MS = 15000;
+  function logs214(t) { return taskPhases(t).indexOf('daily') !== -1 && !isCheckIn(t) && !/#214$/.test(t.url || ''); }
+  function lsJson(k, dflt) { try { return JSON.parse(localStorage.getItem(k) || 'null') || dflt; } catch (e) { return dflt; } }
+  function lsPut(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function pickedIncident() {
+    var c = lsJson('wri_incident_choice', null);
+    return c && c.id && c.expires > Date.now()
+      ? { incident_id: String(c.id), project_key: c.key || '', incident_name: c.name || c.key || '', client_name: c.client || '' } : null;
+  }
+  function myName() { return checkedInName() || localStorage.getItem('wri_recon_name') || ''; }
+  function rid() { return window.crypto && crypto.randomUUID ? crypto.randomUUID() : 't-' + Date.now() + '-' + Math.random().toString(16).slice(2); }
+
+  function log214(role, t) {
+    var who = myName(), inc = pickedIncident();
+    if (!who || !inc) {
+      toast(!who ? 'Ticked. Check in on this phone and your daily ticks go to your 214 too.'
+                 : 'Ticked. Pick the incident in the Field App and your daily ticks go to your 214 too.');
+      return;
+    }
+    var id = rid(), now = Date.now();
+    var rec = { recon_id: id, kind: '214', incident: inc, hold_until: now + HOLD_MS, from: 'checklist',
+      fields: { person: who, position: localStorage.getItem('wri_214_pos') || '', activity: 'Checklist: ' + t.label, at: now,
+        also_unit: false, section: localStorage.getItem('wri_214_section') || '' } };
+    var pend = lsJson(PENDING, []); pend.push(rec); lsPut(PENDING, pend);
+    var map = lsJson(LOGGED + role, {}); map[t.id] = { id: id, at: now }; lsPut(LOGGED + role, map);
+    toast('Logged to your 214.', 'Undo', function () { toggleTask(role, t.id); });
+    flushPending();
+    setTimeout(function () { withOutbox(function () { Outbox.drain(); }); }, HOLD_MS + 1000);   // send once the undo window closes
+  }
+  function unlog214(role, t) {
+    var map = lsJson(LOGGED + role, {}), hit = map[t.id];
+    delete map[t.id]; lsPut(LOGGED + role, map);
+    if (!hit) return;
+    var pend = lsJson(PENDING, []), left = pend.filter(function (r) { return r.recon_id !== hit.id; });
+    if (left.length !== pend.length) { lsPut(PENDING, left); toast('Removed from your 214.'); return; }
+    withOutbox(function () {
+      Store.get('records', hit.id).then(function (r) {
+        if (r && r.status !== 'sent') return Outbox.discard(hit.id).then(function () { toast('Removed from your 214.'); });
+        toast('It was already uploaded to your 214, so it stays there.');
+      });
+    });
+  }
+  function loggedNow(role, t) {   // logged today (shown on the row)
+    var h = lsJson(LOGGED + role, {})[t.id];
+    return !!h && h.at > lastReset();
+  }
+
+  // Field Forms' outbox scripts (config, store, api, outbox, forms) run here unchanged
+  var obState = 0, obWait = [];
+  function withOutbox(fn) {
+    if (obState === 2) return fn();
+    obWait.push(fn);
+    if (obState === 1) return;
+    obState = 1;
+    var files = ['config', 'store', 'api', 'outbox', 'forms'], i = 0;
+    (function next() {
+      if (i === files.length) { obState = 2; var w = obWait; obWait = []; w.forEach(function (f) { try { f(); } catch (e) {} }); return; }
+      var sc = document.createElement('script');
+      sc.src = '/wri-recon/js/' + files[i++] + '.js';
+      sc.onload = next;
+      sc.onerror = function () { obState = 0; obWait = []; };   // no signal: the ticks wait in PENDING
+      document.head.appendChild(sc);
+    })();
+  }
+  function flushPending() {
+    if (!lsJson(PENDING, []).length) return;
+    withOutbox(function () {
+      var pend = lsJson(PENDING, []);
+      pend.reduce(function (p, r) {
+        return p.then(function () { return Outbox.enqueue(r, []); }).then(function () {
+          lsPut(PENDING, lsJson(PENDING, []).filter(function (x) { return x.recon_id !== r.recon_id; }));
+        });
+      }, Promise.resolve()).then(function () {
+        var inc = pickedIncident();
+        if (inc) return Outbox.pinFor(inc.incident_id).then(function (pin) {
+          if (!pin) toast('Your 214 entries are saved on this phone and wait for the incident PIN. Open LOG 214 once to enter it.');
+        });
+      }).catch(function () {});
+    });
+  }
+  window.addEventListener('online', flushPending);
+
+  var toastTimer = null;
+  function toast(msg, actLabel, act) {
+    var el = document.getElementById('toast');
+    el.innerHTML = '';
+    el.appendChild(document.createTextNode(msg));
+    if (actLabel) { var b = document.createElement('button'); b.textContent = actLabel; b.onclick = function () { el.hidden = true; act(); }; el.appendChild(b); }
+    el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.hidden = true; }, actLabel ? HOLD_MS - 1000 : 6000);
   }
 
   function resetTasks(role) {
@@ -404,7 +514,8 @@
         body += '<div class="task' + (isDone ? ' done' : '') + '">' +
           '<button class="task-check" onclick="toggleTask(\'' + roleId + '\',\'' + esc(t.id) + '\')">&#10003;</button>' +
           '<div class="task-label">' + esc(t.label) +
-          (isCheckIn(t) && checkedInName() ? '<div class="task-note">Checked in as ' + esc(checkedInName()) + '</div>' : '') + '</div>';
+          (isCheckIn(t) && checkedInName() ? '<div class="task-note">Checked in as ' + esc(checkedInName()) + '</div>' : '') +
+          (isDone && loggedNow(roleId, t) ? '<div class="task-note t214">In your 214</div>' : '') + '</div>';
         if (t.url && /^page:/.test(t.url)) {   // a Field App page: switch the shell to it (no reload)
           body += '<a class="task-link ' + esc((t.buttonColor || 'slate').toLowerCase()) + '" href="#" data-page="' + esc(t.url.slice(5)) + '">' +
             esc(t.linkLabel || 'Open') + '</a>';
@@ -418,6 +529,7 @@
     });
 
     if (total) h += '<div class="progress"><b>' + checked + '</b> / ' + total + ' complete</div>';
+    if (total && currentPhase === 'daily') h += '<div class="task-note t214" style="margin:0 2px 10px">Ticking a daily task adds it to your 214 activity log.</div>';
     h += body || '<div class="empty">No tasks in this phase.</div>';
     if (total) h += '<div class="reset-row"><button class="reset-btn" onclick="resetTasks(\'' + roleId + '\')">Reset checklist</button></div>';
     document.getElementById('content').innerHTML = h;
