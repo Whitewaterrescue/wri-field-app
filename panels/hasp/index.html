@@ -96,11 +96,23 @@
 <script>
   var API = 'https://script.google.com/macros/s/AKfycbzcg-yD3_ALkdGYVEOuGY3VR8NrlsPRoxL6k-4LKX3SqEI6NlaKkpprKCtez2xo9C2u/exec';
   var CACHE_KEY = 'wri_hasp_cache';
+  // 2026-11-04 (batch 7): the crew's incident, read like panels/board: ?incident= on the panel,
+  // the map's picker (same origin), the phone's pick (incident-gate.js), the last map scope. '' = none.
+  function haspPick() {
+    try { var q = new URLSearchParams(location.search).get('incident'); if (q) return { id: q, label: q }; } catch (e) {}
+    try { var w = window.top && window.top.__wriIncident; if (w && w.incident_id) return { id: String(w.incident_id), label: w.project_key || w.incident_name || String(w.incident_id) }; } catch (e) {}
+    try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) return { id: String(c.id), label: c.key || c.name || String(c.id) }; } catch (e) {}
+    try { var p = JSON.parse(localStorage.getItem('wri_incident_scope') || 'null'); if (p && p.id) return { id: String(p.id), label: p.key || p.name || String(p.id) }; } catch (e) {}
+    return { id: '', label: '' };
+  }
+  var PICK = haspPick();
+  var HASP_API = API + '?api=hasp' + (PICK.id ? '&incident=' + encodeURIComponent(PICK.id) : '');
 
   function loadCache() {
     try {
       var c = JSON.parse(localStorage.getItem(CACHE_KEY));
-      if (c && c.data) return c.data;
+      // a saved plan only stands in for the same incident (old caches have no incident = no pick)
+      if (c && c.data && String(c.incident || '') === PICK.id) return c.data;
     } catch (e) {}
     return null;
   }
@@ -108,11 +120,19 @@
   function init() {
     var cached = loadCache();
     if (cached) render(cached);
-    fetch(API + '?api=hasp')
+    fetch(HASP_API)
       .then(function (r) { return r.json(); })
       .then(function (d) {
+        if (d && d.ok && d.hasp && d.hasp.noHaspForIncident) {   // never another incident's plan
+          try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+          document.getElementById('offline').classList.remove('show');
+          document.getElementById('content').innerHTML =
+            '<div class="empty" id="noHasp" style="font-size:18px;color:#fff;line-height:1.5">No HASP issued for <b>' +
+            esc(d.hasp.incident || PICK.label || 'this incident') + '</b> yet: ask the Safety Officer.</div>';
+          return;
+        }
         if (d && d.ok && d.hasp && !d.hasp.error) {
-          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: d })); } catch (e) {}
+          try { localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), incident: PICK.id, data: d })); } catch (e) {}
           document.getElementById('offline').classList.remove('show');
           render(d);
         } else if (!cached) {
