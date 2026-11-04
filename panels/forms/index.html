@@ -43,6 +43,7 @@
   }
   .section-title.collapsed .sec-caret{transform:rotate(-90deg)}
   .btn-grid.collapsed{display:none}
+  .sec-note{font-size:12px;font-weight:500;opacity:.7;margin-left:8px;text-transform:none;letter-spacing:0}
   .btn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .app-btn{
     display:flex;align-items:center;justify-content:center;text-align:center;
@@ -300,12 +301,35 @@
     return (app.subLinks || []).some(function (s) { return s.name.toLowerCase().indexOf(q) !== -1; });
   }
 
+  // WRI Field Forms (same origin): saves on the phone and uploads when there's signal. Listed first:
+  // on 2026-11-03 a crew lead walkthrough used the online Recon Survey (v2) from this list, which
+  // loses the entry with no signal, and couldn't find a "Request" form (it's under Resources).
+  var FIELD_FORMS = '/wri-recon/';
+  var OFFLINE = [
+    { name: 'Recon point (photos)', hash: '', color: 'red' },
+    { name: 'ICS 214 log', hash: '214', color: 'red' },
+    { name: 'Resource request', hash: 'rr', color: 'red' },
+    { name: 'Drone photos', hash: 'drone', color: 'red' },
+    { name: 'Drill eval', hash: 'drill', color: 'red' }
+  ];
+  function renderOffline(q) {
+    var list = OFFLINE.filter(function (f) { return !q || f.name.toLowerCase().indexOf(q) !== -1 || 'offline field forms'.indexOf(q) !== -1; });
+    if (!list.length) return '';
+    return '<div class="section-title" data-sec="Works without signal">Works without signal' +
+      '<span class="sec-note">saves on the phone, uploads later</span></div><div class="btn-grid">' +
+      list.map(function (f) {
+        return '<a class="app-btn ' + f.color + ' half" href="' + FIELD_FORMS + '?from=fieldapp' + (f.hash ? '#' + f.hash : '') +
+          '" target="_blank" rel="noopener" data-open data-embed="1" data-name="' + esc(f.name) + '">' + esc(f.name) + '</a>';
+      }).join('') + '</div>';
+  }
+
   function render() {
     var q = document.getElementById('search').value.trim().toLowerCase();
     // table-type rows are Mission-Hub-internal editors; no launchable URL
     var apps = allApps.filter(function (a) { return a.type !== 'table' && matches(a, q); });
+    var offline = renderOffline(q);
 
-    if (!apps.length) {
+    if (!apps.length && !offline) {
       document.getElementById('content').innerHTML = '<div class="empty">No matching forms.</div>';
       return;
     }
@@ -319,7 +343,7 @@
     });
     sections.sort(function (a, b) { return (a === '') - (b === ''); });
 
-    var html = '';
+    var html = offline;
     sections.forEach(function (sec) {
       var title = sec || 'More Tools';
       // Sections are collapsible; remember choices for the visit. Response

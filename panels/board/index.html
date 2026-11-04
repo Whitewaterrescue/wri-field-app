@@ -550,14 +550,18 @@ function renderWork(b){
   b.work.forEach(w => { const k = w.division || w.branch || "Unassigned"; (groups[k]=groups[k]||[]).push(w); });
   const keys = Object.keys(groups).sort();
   const open = b.work.filter(w => w.wa_status!=="complete" && w.wa_status!=="cancelled").length;
-  $("cntWork").textContent = b.work.length ? "("+open+")" : "";
+  $("cntWork").textContent = b.work.length ? "("+open+" open)" : "";
+  // Mine is always offered (2026-11-03 walkthrough: hidden at 0, a crew lead concluded it didn't exist)
   const mine = b.work.filter(w => isMyWork(w, state.me));
-  if (mine.length) groups["\__mine__"] = mine;
-  const tabs = (mine.length ? ["\__mine__"] : []).concat(keys);
+  groups["\__mine__"] = mine;
+  const tabs = ["\__mine__"].concat(keys);
   const f = tabs.indexOf(state.workFilter)>=0 ? state.workFilter : "all";
-  $("workFilter").innerHTML = tabs.length>1 || mine.length ? ["all"].concat(tabs).map(k => `<div class="tab${k===f?" active":""}" data-wf="${esc(k)}">${k==="all"?"All":k==="\__mine__"?"Mine ("+mine.length+")":esc(k)}</div>`).join("") : "";
+  $("workFilter").innerHTML = ["all"].concat(tabs).map(k => `<div class="tab${k===f?" active":""}" data-wf="${esc(k)}">${k==="all"?"All":k==="\__mine__"?"Mine ("+mine.length+")":esc(k)}</div>`).join("");
   const show = f==="all" ? keys : [f];
-  $("listWork").innerHTML = !b.work.length ? `<div class="empty">No work assignments yet.</div>` : show.map(k =>
+  const myName = state.me && state.me.name;
+  $("listWork").innerHTML = f==="\__mine__" && !mine.length
+    ? `<div class="empty">${myName ? "Nothing assigned to "+esc(myName)+" yet. An assignment shows here when its Assigned to names you." : "Sign in to see the work assigned to you."}</div>`
+    : !b.work.length ? `<div class="empty">No work assignments yet.</div>` : show.map(k =>
     (keys.length>1&&f==="all"?`<div class="group">${esc(k)}</div>`:"") +
     groups[k].sort((a,c)=>(order[a.wa_status]??9)-(order[c.wa_status]??9)).map(w => `<div class="item">
       <div class="t">${badge(w.wa_status)}${w.priority==="high"?badge("high"):""}${esc(w.title||w.location_name||"Work assignment")}</div>
@@ -593,7 +597,7 @@ function renderReq(b){
   const rows = b.req.filter(r => showClosed || done.indexOf(r.request_status)<0)
     .sort((a,c)=>(c.requested_at||0)-(a.requested_at||0));
   $("cntReq").textContent = rows.length ? "("+rows.length+")" : "";
-  $("listReq").innerHTML = !rows.length ? `<div class="empty">No open 213-RR requests.</div>` : rows.map(r => `<div class="item">
+  $("listReq").innerHTML = !rows.length ? `<div class="empty">No open 213-RR requests. A new request shows here within about 5 minutes of being sent.</div>` : rows.map(r => `<div class="item">
       <div class="t">${badge(r.request_status)}${r.priority==="high"?badge("high"):""}${esc((r.quantity?r.quantity+" "+(r.uom||"")+" ":"")+(r.item||"Request"))}</div>
       <div class="m">${[r.request_id, r.lsc_number, r.deliver_to?"to "+r.deliver_to:"", r.eta?"ETA "+fmtTime(r.eta):"", r.supplier, r.requested_by?"by "+r.requested_by:""]
         .filter(Boolean).map(esc).join(" · ")}</div>
