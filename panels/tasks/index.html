@@ -254,6 +254,8 @@
 
   function init() {
     flushPending();   // ticks saved while the outbox scripts couldn't load
+    loadHaspPpe();
+    fetchHaspPpe();
     var cached = loadCache();
     if (cached) { roles = cached; render(); }
     fetch(API + '?api=tasks')
@@ -274,6 +276,34 @@
         else document.getElementById('content').innerHTML =
           '<div class="empty">Could not load the checklist.<br>Check your connection and reload.</div>';
       });
+  }
+
+  // 2026-11-04 (batch 7): the PPE check names the HASP's ONE PPE list (same ?api=hasp + cache as the
+  // HASP page), so the checklist and the plan can't disagree. No HASP summary = the sheet's wording.
+  var HASP_CACHE = 'wri_hasp_cache', haspPpe = null;
+  function ppeFrom(d) {
+    var p = d && d.summary && d.summary.ppe;
+    return p && p.items && p.items.length ? p : null;
+  }
+  function loadHaspPpe() {
+    try { var c = JSON.parse(localStorage.getItem(HASP_CACHE)); haspPpe = ppeFrom(c && c.data); } catch (e) {}
+  }
+  function fetchHaspPpe() {
+    fetch(API + '?api=hasp')
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!(d && d.ok && d.hasp && !d.hasp.error)) return;
+        try { localStorage.setItem(HASP_CACHE, JSON.stringify({ ts: Date.now(), data: d })); } catch (e) {}
+        haspPpe = ppeFrom(d);
+        render();
+      })
+      .catch(function () {});
+  }
+  function taskLabel(t) {
+    if (haspPpe && /^PPE check\b/i.test(t.label || '')) {
+      return 'PPE check (from the HASP' + (haspPpe.level ? ', ' + haspPpe.level : '') + '): ' + haspPpe.items.join(', ');
+    }
+    return t.label;
   }
 
   // ids the Mission Hub label map doesn't name (it returns the id itself)
@@ -513,7 +543,7 @@
         if (isDone) checked++;
         body += '<div class="task' + (isDone ? ' done' : '') + '">' +
           '<button class="task-check" onclick="toggleTask(\'' + roleId + '\',\'' + esc(t.id) + '\')">&#10003;</button>' +
-          '<div class="task-label">' + esc(t.label) +
+          '<div class="task-label">' + esc(taskLabel(t)) +
           (isCheckIn(t) && checkedInName() ? '<div class="task-note">Checked in as ' + esc(checkedInName()) + '</div>' : '') +
           (isDone && loggedNow(roleId, t) ? '<div class="task-note t214">In your 214</div>' : '') + '</div>';
         if (t.url && /^page:/.test(t.url)) {   // a Field App page: switch the shell to it (no reload)

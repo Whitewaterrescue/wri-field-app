@@ -57,6 +57,34 @@
     animation:spin .8s linear infinite;
   }
   @keyframes spin{to{transform:rotate(360deg)}}
+  /* 2026-11-04 (batch 7): phone card first (sun + gloves: >=16 px, high contrast, >=56 px targets),
+     then the full plan, then Acknowledge last so it comes after the reading */
+  .sum{background:#0d0e0e;border:2px solid #f0f0f0;border-radius:12px;padding:14px;margin-bottom:12px;color:#fff;font-size:17px;line-height:1.4}
+  .sec{border-top:1px solid #4a4d4d;padding:12px 0 2px;margin-top:10px}
+  .lbl{font-size:16px;font-weight:700;color:#ffd166;margin-bottom:4px}
+  .val{font-size:18px;font-weight:600;color:#fff;word-wrap:break-word}
+  .val small{display:block;font-size:16px;font-weight:400;color:#e4e6e6;margin-top:2px}
+  .call{display:flex;align-items:center;justify-content:center;gap:10px;min-height:60px;width:100%;margin:8px 0 0;
+    padding:10px 14px;border-radius:12px;font-size:19px;font-weight:800;color:#fff;text-decoration:none;text-align:center;line-height:1.2;border:2px solid transparent}
+  .call.e911{background:#d4141a;border-color:#fff}
+  .call.wri{background:#1f5fbf}
+  .call.hosp{background:#16794a}
+  .call.dir{background:#3A3C3C;border-color:#9a9e9e;font-size:17px;font-weight:700}
+  .call .num{font-weight:600;font-size:17px}
+  .call:active{transform:scale(0.98)}
+  .ppe-list{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+  .ppe-list li{background:#fff;color:#000;font-weight:700;font-size:17px;border-radius:8px;padding:6px 10px}
+  .warn-box{background:#3b2a08;border:2px solid var(--warning);color:#ffe8b3;border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:16px;line-height:1.4}
+  .warn-box b{color:var(--warning);display:block;margin-bottom:4px}
+  .warn-box ul{margin-left:18px}
+  .step-h{font-size:16px;font-weight:700;color:#fff;margin:18px 2px 8px}
+  .ack-card{background:var(--surface);border:2px solid var(--accent);border-radius:12px;padding:14px;margin:14px 0 12px}
+  .ack-card p{font-size:16px;color:#fff;margin-bottom:10px;line-height:1.4}
+  .btn.ack{min-height:60px;font-size:18px;width:100%}
+  .btn-row.one{grid-template-columns:1fr;margin-top:0}
+  .btn.busy,.call.busy{pointer-events:none;opacity:.7}
+  .btn.busy::after,.call.busy::after{content:'';width:16px;height:16px;margin-left:10px;border-radius:50%;
+    border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:spin .7s linear infinite;flex:none}
 </style>
 </head>
 <body>
@@ -109,11 +137,52 @@
       ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   }
 
+  // 2026-11-04 (batch 7): the phone card: numbers to dial, hospital, meeting point, route, ONE PPE list, SO
+  function telHref(n) { var t = String(n || '').replace(/[^\d+]/g, ''); return t ? 'tel:' + t : ''; }
+
+  function summaryHtml(sm) {
+    var h = '<div class="sum" id="haspSummary">';
+    if (sm.checks && sm.checks.length) {
+      h += '<div class="warn-box" id="haspChecks"><b>Check with the Safety Officer: parts of this plan look wrong</b><ul>' +
+        sm.checks.map(function (c) { return '<li>' + esc(c.msg) + '</li>'; }).join('') + '</ul></div>';
+    }
+    h += '<div class="lbl">Emergency</div>';
+    (sm.call && sm.call.length ? sm.call : [{ label: 'Emergency', number: '911', tel: '911' }]).forEach(function (c) {
+      var href = telHref(c.tel || c.number);
+      if (!href) return;
+      var is911 = href === 'tel:911';
+      h += '<a class="call ' + (is911 ? 'e911' : 'wri') + '" href="' + esc(href) + '">' +
+        (is911 ? 'Call 911' : 'Call ' + esc(c.label || 'WRI') + ' <span class="num">' + esc(c.number) + '</span>') + '</a>';
+    });
+    if (sm.caller911) h += '<div class="val"><small>Calls 911 for the crew: ' + esc(sm.caller911) + '</small></div>';
+    var hp = sm.hospital;
+    if (hp) {
+      var dist = [hp.distance, hp.driveTime ? hp.driveTime + ' drive' : ''].filter(Boolean).map(esc).join(' &middot; ');
+      var hTel = telHref(hp.tel || hp.phone);
+      h += '<div class="sec"><div class="lbl">Hospital</div><div class="val">' + esc(hp.name) +
+        (hp.address ? '<small>' + esc(hp.address) + '</small>' : '') +
+        (dist ? '<small id="hospDist">' + dist + '</small>' : '') + '</div>' +
+        (hTel ? '<a class="call hosp" id="callHosp" href="' + esc(hTel) + '">Call hospital <span class="num">' + esc(hp.phone) + '</span></a>' : '') +
+        (hp.directionsUrl ? '<a class="call dir" href="' + esc(hp.directionsUrl) + '" target="_blank" rel="noopener">Directions to hospital</a>' : '') +
+        '</div>';
+    }
+    h += '<div class="sec"><div class="lbl">Meeting point</div><div class="val" id="meetPt">' + esc(sm.meetingPoint || 'Not set: ask the Safety Officer') + '</div></div>';
+    h += '<div class="sec"><div class="lbl">Evacuation route</div><div class="val" id="evacRt">' + esc(sm.evacuationRoute || 'Not set: ask the Safety Officer') + '</div></div>';
+    var ppe = sm.ppe || {};
+    if ((ppe.items && ppe.items.length) || ppe.level) {
+      h += '<div class="sec"><div class="lbl">Wear' + (ppe.level ? ' (PPE ' + esc(ppe.level) + ')' : '') + '</div>' +
+        '<ul class="ppe-list" id="ppeList">' + (ppe.items || []).map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>' +
+        (ppe.siteGear && ppe.siteGear.length ? '<div class="val"><small>On site: ' + ppe.siteGear.map(esc).join(', ') + '</small></div>' : '') + '</div>';
+    }
+    if (sm.safetyOfficer) h += '<div class="sec"><div class="lbl">Safety Officer</div><div class="val" id="soName">' + esc(sm.safetyOfficer) + '</div></div>';
+    return h + '</div>';
+  }
+
   function render(d) {
-    var h = d.hasp;
+    var h = d.hasp, sm = d.summary || null;
     var html =
       '<div class="card">' +
-        '<h2>Current Health &amp; Safety Plan</h2>' +
+        '<h2>Safety Plan (HASP)</h2>' +
         '<div class="proj">' + esc(h.projectName || 'HASP') + '</div>' +
         '<div class="meta">' +
           (h.client ? '<b>' + esc(h.client.toUpperCase()) + '</b> &middot; ' : '') +
@@ -121,16 +190,28 @@
           (h.creator ? 'By ' + esc(h.creator.replace(/_/g, ' ')) + ' &middot; ' : '') +
           (h.timestamp ? esc(fmtDate(h.timestamp)) : '') +
         '</div>' +
-        '<div class="btn-row">' +
-          (h.ackUrl ? '<a class="btn ack" href="' + esc(h.ackUrl) + '" target="_blank" rel="noopener">Acknowledge HASP</a>' : '') +
-          (h.docUrl ? '<a class="btn view" href="' + esc(h.docUrl) + '" target="_blank" rel="noopener">Open Doc</a>' : '') +
-          (h.pdfUrl ? '<a class="btn pdf" href="' + esc(h.pdfUrl) + '" target="_blank" rel="noopener">Download PDF</a>' : '') +
-        '</div>' +
       '</div>' +
-      (d.haspUrl ? '<a class="full-link" href="' + esc(d.haspUrl) + '" target="_blank" rel="noopener">Open full HASP app (create / edit plans)</a>' : '') +
-      (h.previewUrl ? '<div class="preview"><iframe src="' + esc(h.previewUrl) + '" title="HASP preview"></iframe></div>' : '');
+      (sm ? summaryHtml(sm) : '') +
+      // the full plan sits above Acknowledge, so the crew reads before they sign
+      '<div class="step-h">Read the full plan</div>' +
+      '<div class="btn-row">' +
+        (h.pdfUrl ? '<a class="btn pdf" id="readPlan" href="' + esc(h.pdfUrl) + '" target="_blank" rel="noopener">Read the full plan (PDF)</a>' : '') +
+        (h.docUrl ? '<a class="btn view" href="' + esc(h.docUrl) + '" target="_blank" rel="noopener">Open Doc</a>' : '') +
+      '</div>' +
+      (h.previewUrl ? '<div class="preview" style="margin-top:12px"><iframe src="' + esc(h.previewUrl) + '" title="HASP preview"></iframe></div>' : '') +
+      (h.ackUrl ? '<div class="ack-card" id="ackCard"><p>Read the plan above, then sign that you have read it.</p>' +
+        '<div class="btn-row one"><a class="btn ack" id="ackBtn" href="' + esc(h.ackUrl) + '" target="_blank" rel="noopener">Acknowledge HASP</a></div></div>' : '') +
+      (d.haspUrl ? '<a class="full-link" href="' + esc(d.haspUrl) + '" target="_blank" rel="noopener">Open full HASP app (create / edit plans)</a>' : '');
     document.getElementById('content').innerHTML = html;
   }
+
+  // busy state on every link-button until the new tab / dialer takes over (4 s)
+  document.addEventListener('click', function (ev) {
+    var a = ev.target.closest && ev.target.closest('a.btn, a.call');
+    if (!a || a.classList.contains('busy')) return;
+    a.classList.add('busy'); a.setAttribute('aria-busy', 'true');
+    setTimeout(function () { a.classList.remove('busy'); a.removeAttribute('aria-busy'); }, 4000);
+  });
 
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
