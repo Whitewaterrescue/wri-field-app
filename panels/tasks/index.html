@@ -271,8 +271,11 @@
       });
   }
 
+  // ids the Mission Hub label map doesn't name (it returns the id itself)
+  var ROLE_NAMES = { field: 'Field Technician' };
   function roleLabel(id) {
     if (roles[id] && roles[id].label && roles[id].label !== id) return roles[id].label;
+    if (ROLE_NAMES[id]) return ROLE_NAMES[id];
     return id.replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
   }
 
