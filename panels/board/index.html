@@ -75,6 +75,8 @@
   .stat .n{font-size:22px;font-weight:700;font-family:'Epilogue',sans-serif}
   .stat .l{font-size:11px;color:var(--text-dim);margin-top:2px;letter-spacing:.3px}
   .stat.bad .n{color:var(--danger)}
+  a.stat{color:inherit;text-decoration:none}
+  .hasp-btn{display:flex;align-items:center;justify-content:center;min-height:52px;margin:0 0 12px;border-radius:12px;background:#EC2329;color:#fff;font-weight:700;font-size:16px;text-decoration:none;font-family:'Epilogue',sans-serif}
   .section-title{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);
     margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
   .section-title .count{background:var(--surface-alt);border-radius:10px;padding:1px 8px;font-size:11px;letter-spacing:0}
@@ -167,9 +169,11 @@
     <div id="alarm" class="alarm" hidden></div>
     <div class="stats">
       <div class="stat"><div class="n" id="stHead">–</div><div class="l">ON SCENE</div></div>
-      <div class="stat"><div class="n" id="stHasp">–</div><div class="l">HASP SIGNED</div></div>
+      <a class="stat" href="#" data-page="page_4" aria-label="Open the HASP"><div class="n" id="stHasp">–</div><div class="l">HASP SIGNED &#8250;</div></a>
       <div class="stat" id="stNmBox"><div class="n" id="stNm">–</div><div class="l">OPEN NEAR MISSES</div></div>
     </div>
+
+    <a class="hasp-btn" href="#" data-page="page_4">Read and sign the HASP &#8250;</a>
 
     <div class="tabs" role="tablist">
       <div class="tab active" data-tab="status" role="tab">Safety &amp; comms</div>
@@ -680,6 +684,19 @@ window.addEventListener("online", () => load(false));
 // P4: show the saved board at once (no wait on a dead network), then refresh it
 if (restoreCache()) banner("bnOffline", navigator.onLine ? "" : "Offline — showing the board as of "+hhmm(state.board.fetchedAt)+". It refreshes when you have signal.");
 load(false);
+
+// HASP links: switch the Field App shell to its HASP page (same origin), as the Checklist does
+document.addEventListener("click", function(ev){
+  var a = ev.target.closest ? ev.target.closest("a[data-page]") : null;
+  if (!a) return;
+  ev.preventDefault();
+  try {
+    var top = window.top, q = new URLSearchParams(top.location.search);
+    q.set("page", a.getAttribute("data-page"));
+    top.history.pushState(null, "", top.location.pathname + "?" + q.toString());
+    top.dispatchEvent(new top.PopStateEvent("popstate", { state: null }));
+  } catch (e) { window.open("/wri-field-app/?page=" + encodeURIComponent(a.getAttribute("data-page")), "_top"); }
+});
 </script>
 </body>
 </html>
