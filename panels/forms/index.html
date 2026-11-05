@@ -56,6 +56,11 @@
   .app-btn.red{background:#EC2329}
   .app-btn.blue{background:#4a4d4d}
   .app-btn.amber,.app-btn.orange{background:#b45309}
+  /* 2026-11-05 (batch 11): one-tap safety reports at the top */
+  .safety-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:4px 0 14px}
+  .safety-row .app-btn{min-height:64px;font-size:16px;line-height:1.2;padding:8px 6px;text-align:center}
+  .safety-row .nm{background:#b45309}
+  .safety-hint{font-size:13px;opacity:.75;margin:0 2px 4px}
   .app-btn.dark{background:#2a2c2c}
   .app-btn.slate{background:#3A3C3C}
   .app-btn.white{background:#f0f0f0;color:#171919}
@@ -319,7 +324,7 @@
     });
     sections.sort(function (a, b) { return (a === '') - (b === ''); });
 
-    var html = '';
+    var html = q ? '' : safetyRow();
     sections.forEach(function (sec) {
       var title = sec || 'More Tools';
       // Sections are collapsible; remember choices for the visit. Response
@@ -365,6 +370,23 @@
     if (!a.url) return '';
     return '<a class="app-btn ' + color + ' ' + width + '" href="' + esc(withIncident(a.url)) + '" target="_blank" rel="noopener" data-open' +
       ' data-embed="' + (a.embed === false ? '0' : '1') + '" data-name="' + esc(a.name) + '">' + esc(a.name) + '</a>';
+  }
+
+  // 2026-11-05 (batch 11, Cody: "the near miss should live on recon"): one tap opens a Field Forms recon already set
+  // to that type (GPS + your check-in name filled in). The saved point texts the command staff signed up for it;
+  // Injury and Stop work also email the IC + Safety Officer at once (via the 214).
+  var SAFETY = [['near_miss', '⚠️ Near miss', 'nm'], ['injury', '🩹 Injury', 'red'], ['stop_work', '✋ Stop work', 'red']];
+  function safetyUrl(type) {
+    var id = '';
+    try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) id = c.id; } catch (e) {}
+    return 'https://whitewaterrescue.github.io/wri-recon/' + (id ? '?incident=' + encodeURIComponent(id) : '') + '#recon?type=' + type;
+  }
+  function safetyRow() {
+    return '<div class="safety-hint">Report a safety event (saves a recon point at your location)</div><div class="safety-row">' +
+      SAFETY.map(function (s) {
+        return '<a class="app-btn ' + s[2] + '" href="' + esc(safetyUrl(s[0])) + '" target="_blank" rel="noopener" data-open data-embed="1"' +
+          ' data-name="' + esc(s[1].replace(/^\S+\s/, '') + ' report') + '">' + esc(s[1]) + '</a>';
+      }).join('') + '</div>';
   }
 
   function esc(s) {
