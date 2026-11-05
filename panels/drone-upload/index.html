@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drone Upload</title>
+<!--
+  Drone > Upload (2026-11-05, Tyler's Field App Drone menu). One place for everything brought in by hand,
+  which is the only way in for the Mini 4 Pro (no DJI cloud): each dropdown opens the page that already
+  does the job, unchanged, in a frame:
+    Drone orthos   ../drone/                    (photos -> Nova -> ortho on the map; orthos on the map)
+    Drone panos    ../panos/                    (360 panoramas -> the incident pano viewer)
+    Videos         ../drone-live/?page=upload   (SD-card video + .SRT -> Dropbox, linked to the map)
+    Drone photos   /wri-recon/#drone            (Field Forms Drone tab: photos -> recon points)
+  All same origin as the Field App, so each keeps the phone's ArcGIS sign-in, incident choice and saved PIN.
+  A section loads the first time it's opened and stays loaded after it closes (an upload keeps going); one
+  section is open at a time and fills the screen below the headers. The Field App never unloads this page
+  when hidden (ics214-fab frame-unloader KEEP list) for the same reason.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* WRI 2025 brand, dark (same tokens as panels/drone) */
+:root{
+  --wipeout:#171919; --rapids:#3A3C3C; --rapids-hi:#4a4d4d; --line:#55595a;
+  --crimson:#EC2329; --text:#f0f0f0; --muted:#b8bcbc;
+  --font-head:'Epilogue',system-ui,-apple-system,sans-serif;
+  --font-body:'Alexandria',system-ui,-apple-system,sans-serif;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--wipeout);color:var(--text);font-family:var(--font-body);display:flex;flex-direction:column;overflow:hidden}
+.sec{border-bottom:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.sec.open{flex:1}
+.head{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;min-height:56px;
+  background:var(--rapids);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .08s ease}
+.head:hover{background:var(--rapids-hi)}
+.head:active{filter:brightness(.85)}
+.head:focus-visible{outline:2px solid var(--crimson);outline-offset:-2px}
+.head .t{flex:1;min-width:0}
+.head b{display:block;font:600 16px/1.25 var(--font-head)}
+.head span{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.chev{flex:none;width:20px;height:20px;transition:transform .15s ease}
+.sec.open .chev{transform:rotate(180deg)}
+.sec.open .head{border-left:4px solid var(--crimson);padding-left:12px}
+.body{flex:1;min-height:0;position:relative;background:var(--wipeout)}
+.body iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
+.sec:not(.open) .body{display:none}
+.load{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<script>
+(function () {
+  var SECTIONS = [
+    { id: 'orthos', title: 'Drone orthos', sub: 'Mapping photos to an ortho on the incident map', src: '../drone/' },
+    { id: 'panos', title: 'Drone panos', sub: '360 panoramas to the incident pano viewer', src: '../panos/' },
+    { id: 'videos', title: 'Videos', sub: 'Drone video (and its .SRT) to Dropbox, linked to the map', src: '../drone-live/?page=upload' },
+    { id: 'photos', title: 'Drone photos', sub: 'Single photos to recon points', src: '/wri-recon/#drone' }
+  ];
+  var CHEV = '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 7.5l5 5 5-5"/></svg>';
+  var els = {};
+  SECTIONS.forEach(function (s) {
+    var sec = document.createElement('section'); sec.className = 'sec'; sec.id = 'sec-' + s.id;
+    sec.innerHTML = '<button type="button" class="head" aria-expanded="false" aria-controls="body-' + s.id + '"><div class="t"><b>' + s.title +
+      '</b><span>' + s.sub + '</span></div>' + CHEV + '</button><div class="body" id="body-' + s.id + '"></div>';
+    document.body.appendChild(sec);
+    sec.querySelector('.head').addEventListener('click', function () { toggle(s); });
+    els[s.id] = sec;
+  });
+  function toggle(s) {
+    var sec = els[s.id], open = !sec.classList.contains('open');
+    SECTIONS.forEach(function (o) { els[o.id].classList.remove('open'); els[o.id].querySelector('.head').setAttribute('aria-expanded', 'false'); });
+    if (open) {
+      sec.classList.add('open'); sec.querySelector('.head').setAttribute('aria-expanded', 'true');
+      var body = sec.querySelector('.body');
+      if (!body.querySelector('iframe')) {   // first open: load it; it stays loaded after it closes
+        body.innerHTML = '<div class="load">Loading…</div>';
+        var f = document.createElement('iframe');
+        f.title = s.title; f.setAttribute('allow', 'autoplay; fullscreen; camera; geolocation');
+        f.addEventListener('load', function () { var l = body.querySelector('.load'); if (l) l.remove(); });
+        f.src = s.src; body.appendChild(f);
+      }
+    }
+    try { localStorage.setItem('wri_drone_upload_open', open ? s.id : ''); } catch (e) {}
+  }
+  // reopen the section last used on this phone
+  var last = ''; try { last = localStorage.getItem('wri_drone_upload_open') || ''; } catch (e) {}
+  SECTIONS.forEach(function (s) { if (s.id === last) toggle(s); });
+})();
+</script>
+</body>
+</html>
