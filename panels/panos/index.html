@@ -57,7 +57,7 @@
   .pick b{color:var(--text);display:block;font-size:15px;margin-bottom:2px}
   .bar{height:8px;border-radius:4px;background:var(--surface-alt);overflow:hidden;margin-top:8px}
   .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .2s}
-  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;border:1px solid var(--border);max-width:92vw;z-index:50}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;border:1px solid var(--border);max-width:92vw;z-index:80}
   #toast[hidden]{display:none}
   #modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}
   #modal[hidden]{display:none}
@@ -65,6 +65,24 @@
   .box h2{font:700 16px var(--head);margin-bottom:8px}.box p{color:var(--text-dim);font-size:14px;line-height:1.4}
   .box .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
   .err{color:#fca5a5;font-size:13px}
+  /* 2026-11-04 (batch 8): where each 360 is + glove-size row buttons (Casey: "Site 1" told her nothing) */
+  .card .where{font-size:14px;color:var(--text);margin-top:4px;line-height:1.35}
+  .card .where .dist{font-weight:700;color:#fff}
+  .card .actions .btn{min-height:48px;min-width:48px;padding:12px 16px;font-size:15px}
+  .btn .spin{border-color:rgba(255,255,255,.35);border-top-color:#fff}
+  .origin{font-size:12.5px;color:var(--text-muted);margin:4px 2px 0}
+  /* 2026-11-04 (batch 8): the viewer opens over this panel, never in a new tab behind the crew's back */
+  #viewer{position:fixed;inset:0;z-index:70;background:#000;display:flex;flex-direction:column}
+  #viewer[hidden]{display:none}
+  #viewer .vbar{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;background:var(--bg);border-bottom:1px solid var(--border);min-height:60px}
+  #viewer .vtitle{flex:1;min-width:0;font:700 15px var(--head);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #viewer .vtab{color:var(--text-dim);font-size:13px;white-space:nowrap;padding:14px 6px;text-decoration:underline}
+  #viewer .vclose{min-width:96px;min-height:52px;font-size:16px}
+  #viewer .vbody{flex:1;min-height:0;position:relative}
+  #viewer iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+  #viewer .vload{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#000;color:#fff;font-size:17px;text-align:center;padding:20px}
+  #viewer .vload[hidden]{display:none}
+  #viewer .vload .spin{width:34px;height:34px;border-width:4px;margin:0}
 </style>
 </head>
 <body>
@@ -110,6 +128,13 @@
 
   <div id="modal" hidden><div class="box"><h2 id="modalTitle"></h2><p id="modalText"></p>
     <div class="actions"><button class="btn ghost" id="modalNo">Cancel</button><button class="btn primary" id="modalYes">Confirm</button></div></div></div>
+  <!-- 2026-11-04 (batch 8): in-panel 360 viewer (same-origin /wri-incident-panos/ page in an iframe) -->
+  <div id="viewer" hidden role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+    <div class="vbar"><div class="vtitle" id="viewerTitle">360</div>
+      <a class="vtab" id="viewerTab" href="#" target="_blank" rel="noopener">Open in its own tab ↗</a>
+      <button class="btn primary vclose" id="viewerClose">Close</button></div>
+    <div class="vbody"><div class="vload" id="viewerLoad"><span class="spin"></span><span id="viewerLoadText">Opening the 360…</span></div></div>
+  </div>
   <div id="toast" hidden></div>
 </div>
 
@@ -312,14 +337,17 @@ async function currentMap(){
     picked ? "Shows on that incident's map in the Field App and the viewers. Change it with the incident chip on the map."
            : "The primary incident (no incident picked on this phone).");
 
+  // 2026-11-04 (batch 8, Casey: "one incident, three names"): name the incident by its key, like the map chip;
+  // the web map's title only in the tooltip, and never the word "project"
+  $("mapline").title = state.mapTitle ? "Map: " + state.mapTitle : "";
   if (!layer) {
-    $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> — this map has never carried the 360 layer. ` +
+    $("mapline").innerHTML = `This incident map has never carried the 360 layer. ` +
       `Run <code>incident_panos.py webmap</code> once for this client, then reload.`;
   } else if (!state.project) {
-    $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> — the 360 layer has no project filter, so a new sphere ` +
-      `could not be scoped. Re-run the incident activation.`;
+    $("mapline").innerHTML = `The 360 layer on this map has no incident filter, so a new sphere ` +
+      `could not be filed. Re-run the incident activation.`;
   } else {
-    $("mapline").innerHTML = `<b>${esc(state.mapTitle)}</b> · project <b>${esc(state.project)}</b>` +
+    $("mapline").innerHTML = `Incident: <b>${esc(state.project)}</b>` +
       (state.client ? ` · ${esc(state.client)}` : "") + (state.picked ? " · picked on the map" : "");
   }
 }
@@ -330,8 +358,96 @@ async function loadPanos(){
   const j = await rest(PANO_SOURCE_URL + "/query", {
     where: `project_name='${state.project.replace(/'/g, "''")}'`,
     outFields: "OBJECTID,pano_name,site_label,captured_date,pano_url,source_device",
-    returnGeometry: "false", orderByFields: "captured_date DESC"}, {label: "panoramas"});
-  state.panos = (j.features || []).map(f => f.attributes);
+    // 2026-11-04 (batch 8): the point too (WGS84), for the place name, the distance and Show on map
+    returnGeometry: "true", outSR: "4326", orderByFields: "captured_date DESC"}, {label: "panoramas"});
+  state.panos = (j.features || []).map(f => {
+    const a = Object.assign({}, f.attributes), g = f.geometry;
+    if (g && isFinite(g.x) && isFinite(g.y) && !(g.x === 0 && g.y === 0)) { a._lon = Number(g.x); a._lat = Number(g.y); }
+    return a;
+  });
+}
+
+/* ============================================================ Where each 360 is (2026-11-04, batch 8) */
+/* Casey (2611open) could not tell "Site 1" from "Site 2": each sphere now carries a place name
+   (reverse geocode, cached on the phone) and its distance from her -- or from the incident when
+   the phone won't share its location. Nearest first. */
+const GATEWAY_API = "https://script.google.com/macros/s/AKfycbx7p4-A8F6G_VedgHsw3RDJgwJK1GKVAFcvSah1JdjIdG5g7PAcvXhHRKHk_ULIhdL0KA/exec";  // wri-respond gateway (public openincidents, same as panels/incident-qr)
+const GEOCODE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode";
+const PLACE_KEY = "wri_panos_places";      // localStorage cache: "lat,lon" (4 dp, ~10 m) -> place text
+const where = {here: null, asked: false, incident: null, incidentFor: "", places: null, pending: new Set()};
+
+function askPhoneLocation(){
+  if (where.asked || !navigator.geolocation) return;
+  where.asked = true;                       // ask once per visit; the browser remembers a No
+  navigator.geolocation.getCurrentPosition(
+    p => { where.here = {lat: p.coords.latitude, lon: p.coords.longitude}; if (!$("viewMain").hidden) render(); },
+    () => { /* denied / no fix: distances fall back to the incident */ },
+    {enableHighAccuracy: false, timeout: 10000, maximumAge: 300000});
+}
+async function loadIncidentPoint(){
+  const picked = pickedIncident(), key = (picked && picked.incident_id) || state.project || "";
+  if (where.incidentFor === key) return false;
+  where.incidentFor = key; where.incident = null;
+  try {
+    const j = await (await fetch(GATEWAY_API + "?api=openincidents&ts=" + Date.now(), {redirect: "follow"})).json();
+    const list = (j && j.ok && j.data && j.data.incidents) || [];
+    const inc = (picked && list.find(i => String(i.incident_id) === String(picked.incident_id)))
+             || list.find(i => i.project_key === state.project) || null;
+    if (inc && isFinite(inc.lat) && isFinite(inc.lon) && inc.lat !== null && inc.lon !== null) where.incident = {lat: Number(inc.lat), lon: Number(inc.lon)};
+  } catch (e) { console.warn("incident location:", e && e.message || e); }
+  return !!where.incident;
+}
+function distOrigin(){
+  return where.here ? {pt: where.here, label: "from you"} : where.incident ? {pt: where.incident, label: "from the incident"} : null;
+}
+function miles(a, b){
+  const R = 3958.8, r = d => d * Math.PI / 180;
+  const dLat = r(b.lat - a.lat), dLon = r(b.lon - a.lon);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+function fmtDist(mi){
+  if (mi < 0.1) return Math.max(10, Math.round(mi * 5280 / 10) * 10) + " ft";
+  return (mi < 10 ? mi.toFixed(1) : Math.round(mi)) + " mi";
+}
+const placeKey = p => p._lat.toFixed(4) + "," + p._lon.toFixed(4);
+const latLonText = p => p._lat.toFixed(5) + ", " + p._lon.toFixed(5);
+function placeCache(){
+  if (where.places) return where.places;
+  try { where.places = JSON.parse(localStorage.getItem(PLACE_KEY) || "{}") || {}; } catch (e) { where.places = {}; }
+  return where.places;
+}
+function savePlace(k, v){
+  const c = placeCache(); c[k] = v;
+  const keys = Object.keys(c); if (keys.length > 300) for (const old of keys.slice(0, keys.length - 300)) delete c[old];
+  try { localStorage.setItem(PLACE_KEY, JSON.stringify(c)); } catch (e) {}
+}
+function placeText(p){
+  const hit = placeCache()[placeKey(p)];
+  return hit ? "near " + hit : latLonText(p);
+}
+async function reverseGeocode(p){
+  const auth = getAuth(); if (!auth) return null;
+  // GET (a read), forStorage=false: the name is only shown, never saved to a layer
+  const u = GEOCODE_URL + "?f=json&forStorage=false&langCode=en&location=" + encodeURIComponent(p._lon + "," + p._lat) + "&token=" + encodeURIComponent(auth.token);
+  const ac = new AbortController(), t = setTimeout(() => ac.abort(), 12000);
+  try {
+    const j = await (await fetch(u, {signal: ac.signal})).json();
+    const a = j && j.address; if (!a) return null;
+    const street = a.Address || "", town = a.City || a.Subregion || "";
+    return street ? street + (town ? ", " + town : "") : (a.ShortLabel || a.Match_addr || town || null);
+  } catch (e) { return null; } finally { clearTimeout(t); }
+}
+async function fillPlaces(){
+  const todo = state.panos.filter(p => p._lat != null && !placeCache()[placeKey(p)] && !where.pending.has(placeKey(p)));
+  for (const p of todo) {                   // one at a time: a few spheres per incident, no burst on one bar
+    const k = placeKey(p); where.pending.add(k);
+    const name = await reverseGeocode(p);
+    if (name) {
+      savePlace(k, name);
+      document.querySelectorAll(`[data-place="${k}"]`).forEach(el => el.textContent = "near " + name);
+    } else setTimeout(() => where.pending.delete(k), 60000);   // no name (or no signal): lat/lon for now, ask again in a minute
+  }
 }
 async function loadRequests(){
   const j = await rest(REQUESTS_URL + "/query", {
@@ -414,11 +530,11 @@ function setProgress(done, total, label){
 async function upload(){
   if (state.busy) return;
   if (!state.file) { toastMsg("Pick a 360 photo first."); return; }
-  if (!state.project) { toastMsg("No project on this map — a sphere could not be scoped."); return; }
+  if (!state.project) { toastMsg("No incident on this map — a sphere could not be filed."); return; }
   const f = state.file, parts = Math.ceil(f.size / CHUNK);
   const name = ($("name").value || "").trim();
   const ok = await confirmBox("Add this sphere?",
-    `${f.name} (${mb(f.size)}) goes onto the ${state.project} map and the public gateway. ` +
+    `${f.name} (${mb(f.size)}) goes onto incident ${state.project}'s map and the public gateway. ` +
     `Uploading takes a few minutes on cell signal; it is live a few minutes after that.`, "Add to the map");
   if (!ok) return;
 
@@ -490,11 +606,12 @@ async function upload(){
 $("btnUpload").onclick = upload;
 
 /* ============================================================ Remove */
-async function removePano(oid){
+async function removePano(oid, b){
   const p = state.panos.find(x => x.OBJECTID === oid); if (!p) return;
   const ok = await confirmBox("Remove this sphere?",
     `"${p.pano_name}" comes off the incident map, the viewers and the public gateway, and its tiles are deleted. This cannot be undone.`, "Remove");
   if (!ok) return;
+  busyBtn(b, true, "Removing…");            // 2026-11-04 (batch 8): busy until the queue answers (refresh re-renders it)
   try {
     await verifyAuth();
     const attrs = {pano_name: p.pano_name, project: state.project, client: state.client, mode: "delete",
@@ -530,28 +647,96 @@ function render(){
     }
   }
 
-  rows.push(`<div class="group">On the map${state.project ? " — " + esc(state.project) : ""}</div>`);
+  rows.push(`<div class="group">On the map${state.project ? " · Incident: " + esc(state.project) : ""}</div>`);   // 2026-11-04 (batch 8): incident key, like the map chip
   if (!state.panos.length) {
     rows.push('<div class="note">No 360s on this incident yet.</div>');
   } else {
-    for (const p of state.panos) {
-      rows.push(`<div class="card">
+    // 2026-11-04 (batch 8): place name + distance on every sphere, nearest first
+    const o = distOrigin();
+    const list = state.panos.map(p => ({p, d: o && p._lat != null ? miles(o.pt, {lat: p._lat, lon: p._lon}) : null}));
+    if (o) list.sort((a, b) => (a.d == null) - (b.d == null) || (a.d ?? 0) - (b.d ?? 0));
+    if (o) rows.push(`<div class="origin">Nearest first · distances ${esc(o.label)}</div>`);
+    for (const {p, d} of list) {
+      const placeLine = p._lat == null ? '<span>No location on this sphere</span>'
+        : `<span data-place="${esc(placeKey(p))}">${esc(placeText(p))}</span>${d != null ? ` · <span class="dist">${esc(fmtDist(d) + " " + o.label)}</span>` : ""}`;
+      rows.push(`<div class="card" data-oid="${p.OBJECTID}">
         <div class="name">${esc(p.pano_name)}</div>
+        <div class="where">${placeLine}</div>
         <div class="meta">${esc(p.site_label || "")}${p.captured_date ? " · " + esc(p.captured_date) : ""}</div>
         <div class="actions">
-          <button class="btn" data-open="${esc(p.pano_url)}">Open</button>
+          <button class="btn primary" data-open="${p.OBJECTID}">Open</button>
+          ${p._lat != null ? `<button class="btn" data-onmap="${p.OBJECTID}">Show on map</button>` : ""}
           <button class="btn ghost" data-remove="${p.OBJECTID}">Remove</button>
         </div></div>`);
     }
   }
   rows.push('<div class="note">Spheres appear on the ICP screens, the client viewer and the public gateway within a couple of minutes — no reload needed.</div>');
   el.innerHTML = rows.join("");
-  el.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => removePano(Number(b.dataset.remove)));
-  el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => window.open(b.dataset.open, "_blank", "noopener"));
+  el.querySelectorAll("[data-remove]").forEach(b => b.onclick = () => removePano(Number(b.dataset.remove), b));
+  el.querySelectorAll("[data-open]").forEach(b => b.onclick = () => openViewer(Number(b.dataset.open), b));
+  el.querySelectorAll("[data-onmap]").forEach(b => b.onclick = () => showOnMap(Number(b.dataset.onmap), b));
 
   armPoll();
   syncLiveMap();
+  fillPlaces();
 }
+
+/* ============================================================ Busy buttons (2026-11-04, batch 8) */
+function busyBtn(b, on, label){
+  if (!b) return;
+  if (on) { if (b.dataset.idle == null) b.dataset.idle = b.innerHTML; b.disabled = true; b.innerHTML = `<span class="spin"></span>${esc(label || b.textContent)}`; }
+  else { if (b.dataset.idle != null) { b.innerHTML = b.dataset.idle; delete b.dataset.idle; } b.disabled = false; }
+}
+
+/* ============================================================ Show on map (2026-11-04, batch 8) */
+/* The shell's incident map widget listens for wri-show-on-map: it switches to the Incident Map page
+   and zooms to the point with a marker. Fire and forget, so the button holds its spinner a moment. */
+function showOnMap(oid, b){
+  const p = state.panos.find(x => x.OBJECTID === oid); if (!p || p._lat == null) return;
+  busyBtn(b, true, "Opening…");
+  toastMsg(EMBEDDED ? "Opening on the map…" : "Opening on the map… (the map is in the Field App)");
+  try {
+    window.top.postMessage({type: "wri-show-on-map", kind: "point",
+      point: {x: p._lon, y: p._lat, spatialReference: {wkid: 4326}}, label: p.pano_name || "360"}, location.origin);
+  } catch (e) { handleErr(e, "Show on map"); }
+  setTimeout(() => busyBtn(b, false), 1500);
+}
+
+/* ============================================================ In-panel viewer (2026-11-04, batch 8) */
+/* Casey tapped Open, saw nothing for 6 s, and had silently left the Field App for a new tab on
+   /wri-incident-panos/. Now the same viewer url opens over this panel at once with a spinner,
+   a big Close, and a small link for anyone who does want its own tab. */
+let viewerBtn = null, viewerSlow = null;
+function openViewer(oid, b){
+  const p = state.panos.find(x => x.OBJECTID === oid); if (!p || !p.pano_url) { toastMsg("This sphere has no viewer link yet."); return; }
+  viewerBtn = b; busyBtn(b, true, "Opening…");
+  const v = $("viewer"), body = v.querySelector(".vbody");
+  $("viewerTitle").textContent = p.pano_name || "360";
+  $("viewerTab").href = p.pano_url;
+  $("viewerLoadText").textContent = "Opening the 360…"; $("viewerLoad").hidden = false;
+  const old = body.querySelector("iframe"); if (old) old.remove();
+  const f = document.createElement("iframe");
+  f.title = "360 viewer: " + (p.pano_name || "");
+  f.allow = "fullscreen; gyroscope; accelerometer";
+  f.setAttribute("allowfullscreen", "");
+  f.onload = () => { if (f.src && f.isConnected) { $("viewerLoad").hidden = true; clearTimeout(viewerSlow); } };
+  body.appendChild(f);
+  v.hidden = false;
+  clearTimeout(viewerSlow);
+  viewerSlow = setTimeout(() => { $("viewerLoadText").textContent = "Still opening the 360… slow signal. It keeps trying, or tap Close."; }, 8000);
+  f.src = p.pano_url;
+  $("viewerClose").focus();
+}
+function closeViewer(){
+  const v = $("viewer"); if (v.hidden) return;
+  clearTimeout(viewerSlow);
+  const f = v.querySelector("iframe"); if (f) { f.src = "about:blank"; f.remove(); }   // frees the WebGL sphere
+  v.hidden = true;
+  busyBtn(viewerBtn, false); viewerBtn = null;
+}
+$("viewerClose").onclick = closeViewer;
+$("viewerTab").onclick = () => setTimeout(closeViewer, 0);
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeViewer(); });
 
 /* ============================================================ Boot */
 function armPoll(){
@@ -569,7 +754,7 @@ async function refresh(quiet){
   let authLost = false;
   try {
     await verifyAuth();
-    if (!quiet) await currentMap();
+    if (!quiet) { await currentMap(); loadIncidentPoint().then(changed => { if (changed && !where.here) render(); }); }
     // allSettled, not all: the two lists are independent, and a slow pano query must not throw
     // away a perfectly good requests result (which is the one driving the spinner)
     const [panos, reqs] = await Promise.allSettled([loadPanos(), loadRequests()]);
@@ -596,12 +781,14 @@ async function boot(){
   showView("viewMain");
   $("subtitle").textContent = state.username ? "Signed in as " + state.username : "Spheres on the incident map";
   try { await currentMap(); } catch (e) { handleErr(e, "Map"); }
+  askPhoneLocation();                        // 2026-11-04 (batch 8): distances from you, else from the incident
+  loadIncidentPoint().then(changed => { if (changed && !where.here && !$("viewMain").hidden) render(); });
   if (!REQUESTS_URL || REQUESTS_URL.startsWith("__")) {
     $("mapline").innerHTML = '<span class="err">The requests layer is not configured in this build.</span>';
   }
   await refresh(true);
 }
-$("btnReload").onclick = () => refresh(false);
+$("btnReload").onclick = async () => { const b = $("btnReload"); busyBtn(b, true, "Refresh"); try { await refresh(false); } finally { busyBtn(b, false); } };
 boot();
 })();
 </script>
