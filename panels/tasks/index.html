@@ -231,7 +231,7 @@
       top.dispatchEvent(new top.PopStateEvent('popstate', { state: null }));
     } catch (e) { window.open('/wri-field-app/?page=' + encodeURIComponent(a.getAttribute('data-page')), '_top'); }
   });
-  window.addEventListener('storage', function (e) { if (e.key === 'wri_checkin_state') render(); });
+  window.addEventListener('storage', function (e) { if (e.key === 'wri_checkin_state' || e.key === 'wri_hasp_acks') render(); });
 
   document.addEventListener('click', function (ev) {
     var a = ev.target.closest ? ev.target.closest('a[data-open]') : null;
@@ -353,6 +353,7 @@
   function lastReset() { var d = new Date(); d.setHours(3, 0, 0, 0); if (d.getTime() > Date.now()) d.setDate(d.getDate() - 1); return d.getTime(); }
   function isDone(done, t, phase) {
     if (isCheckIn(t) && checkedInName()) return true;
+    if (isHaspAck(t) && haspSigned()) return true;
     var v = done[t.id];
     return !!v && (phase !== 'daily' || v > lastReset());
   }
@@ -362,6 +363,30 @@
   }
   function checkedInName() {
     try { var s = JSON.parse(localStorage.getItem('wri_checkin_state') || 'null'); return s && s.name ? String(s.name) : ''; } catch (e) { return ''; }
+  }
+
+  // 2026-11-05 (batch 11): the "Read the safety plan (HASP) and tap Acknowledge" row follows the HASP
+  // page's sign-off (localStorage.wri_hasp_acks['<incident>|<haspId>'], written by Field Forms' ?embed=hasp
+  // frame): ticked once this person signed the picked incident's current plan (saved on the phone counts).
+  // Never logged to the 214 from here: the ack writes its own 214 entry (HASP V5 haspAuto214_).
+  function isHaspAck(t) {
+    return (t.url === 'page:page_4' || /^hasp$/i.test(t.linkLabel || '')) && /\bhasp\b/i.test(t.label || '') && /acknowledge|sign/i.test(t.label || '');
+  }
+  function haspSigned() {
+    var acks; try { acks = JSON.parse(localStorage.getItem('wri_hasp_acks') || '{}') || {}; } catch (e) { return null; }
+    var cur = ''; try { var c = JSON.parse(localStorage.getItem(HASP_CACHE)); if (c && String(c.incident || '') === PICK.id && c.data && c.data.hasp) cur = String(c.data.hasp.objectId || ''); } catch (e) {}
+    var me = checkedInName().trim().toLowerCase(), hit = null;
+    Object.keys(acks).forEach(function (k) {
+      var a = acks[k], i = k.lastIndexOf('|');
+      if (!a || k.slice(0, i) !== PICK.id || (cur && k.slice(i + 1) !== cur)) return;   // this incident, its current plan
+      if (!/^(sent|queued|needs_pin)$/.test(a.status) || (me && String(a.name || '').trim().toLowerCase() !== me)) return;
+      if (!hit || a.status === 'sent') hit = a;
+    });
+    return hit;
+  }
+  function haspSignedNote(a) {
+    var d = new Date(Number(a.at)), t = isNaN(d.getTime()) ? '' : ' ' + d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    return (a.status === 'sent' ? 'Signed' : 'Signed on this phone (sends with signal)') + t + ' as ' + a.name;
   }
 
   function isDone_(done, t) { return isDone(done, t, currentPhase); }
@@ -387,7 +412,7 @@
   // so a tick is first kept in PENDING (localStorage); this page, or Field Forms when it next opens,
   // moves it into the outbox. Not logged: the self-ticking check-in row and rows that ARE the 214 log.
   var PENDING = 'wri_214_pending', LOGGED = 'wri_tasks_214_', HOLD_MS = 15000;
-  function logs214(t) { return taskPhases(t).indexOf('daily') !== -1 && !isCheckIn(t) && !/#214$/.test(t.url || ''); }
+  function logs214(t) { return taskPhases(t).indexOf('daily') !== -1 && !isCheckIn(t) && !isHaspAck(t) && !/#214$/.test(t.url || ''); }
   function lsJson(k, dflt) { try { return JSON.parse(localStorage.getItem(k) || 'null') || dflt; } catch (e) { return dflt; } }
   function lsPut(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function pickedIncident() {
@@ -557,6 +582,7 @@
           '<button class="task-check" onclick="toggleTask(\'' + roleId + '\',\'' + esc(t.id) + '\')">&#10003;</button>' +
           '<div class="task-label">' + esc(taskLabel(t)) +
           (isCheckIn(t) && checkedInName() ? '<div class="task-note">Checked in as ' + esc(checkedInName()) + '</div>' : '') +
+          (isHaspAck(t) && haspSigned() ? '<div class="task-note" id="haspSignedNote">' + esc(haspSignedNote(haspSigned())) + '</div>' : '') +
           (isDone && loggedNow(roleId, t) ? '<div class="task-note t214">In your 214</div>' : '') + '</div>';
         if (t.url && /^page:/.test(t.url)) {   // a Field App page: switch the shell to it (no reload)
           body += '<a class="task-link ' + esc((t.buttonColor || 'slate').toLowerCase()) + '" href="#" data-page="' + esc(t.url.slice(5)) + '">' +

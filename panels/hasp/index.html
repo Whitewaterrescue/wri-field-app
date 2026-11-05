@@ -85,12 +85,47 @@
   .btn.busy,.call.busy{pointer-events:none;opacity:.7}
   .btn.busy::after,.call.busy::after{content:'';width:16px;height:16px;margin-left:10px;border-radius:50%;
     border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:spin .7s linear infinite;flex:none}
+  /* 2026-11-05 (batch 11): Acknowledge signs in an in-panel overlay (WRI Field Forms ?embed=hasp, same
+     origin, works with no signal), never a new tab; the result shows here and survives a reload */
+  button.btn{border:0;width:100%;font-family:var(--font);cursor:pointer}
+  button.btn:disabled{cursor:default}
+  .btn.ack.signed{background:#16794a}
+  .btn.ack.pending{background:#3b2a08;color:#ffe8b3;border:2px solid var(--warning)}
+  .ack-who{font-size:16px;color:#e4e6e6;margin:0 0 10px}
+  .ack-who b{color:#fff}
+  .ack-status{font-size:18px;font-weight:700;line-height:1.35;margin:0 0 12px;padding:12px;border-radius:10px}
+  .ack-status.ok{background:#0f3d26;color:#c8f7dc;border:2px solid #16794a}
+  .ack-status.wait{background:#3b2a08;color:#ffe8b3;border:2px solid var(--warning)}
+  .ack-status.bad{background:#3d0f10;color:#ffd5d6;border:2px solid var(--accent)}
+  .ack-status small{display:block;font-size:15px;font-weight:400;margin-top:4px}
+  .overlay{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;background:var(--bg)}
+  .overlay[hidden]{display:none}
+  .overlay-bar{display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface);border-bottom:1px solid var(--border);min-height:52px}
+  .ov-back{display:flex;align-items:center;gap:4px;min-height:44px;padding:9px 16px;border-radius:8px;border:none;background:var(--accent);
+    color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap}
+  .ov-back:active{opacity:0.85}
+  .ov-title{flex:1;font-size:15px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ov-frame-wrap{position:relative;flex:1;background:var(--bg)}
+  .ov-frame-wrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:var(--bg)}
+  .ov-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    padding:24px;text-align:center;background:var(--bg);color:var(--text-dim);font-size:16px;line-height:1.45}
+  .ov-loading[hidden]{display:none}
+  .ov-loading .btn{max-width:320px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div id="offline" class="offline-banner">Offline &mdash; showing last saved HASP info</div>
   <div id="content"><div class="loading"><div class="spin"></div>Loading current HASP&hellip;</div></div>
+</div>
+<div id="ackOverlay" class="overlay" hidden role="dialog" aria-label="Sign the HASP">
+  <div class="overlay-bar">
+    <button class="ov-back" id="ackClose" type="button">&#x2715; Close</button>
+    <div class="ov-title">Sign the HASP</div>
+  </div>
+  <div class="ov-frame-wrap" id="ackWrap">
+    <div class="ov-loading" id="ackLoading"><div class="spin"></div><div id="ackLoadMsg">Opening the sign-off&hellip;</div></div>
+  </div>
 </div>
 
 <script>
@@ -219,11 +254,194 @@
         (h.docUrl ? '<a class="btn view" href="' + esc(h.docUrl) + '" target="_blank" rel="noopener">Open Doc</a>' : '') +
       '</div>' +
       (h.previewUrl ? '<div class="preview" style="margin-top:12px"><iframe src="' + esc(h.previewUrl) + '" title="HASP preview"></iframe></div>' : '') +
-      (h.ackUrl ? '<div class="ack-card" id="ackCard"><p>Read the plan above, then sign that you have read it.</p>' +
-        '<div class="btn-row one"><a class="btn ack" id="ackBtn" href="' + esc(h.ackUrl) + '" target="_blank" rel="noopener">Acknowledge HASP</a></div></div>' : '') +
+      (haspIdOf(h) ? '<div class="ack-card" id="ackCard"></div>' : '') +
       (d.haspUrl ? '<a class="full-link" href="' + esc(d.haspUrl) + '" target="_blank" rel="noopener">Open full HASP app (create / edit plans)</a>' : '');
     document.getElementById('content').innerHTML = html;
+    ACK.hasp = h; ACK.id = haspIdOf(h);
+    renderAck();
+    sendInBackground();
   }
+
+  // ---------- 2026-11-05 (batch 11): sign inside the app ----------
+  // Acknowledge opens WRI Field Forms' HASP sign-off (/wri-recon/?embed=hasp, same origin) in an overlay:
+  // saved on the phone first, sent by its outbox with the incident PIN (HASP V5 offline_ack, idempotent
+  // by the record id; the ack writes the crew member's own 214). The frame reports
+  // {type:'wri-hasp', v:1, status, haspId, name, at, ...} and also keeps localStorage.wri_hasp_acks,
+  // so the result here (and the Checklist's HASP tick) survives a reload.
+  var FORMS = '/wri-recon/', ACKS_KEY = 'wri_hasp_acks', STATUSES = { ready: 1, queued: 1, needs_pin: 1, sent: 1, failed: 1 };
+  var ACK = { hasp: null, id: '', frame: null, open: false, busy: false, timer: 0, closeTimer: 0, triedUpdate: false, err: '' };
+  function haspIdOf(h) {
+    var id = String((h && h.objectId) || '');
+    if (!id && h && h.ackUrl) { var m = /[?&]id=(\d+)/.exec(h.ackUrl); if (m) id = m[1]; }
+    return /^\d{1,12}$/.test(id) ? id : '';
+  }
+  function checkinName() {
+    try { var s = JSON.parse(localStorage.getItem('wri_checkin_state') || 'null'); return s && s.name ? String(s.name).trim() : ''; } catch (e) { return ''; }
+  }
+  function ackKey() { return PICK.id + '|' + ACK.id; }
+  function ackState() {
+    try { var a = JSON.parse(localStorage.getItem(ACKS_KEY) || '{}') || {}, s = a[ackKey()]; return s && STATUSES[s.status] ? s : null; } catch (e) { return null; }
+  }
+  function saveAckState(s) {
+    try {
+      var a = JSON.parse(localStorage.getItem(ACKS_KEY) || '{}') || {};
+      a[ackKey()] = { name: s.name, at: s.at, status: s.status, sentAt: s.sentAt || 0, error: s.error || '', id: s.id || '' };
+      localStorage.setItem(ACKS_KEY, JSON.stringify(a));
+    } catch (e) {}
+  }
+  function fmtTime(t) { var d = new Date(Number(t)); return isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
+
+  function renderAck() {
+    var card = document.getElementById('ackCard');
+    if (!card) return;
+    var s = ackState(), who = (s && s.name) || checkinName(), h = '';
+    if (s && s.status === 'sent') {
+      h = '<div class="ack-status ok" id="ackStatus">Signed ' + esc(fmtTime(s.at)) + ' as ' + esc(s.name) + '<small>The Safety Officer sees it, and it is in your 214.</small></div>' +
+        '<button class="btn ack signed" id="ackBtn" type="button" disabled>Signed &#10003;</button>';
+    } else if (s && s.status === 'queued') {
+      h = '<div class="ack-status wait" id="ackStatus">Saved on this phone, it sends when you have signal' +
+        '<small>Signed ' + esc(fmtTime(s.at)) + ' as ' + esc(s.name) + (navigator.onLine ? '. Sending now&hellip;' : '.') + '</small></div>' +
+        '<button class="btn ack pending" id="ackBtn" type="button" disabled>Saved on this phone</button>';
+    } else if (s && s.status === 'needs_pin') {
+      h = '<div class="ack-status wait" id="ackStatus">Saved on this phone: it needs the incident PIN to send' +
+        '<small>Signed ' + esc(fmtTime(s.at)) + ' as ' + esc(s.name) + '. Ask your lead for the PIN.</small></div>' +
+        '<button class="btn ack" id="ackBtn" type="button" data-act="pin">Enter the incident PIN</button>';
+    } else {
+      var bad = ACK.err || (s && s.status === 'failed' ? (s.error || 'The sign-off could not be sent.') : '');
+      h = (bad ? '<div class="ack-status bad" id="ackStatus">Not signed yet<small>' + esc(bad) + '</small></div>' : '') +
+        '<p>Read the plan above, then sign that you have read it.</p>' +
+        (who ? '<p class="ack-who" id="ackWho">You sign as <b>' + esc(who) + '</b>' + (s ? '' : ' (checked in on this phone)') + '.</p>' : '') +
+        '<button class="btn ack' + (ACK.busy ? ' busy' : '') + '" id="ackBtn" type="button"' + (ACK.busy ? ' disabled aria-busy="true"' : '') + '>' +
+        (bad ? 'Try again' : 'Acknowledge HASP') + '</button>';
+    }
+    card.innerHTML = h;
+  }
+
+  function frameUrl() {
+    var h = ACK.hasp || {}, q = new URLSearchParams();
+    q.set('embed', 'hasp'); q.set('hasp', ACK.id);
+    if (PICK.id) q.set('incident', PICK.id);
+    var who = checkinName(); if (who) q.set('name', who);
+    if (h.projectName) q.set('project', h.projectName);
+    return FORMS + '?' + q.toString() + '#hasp';
+  }
+  function loading(msg, retry) {
+    var el = document.getElementById('ackLoading');
+    el.hidden = false;
+    el.innerHTML = retry
+      ? '<div id="ackLoadMsg">' + esc(msg) + '</div><button class="btn ack" id="ackRetry" type="button">Retry</button>'
+      : '<div class="spin"></div><div id="ackLoadMsg">' + esc(msg) + '</div>';
+  }
+  function setBusy(on) { ACK.busy = on; renderAck(); }
+  /** a fresh frame (shown = the overlay; else it sends a saved sign-off in the background) */
+  function makeFrame(show) {
+    clearTimeout(ACK.timer);
+    if (ACK.frame) ACK.frame.remove();
+    var f = document.createElement('iframe');
+    f.title = 'Sign the HASP'; f.id = 'ackFrame';
+    f.onload = function () { frameLoaded(f); };
+    f.src = frameUrl();
+    ACK.frame = f;
+    loading('Opening the sign-off…');
+    document.getElementById('ackWrap').appendChild(f);
+    // no answer from the frame = it did not open (no signal and Field Forms never opened on this phone)
+    ACK.timer = setTimeout(function () { if (ACK.frame === f) frameFailed('The sign-off did not open. Check your signal, then tap Retry.'); }, 25000);
+    return f;
+  }
+  function frameLoaded(f) {
+    if (ACK.frame !== f) return;
+    var ok = false;
+    try { ok = !!(f.contentWindow && f.contentWindow.WRIHaspEmbed); } catch (e) { ok = false; }
+    if (ok) return;   // its first status message hides the spinner
+    // an old copy of Field Forms on this phone (no ?embed=hasp yet): update its service worker once, then reload
+    if (!ACK.triedUpdate && navigator.onLine && navigator.serviceWorker) {
+      ACK.triedUpdate = true;
+      loading('Updating WRI Field Forms on this phone…');
+      navigator.serviceWorker.getRegistration(FORMS).then(function (r) { return r && Promise.race([r.update(), new Promise(function (res) { setTimeout(res, 8000); })]); })
+        .catch(function () {}).then(function () { if (ACK.frame === f) makeFrame(ACK.open); });
+      return;
+    }
+    frameFailed(navigator.onLine ? 'The sign-off could not open here. Tap Retry.' : 'No signal, and the sign-off is not saved on this phone yet. Get signal, then tap Retry.');
+  }
+  function frameFailed(msg) {
+    clearTimeout(ACK.timer);
+    if (ACK.frame) { ACK.frame.remove(); ACK.frame = null; }
+    setBusy(false);
+    if (ACK.open) loading(msg, true);
+    else { ACK.err = msg; renderAck(); }
+  }
+
+  function openAck() {
+    if (ACK.busy || !ACK.id) return;
+    var s = ackState();
+    if (s && (s.status === 'sent' || s.status === 'queued')) return renderAck();   // never twice
+    ACK.err = ''; ACK.triedUpdate = false; setBusy(true);
+    document.getElementById('ackOverlay').hidden = false;
+    document.body.style.overflow = 'hidden';
+    ACK.open = true;
+    try { history.pushState({ wriOverlay: 1 }, ''); } catch (e) {}   // Back closes the overlay
+    makeFrame(true);
+  }
+  function dismissAck() {
+    clearTimeout(ACK.closeTimer);
+    document.getElementById('ackOverlay').hidden = true;
+    document.body.style.overflow = '';
+    ACK.open = false;
+    var s = ackState();
+    // a saved sign-off keeps its frame (hidden) so it can still send; otherwise drop it
+    if (!(s && s.status === 'queued') && ACK.frame) { clearTimeout(ACK.timer); ACK.frame.remove(); ACK.frame = null; }
+    setBusy(false);
+  }
+  function closeAck() {
+    var hadMarker = ACK.open && history.state && history.state.wriOverlay;
+    dismissAck();
+    if (hadMarker) { try { history.back(); } catch (e) {} }
+  }
+  window.addEventListener('popstate', function () { if (ACK.open) dismissAck(); });
+
+  /** a sign-off saved on the phone goes out from a hidden frame when there is signal */
+  function sendInBackground() {
+    var s = ackState();
+    if (!ACK.id || ACK.open || ACK.frame || !navigator.onLine || !(s && s.status === 'queued')) return;
+    makeFrame(false);
+  }
+  window.addEventListener('online', function () {
+    renderAck();
+    // a frame already holding the sign-off: tell it signal is back (WebKit fires 'online' on the top page only)
+    if (ACK.frame) { try { ACK.frame.contentWindow.postMessage({ type: 'wri-hasp', action: 'report' }, location.origin); } catch (e) {} }
+    else sendInBackground();
+  });
+  window.addEventListener('offline', renderAck);
+  window.addEventListener('storage', function (e) { if (e.key === ACKS_KEY) renderAck(); });
+
+  // the frame's reports: same origin, our frame, a known shape (treated as data only)
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (e.origin !== location.origin || !ACK.frame || e.source !== ACK.frame.contentWindow) return;
+    if (!d || typeof d !== 'object' || d.type !== 'wri-hasp' || d.v !== 1 || !STATUSES[d.status] || String(d.haspId) !== ACK.id) return;
+    clearTimeout(ACK.timer);
+    document.getElementById('ackLoading').hidden = true;
+    if (d.status === 'ready') { setBusy(false); return; }
+    var name = typeof d.name === 'string' ? d.name.trim().slice(0, 120) : '';
+    if (!name) return;
+    var at = Number(d.at); if (!(at > 0)) at = Date.now();
+    saveAckState({ name: name, at: at, status: d.status, sentAt: Number(d.sentAt) || 0,
+      error: typeof d.error === 'string' ? d.error.slice(0, 300) : '', id: typeof d.id === 'string' ? d.id.slice(0, 64) : '' });
+    ACK.err = ''; ACK.busy = false; renderAck();
+    // saved or signed: show the result on the page; PIN / errors stay open so they can be fixed there
+    if (ACK.open && (d.status === 'queued' || d.status === 'sent')) {
+      clearTimeout(ACK.closeTimer); ACK.closeTimer = setTimeout(function () { if (ACK.open) closeAck(); }, 1500);
+    }
+    if (d.status === 'sent' && !ACK.open && ACK.frame) { ACK.frame.remove(); ACK.frame = null; }
+  });
+
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('#ackBtn, #ackRetry, #ackClose');
+    if (!b || b.disabled) return;
+    if (b.id === 'ackClose') return closeAck();
+    if (b.id === 'ackRetry') { ACK.triedUpdate = false; makeFrame(true); return; }
+    openAck();
+  });
 
   // busy state on every link-button until the new tab / dialer takes over (4 s)
   document.addEventListener('click', function (ev) {
