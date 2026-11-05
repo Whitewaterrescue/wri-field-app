@@ -22,6 +22,11 @@
   signs in with it once, drops it from its address, and shows its PIN box as before if it's missing or wrong.
   The crew PIN is never passed.
 
+  2026-11-05 (Tyler, Field App "Drone" menu): ?page=live|recorded|upload|missions picks which of the drone
+  page's tabs show (Livestream / Recorded / Upload / Mission Planner); no ?page= = every tab (the response
+  viewers' Drone Video button). Upload and Mission Planner are never unloaded when hidden (a video upload or a
+  half-built mission would be lost); live video and recorded playback are.
+
   Video stops 3 s after the page is hidden (same rule as the Live Stream panel) so a parked panel
   doesn't keep pulling video over a phone connection, except while the Upload tab is sending a
   video to Dropbox (the page says so with 'wri-live-busy'). Recorded / Upload tabs: P5b.
@@ -49,6 +54,8 @@
   var TEARDOWN_MS = 3000;
   var host = document.getElementById('host'), off = document.getElementById('off');
   var frame = null, hiddenSince = null, uploading = false;
+  var PAGE = (function () { var p = new URLSearchParams(location.search).get('page') || ''; return /^(live|recorded|upload|missions)$/.test(p) ? p : ''; })();
+  var KEEP = PAGE === 'upload' || PAGE === 'missions';   // typing / sending: never torn down
 
   function exbToken() {
     var raw = null;
@@ -113,7 +120,7 @@
     var f = frame, inc = incident();
     savedPin(inc).then(function (pin) {
       if (frame !== f) return;   // closed meanwhile
-      f.src = SERVER + '/live?embed=1' + (pin ? '#pin=' + encodeURIComponent(pin) + '&inc=' + encodeURIComponent(inc) : '');
+      f.src = SERVER + '/live?embed=1' + (PAGE ? '&page=' + PAGE : '') + (pin ? '#pin=' + encodeURIComponent(pin) + '&inc=' + encodeURIComponent(inc) : '');
     });
     off.classList.remove('on'); host.style.display = '';
   }
@@ -140,7 +147,7 @@
     return window.innerWidth === 0 || window.innerHeight === 0;
   }
   function check() {
-    if (!frame || uploading) return;
+    if (!frame || uploading || KEEP) return;
     if (isHidden()) {
       if (hiddenSince === null) hiddenSince = Date.now();
       else if (Date.now() - hiddenSince >= TEARDOWN_MS) { hiddenSince = null; unmount('Video stopped when you left the page.'); }

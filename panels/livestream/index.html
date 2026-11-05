@@ -89,7 +89,7 @@
     if (tab === 'drones' && !drones.firstChild) {
       var f = document.createElement('iframe');
       f.title = 'WRI drone video'; f.setAttribute('allow', 'autoplay; fullscreen'); f.setAttribute('allowfullscreen', '');
-      f.src = '../drone-live/'; drones.appendChild(f);
+      f.src = '../drone-live/?page=live'; drones.appendChild(f);   // live video only (2026-11-05 Drone menu)
     }
     if (tab !== 'drones') drones.innerHTML = '';
     if (tab !== 'nova') { var c = document.getElementById('closeBtn'); if (c && document.getElementById('player').classList.contains('on')) c.click(); }
