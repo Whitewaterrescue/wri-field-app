@@ -16,6 +16,12 @@
   the WRI crew PIN = watch + crew controls (start/stop video, camera + gimbal, client links). Check-out
   is the pilot's alone (sign out in Pilot 2).
 
+  2026-11-04 (batch 8): the incident PIN Field Forms already saved on this phone (same github.io origin,
+  IndexedDB 'wri-recon', kv 'pins' = {incident_id: pin}, else the old single kv 'pin') goes to the drone page
+  in the URL fragment (#pin=..&inc=..): never the query string, so it never reaches a server log. The page
+  signs in with it once, drops it from its address, and shows its PIN box as before if it's missing or wrong.
+  The crew PIN is never passed.
+
   Video stops 3 s after the page is hidden (same rule as the Live Stream panel) so a parked panel
   doesn't keep pulling video over a phone connection, except while the Upload tab is sending a
   video to Dropbox (the page says so with 'wri-live-busy'). Recorded / Upload tabs: P5b.
@@ -60,6 +66,38 @@
     try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) return String(c.id); } catch (e) {}
     return '';
   }
+  /* 2026-11-04 (batch 8): Field Forms' saved PIN for this incident ('' = none). Read only: it asks the
+     browser first whether Field Forms' database exists (WebKit keeps an empty name behind even after an
+     aborted open), and an open that would create it is aborted, so this never makes one. */
+  function savedPin(inc) {
+    return new Promise(function (done) {
+      if (!inc || !window.indexedDB) return done('');
+      var t = setTimeout(function () { fin(''); }, 1500), over = false;
+      function fin(v) { if (over) return; over = true; clearTimeout(t); done(String(v || '').trim()); }
+      function read() {
+        var rq;
+        try { rq = indexedDB.open('wri-recon'); } catch (e) { return fin(''); }
+        rq.onupgradeneeded = function () { try { rq.transaction.abort(); } catch (e) {} };
+        rq.onerror = function () { fin(''); };
+        rq.onsuccess = function () {
+          var db = rq.result;
+          try {
+            if (!db.objectStoreNames.contains('kv')) { db.close(); return fin(''); }
+            var tx = db.transaction('kv', 'readonly'), kv = tx.objectStore('kv'), a = kv.get('pins'), b = kv.get('pin');
+            tx.oncomplete = function () {
+              var pins = (a.result && a.result.v) || {};
+              db.close(); fin(pins[inc] || (b.result && b.result.v) || '');
+            };
+            tx.onerror = tx.onabort = function () { db.close(); fin(''); };
+          } catch (e) { try { db.close(); } catch (x) {} fin(''); }
+        };
+      }
+      if (!indexedDB.databases) return read();
+      indexedDB.databases().then(function (l) {
+        if ((l || []).some(function (d) { return d.name === 'wri-recon' && d.version > 0; })) read(); else fin('');
+      }, read);
+    });
+  }
   function send() {
     if (!frame || !frame.contentWindow) return;
     frame.contentWindow.postMessage({ type: 'wri-live-auth', agol_token: exbToken(), incident: incident() }, SERVER);
@@ -71,8 +109,12 @@
     frame.title = 'WRI drone live video';
     frame.setAttribute('allow', 'autoplay; fullscreen');
     frame.setAttribute('allowfullscreen', '');
-    frame.src = SERVER + '/live?embed=1';
     host.appendChild(frame);
+    var f = frame, inc = incident();
+    savedPin(inc).then(function (pin) {
+      if (frame !== f) return;   // closed meanwhile
+      f.src = SERVER + '/live?embed=1' + (pin ? '#pin=' + encodeURIComponent(pin) + '&inc=' + encodeURIComponent(inc) : '');
+    });
     off.classList.remove('on'); host.style.display = '';
   }
   function unmount(m) {
