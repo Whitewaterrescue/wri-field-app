@@ -111,6 +111,24 @@ button.wide{width:100%;padding:15px;font-size:13px}
 #modalCard{background:var(--rapids);border:1px solid var(--line);border-radius:14px;padding:18px;max-width:420px;width:100%}
 #modalCard b{font-family:var(--font-head)}
 .diag{font-size:11px;color:var(--muted);margin-top:12px;word-break:break-word;opacity:.75}
+/* 2026-11-04 (batch 8): one row per ortho with its flight date, Show on map, Compare (swipe) */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;
+      border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:7px}
+.item .when{font:700 16px/1.2 var(--font-head);color:#fff;margin:0 0 4px}
+.pill.today{background:var(--ok);color:#111}
+.item .acts{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+.item .acts button,#btnCompare,#cmpClose{min-height:48px}
+.item .acts button{flex:1 1 140px}
+#cmp{position:fixed;inset:0;z-index:45;background:var(--wipeout);display:flex;flex-direction:column}
+#cmpBar{background:var(--rapids);border-bottom:1px solid var(--line);padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#cmpBar select{flex:1 1 130px;min-height:48px;font-size:15px;padding:8px;background:var(--field);color:var(--text);-webkit-appearance:none;appearance:none}
+#cmpBar select:disabled{opacity:1;color:var(--muted)}
+#cmpBar .side{font:700 11px/1 var(--font-head);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+#cmpClose{flex:none;min-width:96px;font-size:14px}
+#cmpView{flex:1;position:relative;min-height:0}
+#cmpMsg{position:absolute;left:10px;right:10px;top:10px;z-index:3;background:rgba(23,25,25,.92);border:1px solid var(--line);
+        border-radius:10px;padding:10px 12px;font-size:14px}
 </style>
 </head>
 <body>
@@ -208,6 +226,8 @@ button.wide{width:100%;padding:15px;font-size:13px}
           <button id="btnRefresh" class="secondary" style="flex:none;padding:7px 10px">Refresh</button>
         </div>
         <div id="orthoList"><div class="note">Loading…</div></div>
+        <!-- 2026-11-04 (batch 8): side-by-side swipe of two orthos -->
+        <button id="btnCompare" class="secondary wide" style="margin-top:12px" hidden>Compare two orthos (swipe)</button>
       </div>
     </section>
 
@@ -215,6 +235,15 @@ button.wide{width:100%;padding:15px;font-size:13px}
   </div>
 </div>
 
+<!-- 2026-11-04 (batch 8): Compare overlay. Left of the line = first pick, right = second. -->
+<div id="cmp" hidden>
+  <div id="cmpBar">
+    <span class="side">Left</span><select id="cmpA" aria-label="Left ortho"></select>
+    <span class="side">Right</span><select id="cmpB" aria-label="Right ortho"></select>
+    <button id="cmpClose">Close</button>
+  </div>
+  <div id="cmpView"><div id="cmpMsg"><span class="spin"></span>Loading the map…</div></div>
+</div>
 <div id="toast" hidden></div>
 <div id="modal" hidden><div id="modalCard">
   <b id="modalTitle"></b>
@@ -351,7 +380,9 @@ async function rest(url, fields, opts={}){
   try {
     const p=new URLSearchParams(); for(const [k,v] of Object.entries(fields||{})) if(v!=null) p.set(k,String(v));
     p.set("f","json"); p.set("token",auth.token);
-    const r=await fetch(url,{method:"POST", body:p, signal:ac.signal});
+    // 2026-11-04 (batch 8): opts.get for service REST info (a plain read, no POST body)
+    const r=opts.get ? await fetch(url+(url.includes("?")?"&":"?")+p.toString(),{signal:ac.signal})
+                     : await fetch(url,{method:"POST", body:p, signal:ac.signal});
     let j; try { j=await r.json(); } catch(e){ throw new Error(label+": HTTP "+r.status+" (not JSON)"); }
     if(j&&j.error){ const code=Number(j.error.code); if(code===498||code===499){ dropAuth(auth.token); throw new AuthError(j.error.message||"Session expired"); } throw new Error(j.error.message||(label+" error "+code)); }
     return j;
@@ -453,7 +484,7 @@ async function currentMap(){
   const item=await rest(PORTAL+"/sharing/rest/content/items/"+state.mapId,{},{label:"map item"});
   state.mapTitle=item.title||state.mapTitle;
   state.mapData=await rest(PORTAL+"/sharing/rest/content/items/"+state.mapId+"/data",{},{label:"map data"});
-  $("mapline").innerHTML=`Incident map: <b>${esc(state.mapTitle)}</b>`;
+  incidentLine();
   await loadTargetMap();
   incidentBanner();
 }
@@ -465,9 +496,15 @@ async function loadTargetMap(){
   if(!t||t===state.mapId) return;
   try {
     state.targetData=await rest(PORTAL+"/sharing/rest/content/items/"+t+"/data",{},{label:"incident map data"});
-    const picked=pickedIncident();
-    $("mapline").innerHTML=`Incident: <b>${esc(picked?picked.project_key:"")}</b> · orthos publish to its ${esc((picked&&picked.client||"").toUpperCase())} map`;
   } catch(e){ state.targetData=null; }
+  incidentLine();
+}
+/* 2026-11-04 (batch 8): "one incident, three names" (Casey). The header names the incident the way
+   the map chip does -- just its key -- never the web map's title; that stays in a tooltip for support. */
+function incidentLine(){
+  const el=$("mapline"), key=currentProject();
+  el.innerHTML = key ? `Incident: <b>${esc(key)}</b>` : '<span class="warn">No incident picked yet — pick one with the incident chip on the map.</span>';
+  el.title = state.mapTitle ? "Web map: "+state.mapTitle : "";
 }
 function walk(layers,out=[]){ for(const l of layers||[]){ out.push(l); if(l.layerType==="GroupLayer") walk(l.layers,out); } return out; }
 function onMap(srcId){ const d=state.targetData||state.mapData; return walk(d&&d.operationalLayers).find(l=>l.id==="ortho_"+srcId)||null; }
@@ -600,8 +637,9 @@ async function loadProjects(){
     // matches one exactly -- pick it rather than making the pilot hunt.
     const hit=state.projects.find(p=>guess&&p.name.toLowerCase()===guess.toLowerCase());
     if(hit) sel.value=hit.id;
-    $("projNote").textContent = hit ? `Matched the incident ${pickedIncident() ? "picked on this phone" : "on the map"} (${guess}).`
-      : guess ? `No Nova project called “${guess}” — pick one or create it. Either way the ortho is filed to ${guess}.` : "";
+    // 2026-11-04 (batch 8): name the incident by its key only ("Incident: 2611open"), as the map chip does
+    $("projNote").textContent = hit ? `Matches incident ${guess}${pickedIncident() ? " (picked on this phone)" : ""}.`
+      : guess ? `Nothing in Nova matches incident ${guess} yet — pick one or tap New. Either way the ortho is filed to incident ${guess}.` : "";
   } catch(e){ $("proj").innerHTML='<option value="">— could not load —</option>'; handleErr(e,"Nova projects"); }
   refreshReady();
 }
@@ -810,7 +848,7 @@ async function runUpload(opts={}){
       const a=(j.features&&j.features[0]&&j.features[0].attributes)||{};
       if(a.status==="done"){ step("publish","done"); runBar(1); runMsg("On the incident map."); break; }
       if(a.status==="failed"||a.status==="held"){ throw new Error(a.message||"the worker could not publish it"); }
-      runMsg("Publishing… "+(a.message||"")); runBar(0.75+0.2*(i/120));
+      runMsg("Publishing… "+crewMsg(a.message)); runBar(0.75+0.2*(i/120));
     }
     $("runTitle").textContent=name+" — done";
     toastMsg("Ortho is on the incident map.",6000);
@@ -848,37 +886,240 @@ async function loadOrthos(){
   state.orthos=(j.results||[]).map(r=>{
     const tag=(r.tags||[]).find(t=>t.startsWith("wri_source_kml:"));
     const proj=(r.tags||[]).find(t=>t.startsWith("wri_project:"));
+    const kw=(r.typeKeywords||[]).join("|");
     return {id:r.id,title:r.title,access:r.access,src:tag?tag.split(":")[1]:null,
-            project:proj?proj.split(":")[1]:null,
+            project:proj?proj.split(":")[1]:null,url:r.url||"",
+            tiled:/Tiled Imagery/i.test(kw), dynamic:/Dynamic Imagery/i.test(kw),
             superseded:/superseded/i.test(r.title||""),created:r.created};
   }).filter(o=>o.src && !o.superseded);
 }
-function renderOrthos(){
-  const host=$("orthoList");
+
+/* 2026-11-04 (batch 8): ONE row per ortho. A republish leaves an older copy (..._hi_img and
+   ..._hi_img_2 on the map with the same title), so rows are grouped by title and the newest wins.
+   Each row leads with the flight date (the date in the title, else the item's created date). */
+const DEBUG=/[?&]debug\b/.test(location.search);
+// worker messages are developer detail ("removed KML []; cleared []; hid superseded [...]"):
+// only with ?debug; a plain sentence (a failure reason) still shows
+function crewMsg(m){
+  m=String(m||""); if(DEBUG) return m;
+  if(/\[[^\]]*\]|removed KML|cleared|hid superseded/i.test(m)) return "";
+  return m;
+}
+function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function flightDay(o){
+  const m=String(o.title||"").match(/(20\d\d)-(\d\d)-(\d\d)/);
+  if(m) return m[0];
+  return o.created ? ymd(new Date(o.created)) : "";
+}
+function dayLabel(day){
+  if(!day) return "Date unknown";
+  const [y,mo,d]=day.split("-").map(Number);
+  return new Date(y,mo-1,d).toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric",year:"numeric"});
+}
+const titleKey = t => String(t||"").toLowerCase().replace(/\s+/g," ").trim();
+function orthoRows(){
   const proj=currentProject();
   const mine=state.orthos.filter(o=>!proj||!o.project||o.project===proj);
-  if(!mine.length){ host.innerHTML='<div class="note">No published orthos for this incident yet.</div>'; return; }
+  const groups=new Map();
+  for(const o of mine){ const k=titleKey(o.title); if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(o); }
+  const rows=[];
+  for(const list of groups.values()){
+    list.sort((a,b)=>(b.created||0)-(a.created||0));
+    const top=list[0];
+    rows.push(Object.assign({},top,{day:flightDay(top),older:list.slice(1)}));
+  }
+  rows.sort((a,b)=>(b.day<a.day?-1:b.day>a.day?1:(b.created||0)-(a.created||0)));
+  return rows;
+}
+function orthoUrl(o){ if(o.url) return o.url; const l=onMap(o.src)||(o.older||[]).map(x=>onMap(x.src)).find(Boolean); return (l&&l.url)||""; }
+function setBusy(b, on, label){
+  b.disabled=!!on;
+  if(on){ b.dataset.label=b.textContent; b.innerHTML='<span class="spin"></span>'+esc(label||"Working…"); }
+  else if(b.dataset.label){ b.textContent=b.dataset.label; delete b.dataset.label; }
+}
+function renderOrthos(){
+  const host=$("orthoList");
+  const rows=orthoRows();
+  state.rows=rows;
+  $("btnCompare").hidden=rows.filter(o=>orthoUrl(o)).length<2;
+  if(!rows.length){ host.innerHTML='<div class="note">No published orthos for this incident yet.</div>'; return; }
   host.innerHTML="";
-  for(const o of mine){
+  const today=ymd(new Date());
+  if(rows[0].day!==today) host.insertAdjacentHTML("beforeend",'<div class="note" style="margin-bottom:6px">No ortho from today yet.</div>');
+  for(const o of rows){
     const live=onMap(o.src), req=state.requests[o.src];
+    const olderLive=o.older.some(x=>onMap(x.src));
     const busy=state.busy.has(o.src)||(req&&(req.status==="queued"||req.status==="processing"));
     const el=document.createElement("div"); el.className="item";
-    const pills=[live?'<span class="pill on">ON THE MAP</span>':"",
+    const pills=[o.day===today?'<span class="pill today">TODAY</span>':"",
+                 live?'<span class="pill on">ON THE MAP</span>':"",
                  // an ortho should never be public now; if one is, say so loudly
                  o.access==="public"?'<span class="pill pub">PUBLIC — TELL CODY</span>':"",
                  req&&req.status==="held"?'<span class="pill sup">HELD</span>':""].join("");
-    el.innerHTML=`<h3>${esc(o.title)}${pills}</h3>
-      <div class="note">${live?"Drawing on the incident map.":"Published — not on the map."}${req&&req.message?" · "+esc(req.message).slice(0,120):""}</div>
-      <div class="row" style="margin-top:8px"></div>`;
-    const row=el.querySelector(".row");
+    const msg=req?crewMsg(req.message):"";
+    const older=o.older.length?` · ${o.older.length} older cop${o.older.length===1?"y":"ies"} hidden`:"";
+    el.innerHTML=`<div class="when">${esc(dayLabel(o.day))}${pills}</div>
+      <h3>${esc(o.title)}</h3>
+      <div class="note">${live?"In the map's layer list.":olderLive?"An older copy is in the map's layer list.":"Published — not in the map's layer list."}${esc(older)}${msg?" · "+esc(msg).slice(0,120):""}</div>
+      <div class="acts"></div>`;
+    const row=el.querySelector(".acts");
+    // Show on map: the Field App shell switches to the Incident Map, turns the layer on and zooms to it
+    const s=document.createElement("button");
+    s.className="act-show"; s.textContent="Show on map";
+    s.disabled=!orthoUrl(o);
+    s.onclick=()=>showOnMap(o,s);
+    row.appendChild(s);
     const b=document.createElement("button");
-    b.className=live?"secondary":""; b.textContent=busy?"Working…":(live?"Remove from map":"Add to map");
-    b.disabled=!!busy;
+    b.className="secondary act-attach";
+    if(busy){ b.innerHTML='<span class="spin"></span>Working…'; b.disabled=true; }
+    else b.textContent=live?"Remove from map":"Add to map";
     b.onclick=()=>act(live?"detach":"attach",o);
     row.appendChild(b);
     host.appendChild(el);
   }
 }
+
+/* 2026-11-04 (batch 8): service REST info (extent, capabilities), cached per url */
+const svcCache=new Map();
+async function serviceInfo(url){
+  if(svcCache.has(url)) return svcCache.get(url);
+  const j=await rest(url,{},{get:true,label:"ortho service"});
+  svcCache.set(url,j); return j;
+}
+function extentOf(info){
+  const e=info&&(info.fullExtent||info.extent||info.initialExtent);
+  if(!e||!isFinite(e.xmin)) return null;
+  const sr=e.spatialReference||info.spatialReference||{};
+  return {xmin:e.xmin,ymin:e.ymin,xmax:e.xmax,ymax:e.ymax,spatialReference:{wkid:sr.latestWkid||sr.wkid||4326}};
+}
+async function showOnMap(o,btn){
+  const url=orthoUrl(o); if(!url) return;
+  setBusy(btn,true,"Opening…");
+  try {
+    let extent=null;
+    try { extent=extentOf(await serviceInfo(url)); } catch(e){ if(e instanceof AuthError) throw e; console.warn("ortho extent",e); }
+    window.top.postMessage({type:"wri-show-on-map",kind:"ortho",url,title:o.title,extent},location.origin);
+    toastMsg("Opening on the map…");
+  } catch(e){ handleErr(e,"show on map"); }
+  finally { setBusy(btn,false); }
+}
+
+/* 2026-11-04 (batch 8): Compare -- two orthos in a swipe map inside this panel. ArcGIS Maps SDK
+   4.30 over AMD: the Field App shell runs 5.0, which is ESM-only on the CDN, so this panel
+   loads its own 4.x. The panel's ArcGIS token is registered for each ortho's server. */
+const JSAPI="https://js.arcgis.com/4.30/";
+let jsapiP=null;
+function loadJsApi(){
+  if(jsapiP) return jsapiP;
+  jsapiP=new Promise((res,rej)=>{
+    const l=document.createElement("link"); l.rel="stylesheet"; l.href=JSAPI+"esri/themes/dark/main.css"; document.head.appendChild(l);
+    const s=document.createElement("script"); s.src=JSAPI; s.async=true;
+    s.onload=()=>window.require?res(window.require):rej(new Error("map library did not start"));
+    s.onerror=()=>{ jsapiP=null; rej(new Error("could not load the map library (no signal?)")); };
+    document.head.appendChild(s);
+  });
+  return jsapiP;
+}
+const amd=(req,mods)=>new Promise((res,rej)=>req(mods,(...m)=>res(m),rej));
+const cmp={view:null,swipe:null,seq:0};
+function cmpMsg(html){ const m=$("cmpMsg"); if(html==null){ m.hidden=true; m.textContent=""; return; } m.innerHTML=html; m.hidden=false; }
+function cmpOptions(){
+  const rows=(state.rows||[]).filter(o=>orthoUrl(o));
+  for(const id of ["cmpA","cmpB"]){
+    const sel=$(id); sel.innerHTML="";
+    for(const o of rows){ const op=document.createElement("option"); op.value=o.id; op.textContent=dayLabel(o.day)+" · "+o.title; sel.appendChild(op); }
+  }
+  // default: the two newest -- older on the left, newest on the right
+  if(rows[1]) $("cmpA").value=rows[1].id;
+  if(rows[0]) $("cmpB").value=rows[0].id;
+  return rows;
+}
+async function openCompare(){
+  const btn=$("btnCompare");
+  setBusy(btn,true,"Opening…");
+  try {
+    const rows=cmpOptions();
+    if(rows.length<2){ toastMsg("Need two orthos to compare."); return; }
+    $("cmp").hidden=false;
+    await drawCompare();
+  } finally { setBusy(btn,false); }
+}
+function closeCompare(){
+  cmp.seq++;
+  try { cmp.swipe&&cmp.swipe.destroy(); } catch(e){}
+  try { cmp.view&&cmp.view.destroy(); } catch(e){}
+  cmp.swipe=cmp.view=null;
+  $("cmp").hidden=true;
+  for(const c of Array.from($("cmpView").children)) if(c.id!=="cmpMsg") c.remove();
+}
+function serverRoot(url){ const i=url.indexOf("/rest/services"); return i>0?url.slice(0,i+"/rest/services".length):url.split("/").slice(0,3).join("/"); }
+async function drawCompare(){
+  const seq=++cmp.seq;
+  for(const s of ["cmpA","cmpB"]) $(s).disabled=true;
+  cmpMsg('<span class="spin"></span>Loading the map…');
+  try {
+    const auth=getAuth(); if(!auth) throw new AuthError("Signed out");
+    const pick=id=>(state.rows||[]).find(o=>o.id===id);
+    const A=pick($("cmpA").value), B=pick($("cmpB").value);
+    if(!A||!B) throw new Error("pick two orthos");
+    const req=await loadJsApi();
+    const [esriConfig,IdentityManager,EsriMap,MapView,Basemap,TileLayer,ImageryLayer,ImageryTileLayer,Swipe,Extent]=await amd(req,
+      ["esri/config","esri/identity/IdentityManager","esri/Map","esri/views/MapView","esri/Basemap","esri/layers/TileLayer",
+       "esri/layers/ImageryLayer","esri/layers/ImageryTileLayer","esri/widgets/Swipe","esri/geometry/Extent"]);
+    if(seq!==cmp.seq) return;
+    esriConfig.portalUrl=PORTAL;
+    const servers=new Set([PORTAL+"/sharing/rest",serverRoot(orthoUrl(A)),serverRoot(orthoUrl(B))]);
+    for(const server of servers) IdentityManager.registerToken({server,token:auth.token,userId:verified.username||auth.username||undefined,ssl:true});
+    // tiled hosted imagery -> ImageryTileLayer; dynamic -> ImageryLayer. If the first class refuses the
+    // service, the other is tried before giving up on that ortho.
+    async function makeLayer(o){
+      const url=orthoUrl(o);
+      let info=null; try { info=await serviceInfo(url); } catch(e){ if(e instanceof AuthError) throw e; }
+      const tiled=/TilesOnly/i.test((info&&info.capabilities)||"") || (o.tiled&&!o.dynamic);
+      const order=tiled?[ImageryTileLayer,ImageryLayer]:[ImageryLayer,ImageryTileLayer];
+      let first=null;
+      for(const C of order){
+        try { const l=new C({url,title:o.title}); await l.load(); return l; } catch(e){ console.warn("compare layer",o.title,e); first=first||e; }
+      }
+      throw new Error(o.title+": "+((first&&first.message)||"would not load"));
+    }
+    const got=await Promise.allSettled([makeLayer(A),makeLayer(B)]);
+    if(seq!==cmp.seq) return;
+    const errs=got.filter(g=>g.status==="rejected").map(g=>String(g.reason&&g.reason.message||g.reason));
+    if(got.some(g=>g.reason instanceof AuthError)) throw new AuthError("Signed out");
+    const [la,lb]=got.map(g=>g.status==="fulfilled"?g.value:null);
+    const basemap=new Basemap({baseLayers:[new TileLayer({url:"https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"})],title:"Imagery"});
+    const map=new EsriMap({basemap,layers:[la,lb].filter(Boolean)});
+    const host=document.createElement("div"); host.style.cssText="position:absolute;inset:0";
+    $("cmpView").appendChild(host);
+    const view=new MapView({container:host,map,constraints:{snapToZoom:false},ui:{components:["zoom"]}});
+    cmp.view=view;
+    // the line stands upright and is dragged left/right: Swipe calls that direction "horizontal"
+    cmp.swipe=new Swipe({view,leadingLayers:la?[la]:[],trailingLayers:lb?[lb]:[],direction:"horizontal",position:50});
+    view.ui.add(cmp.swipe);
+    // a phone whose browser cannot start the map (no WebGL) never resolves view.when(): say so
+    await Promise.race([view.when(), sleep(30000).then(()=>{ throw new Error("the map did not start on this phone"); })]);
+    if(seq!==cmp.seq) return;
+    cmpMsg(errs.length ? '<span class="err">Could not show '+esc(errs.join("; "))+'</span>' : null);
+    const exts=[la,lb].filter(Boolean).map(l=>l.fullExtent).filter(Boolean);
+    if(exts.length) view.goTo(exts).catch(()=>view.goTo(exts[0]).catch(()=>{}));
+  } catch(e){
+    if(seq!==cmp.seq) return;
+    if(e instanceof AuthError){ closeCompare(); handleErr(e,"compare"); return; }
+    cmpMsg('<span class="err">Compare did not load: '+esc(String(e&&e.message||e))+'</span>');
+  } finally { if(seq===cmp.seq) for(const s of ["cmpA","cmpB"]) $(s).disabled=false; }
+}
+async function redrawCompare(){
+  try { cmp.swipe&&cmp.swipe.destroy(); } catch(e){}
+  try { cmp.view&&cmp.view.destroy(); } catch(e){}
+  cmp.swipe=cmp.view=null;
+  for(const c of Array.from($("cmpView").children)) if(c.id!=="cmpMsg") c.remove();
+  await drawCompare();
+}
+$("btnCompare").onclick=openCompare;
+$("cmpClose").onclick=closeCompare;
+$("cmpA").onchange=redrawCompare;
+$("cmpB").onchange=redrawCompare;
 async function act(mode,o){
   const conf=await confirmBox(
     mode==="detach"?"Remove from the map?":"Add to the incident map?",
