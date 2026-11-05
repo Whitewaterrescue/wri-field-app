@@ -237,6 +237,25 @@
     if (overlayOpen) dismissOverlay();
   });
 
+  // 2026-11-05 (batch 11 Part B): the Field App asks for a form by name ("Confirm today's hours" after check-out
+  // wants the Time Tracker). Open its link in the overlay as a tap would; wait for the list if it isn't drawn yet.
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (e.origin !== location.origin || e.source !== window.parent || !d || d.type !== 'wri-open-form' || typeof d.name !== 'string') return;
+    try { e.source.postMessage({ type: 'wri-open-form-ack', name: d.name }, e.origin); } catch (x) {}   // the app stops re-sending
+    if (window.__wriOpening === d.name) return;   // a re-send of the one already being opened
+    window.__wriOpening = d.name; setTimeout(function () { window.__wriOpening = ''; }, 3000);
+    var want = d.name.toLowerCase(), tries = 0;
+    (function find() {
+      var links = [].slice.call(document.querySelectorAll('a[data-open]')), nm = function (x) { return (x.getAttribute('data-name') || '').toLowerCase(); };
+      // exact name first, else the one it starts ("Time Tracker" is listed as "Time Tracker and Dashboard")
+      var a = links.filter(function (x) { return nm(x) === want; })[0] || links.filter(function (x) { return nm(x).indexOf(want) === 0; })[0];
+      if (!a) { if (++tries < 40) setTimeout(find, 250); return; }
+      if (overlayOpen) dismissOverlay();
+      openOverlay(withIncident(a.getAttribute('href')), a.getAttribute('data-name'));
+    })();
+  });
+
   // Delegated click: [data-open] anchors open in the overlay when embeddable,
   // otherwise fall through to their normal target=_blank behavior.
   document.addEventListener('click', function (ev) {
