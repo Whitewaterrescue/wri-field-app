@@ -315,7 +315,35 @@
     if (haspPpe && /^PPE check\b/i.test(t.label || '')) {
       return 'PPE check (from the HASP' + (haspPpe.level ? ', ' + haspPpe.level : '') + '): ' + haspPpe.items.join(', ');
     }
-    return t.label;
+    return nightShift() ? nightWording(t.label) : t.label;
+  }
+
+  // ---------- night shift (batch 13, 2026-11-06) ----------
+  // Checked in with "Night shift" ticked (wri-checkin writes wri_checkin_state.shift = 'night'): the sheet's
+  // day wording reads as a night shift ("morning safety briefing" -> shift-start, "today's" -> tonight's),
+  // and the shift starts with reading the day shift's handoff (a row of its own, ticked and 214-logged like
+  // the others). A day check-in, or none, keeps the sheet's wording.
+  function nightShift() {
+    try { var s = JSON.parse(localStorage.getItem('wri_checkin_state') || 'null'); return !!(s && s.name && s.shift === 'night'); } catch (e) { return false; }
+  }
+  function nightWording(label) {
+    return String(label || '')
+      .replace(/\bmorning safety briefing\b/gi, 'shift-start safety briefing')
+      .replace(/\b(this )?morning\b/gi, 'shift start')
+      .replace(/\btoday(['’])s\b/gi, 'tonight$1s')
+      .replace(/\btoday\b/gi, 'tonight');
+  }
+  var HANDOFF_TASK = { id: 'night_handoff', label: 'Read the day shift handoff: the unit log (Incident Board › 214 Log), open assignments and overdue requests; ask the outgoing lead what changed',
+    phase: 'initial,daily', buttonColor: 'blue', linkLabel: 'Incident Board', url: 'page:page_23' };
+  // the role's sections with the night rows added: the handoff goes right after the check-in / HASP rows
+  function sectionsFor(role) {
+    var secs = (role && role.sections) || [];
+    if (!nightShift() || !secs.length) return secs;
+    var out = secs.map(function (s) { return { title: s.title, tasks: (s.tasks || []).slice() }; });
+    var first = out[0].tasks, at = 0;
+    for (var i = 0; i < first.length; i++) if (isCheckIn(first[i]) || isHaspAck(first[i])) at = i + 1;
+    first.splice(at, 0, HANDOFF_TASK);
+    return out;
   }
 
   // ids the Mission Hub label map doesn't name (it returns the id itself)
@@ -401,7 +429,7 @@
   }
   function findTask(role, id) {
     var hit = null;
-    ((roles[role] && roles[role].sections) || []).forEach(function (s) { (s.tasks || []).forEach(function (t) { if (t.id === id) hit = t; }); });
+    sectionsFor(roles[role]).forEach(function (s) { (s.tasks || []).forEach(function (t) { if (t.id === id) hit = t; }); });
     return hit;
   }
 
@@ -432,7 +460,7 @@
     }
     var id = rid(), now = Date.now();
     var rec = { recon_id: id, kind: '214', incident: inc, hold_until: now + HOLD_MS, from: 'checklist',
-      fields: { person: who, position: localStorage.getItem('wri_214_pos') || '', activity: 'Checklist: ' + t.label, at: now,
+      fields: { person: who, position: localStorage.getItem('wri_214_pos') || '', activity: 'Checklist: ' + (nightShift() ? nightWording(t.label) : t.label), at: now,
         also_unit: false, section: localStorage.getItem('wri_214_section') || '' } };
     var pend = lsJson(PENDING, []); pend.push(rec); lsPut(PENDING, pend);
     var map = lsJson(LOGGED + role, {}); map[t.id] = { id: id, at: now }; lsPut(LOGGED + role, map);
@@ -518,7 +546,7 @@
 
   function phasesFor(role) {
     var seen = {};
-    (role.sections || []).forEach(function (sec) {
+    sectionsFor(role).forEach(function (sec) {
       (sec.tasks || []).forEach(function (t) {
         taskPhases(t).forEach(function (p) { seen[p] = 1; });
       });
@@ -568,7 +596,7 @@
     }
 
     var total = 0, checked = 0, body = '';
-    (role.sections || []).forEach(function (sec) {
+    sectionsFor(role).forEach(function (sec) {
       var tasks = (sec.tasks || []).filter(function (t) {
         return taskPhases(t).indexOf(currentPhase) !== -1;
       });
@@ -597,6 +625,7 @@
     });
 
     if (total) h += '<div class="progress"><b>' + checked + '</b> / ' + total + ' complete</div>';
+    if (total && nightShift()) h += '<div class="task-note" id="nightNote" style="margin:0 2px 10px">Night shift: you checked in for nights.</div>';
     if (total && currentPhase === 'daily') h += '<div class="task-note t214" style="margin:0 2px 10px">Ticking a daily task adds it to your 214 activity log.</div>';
     h += body || '<div class="empty">No tasks in this phase.</div>';
     if (total) h += '<div class="reset-row"><button class="reset-btn" onclick="resetTasks(\'' + roleId + '\')">Reset checklist</button></div>';

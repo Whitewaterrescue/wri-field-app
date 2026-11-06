@@ -74,6 +74,7 @@
   .stat{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
   .stat .n{font-size:22px;font-weight:700;font-family:'Epilogue',sans-serif}
   .stat .l{font-size:11px;color:var(--text-dim);margin-top:2px;letter-spacing:.3px}
+  .stat .s{font-size:11px;color:var(--text-muted);margin-top:1px}
   .stat.bad .n{color:var(--danger)}
   a.stat{color:inherit;text-decoration:none}
   .hasp-btn{display:flex;align-items:center;justify-content:center;min-height:52px;margin:0 0 12px;border-radius:12px;background:#EC2329;color:#fff;font-weight:700;font-size:16px;text-decoration:none;font-family:'Epilogue',sans-serif}
@@ -175,9 +176,9 @@
     <div id="asof" class="asof"></div>
     <div id="alarm" class="alarm" hidden></div>
     <div class="stats">
-      <div class="stat"><div class="n" id="stHead">–</div><div class="l">ON SCENE</div></div>
-      <a class="stat" href="#" data-page="page_4" aria-label="Open the HASP"><div class="n" id="stHasp">–</div><div class="l">HASP SIGNED &#8250;</div></a>
-      <div class="stat" id="stNmBox"><div class="n" id="stNm">–</div><div class="l">OPEN NEAR MISSES</div></div>
+      <div class="stat"><div class="n" id="stHead">–</div><div class="l">ON SCENE</div><div class="s">checked in &lt; 16 h</div></div>
+      <a class="stat" href="#" data-page="page_4" aria-label="Open the HASP"><div class="n" id="stHasp">–</div><div class="l">HASP SIGNED &#8250;</div><div class="s" id="stHaspSub">of those on scene</div></a>
+      <div class="stat" id="stNmBox"><div class="n" id="stNm">–</div><div class="l">NEAR MISSES</div><div class="s">today + open reports</div></div>
     </div>
 
     <a class="hasp-btn" href="#" data-page="page_4">Read and sign the HASP &#8250;</a>
@@ -203,6 +204,7 @@
 
     <div data-pane="work" hidden>
       <div class="tabs" id="workFilter"></div>
+      <label class="toggle" id="chkDoneWrap" hidden><input type="checkbox" id="chkDone"> Show completed / cancelled (<span id="cntDone"></span>)</label>
       <div id="listWork"></div>
     </div>
 
@@ -477,7 +479,11 @@ function render(){
   al.innerHTML = `<span class="dot"></span><div>Air monitoring: ${st==="red"?"ACTION LEVEL EXCEEDED":st==="amber"?"Elevated readings":"Readings normal"}`+
     (s.air_alarm_detail?`<small>${esc(s.air_alarm_detail)}</small>`:"")+`<small>Last 12 h of HASP air readings</small></div>`;
   $("stHead").textContent = s.headcount_total ?? "–";
-  $("stHasp").textContent = s.hasp_ack_pct==null ? "–" : Math.round(s.hasp_ack_pct)+"%";
+  // batch 13 (2026-11-06): the COP publisher's hasp_ack_pct is the share of the people ON SCENE who signed the
+  // incident's current HASP (the Sit Stat rule), so "1 of 4" is exact from it and the headcount
+  const hn = Number(s.headcount_total) || 0, hp = s.hasp_ack_pct;
+  $("stHasp").textContent = hp==null ? "–" : hn ? Math.round(hp*hn/100)+" of "+hn : Math.round(hp)+"%";
+  $("stHaspSub").textContent = hp==null ? (hn ? "no HASP yet" : "of those on scene") : "on scene ("+Math.round(hp)+"%)";
   $("stNm").textContent = s.near_miss_open ?? "–";
   $("stNmBox").classList.toggle("bad", Number(s.near_miss_open)>0);
 
@@ -486,7 +492,8 @@ function render(){
   const kv = [];
   if (s.comms_primary) kv.push(["Radio (205)", esc(s.comms_primary).replace(/; /g,"<br>")]);
   if (s.hospital_name) kv.push(["Hospital (206)", esc(s.hospital_name)+(s.hospital_phone?"<br>"+telLink(s.hospital_phone):"")]);
-  if (s.weather_summary) kv.push(["Weather (HASP)", esc(s.weather_summary)]);
+  // batch 13: the NWS forecast Sit Stat shows (with its update time); "(from the HASP...)" only when NWS can't be had
+  if (s.weather_summary) kv.push([/NWS forecast/.test(s.weather_summary) ? "Weather (NWS)" : "Weather (HASP)", esc(s.weather_summary)]);
   $("kvComms").innerHTML = kv.length ? kv.map(([k,v]) => `<div class="kv"><span>${k}</span><span style="text-align:right">${v}</span></div>`).join("")
     : `<div class="empty">No 205 / 206 posted yet.</div>`;
   let orgs = {}; try { orgs = JSON.parse(s.headcount_by_org||"{}"); } catch(e){}
@@ -570,16 +577,21 @@ function isMyWork(w, names, units){
   return !!units && ((w.tf_unit_id && units.ids[w.tf_unit_id]) || (w.division && units.groups[String(w.division).toLowerCase()]));
 }
 function renderWork(b){
-  const order = {in_progress:0, assigned:1, planned:2, complete:3, cancelled:4};
-  const groups = {};
-  b.work.forEach(w => { const k = w.division || w.branch || "Unassigned"; (groups[k]=groups[k]||[]).push(w); });
-  const keys = Object.keys(groups).sort();
-  const open = b.work.filter(w => w.wa_status!=="complete" && w.wa_status!=="cancelled").length;
+  const order = {in_progress:0, assigned:1, planned:2, complete:3, completed:3, cancelled:4, canceled:4};
+  // batch 13 (2026-11-06): "Assignments (3 open)" listed the completed ones too. The list shows the same open
+  // assignments the count counts; completed / cancelled only behind the toggle.
+  const isClosed = w => /^(complete|completed|cancelled|canceled)$/i.test(String(w.wa_status||"").trim());
+  const nClosed = b.work.filter(isClosed).length, open = b.work.length - nClosed;
   $("cntWork").textContent = b.work.length ? "("+open+" open)" : "";
+  $("chkDoneWrap").hidden = !nClosed; $("cntDone").textContent = nClosed;
+  const list = $("chkDone").checked ? b.work : b.work.filter(w => !isClosed(w));
+  const groups = {};
+  list.forEach(w => { const k = w.division || w.branch || "Unassigned"; (groups[k]=groups[k]||[]).push(w); });
+  const keys = Object.keys(groups).sort();
   // Mine is always offered (2026-11-03 walkthrough: hidden at 0, a crew lead concluded it didn't exist),
   // and opens first when it has anything (2026-11-04)
   const names = myNames(state.me), units = myUnits(b, names);
-  const mine = b.work.filter(w => isMyWork(w, names, units));
+  const mine = list.filter(w => isMyWork(w, names, units));
   groups["\__mine__"] = mine;
   const tabs = ["\__mine__"].concat(keys);
   const f = state.workFilter==="all" || tabs.indexOf(state.workFilter)>=0 ? state.workFilter : (mine.length ? "\__mine__" : "all");
@@ -588,7 +600,8 @@ function renderWork(b){
   const myName = (state.me && state.me.name) || names[0];
   $("listWork").innerHTML = f==="\__mine__" && !mine.length
     ? `<div class="empty">${myName ? "Nothing assigned to "+esc(myName)+" yet. An assignment shows here when its Assigned to names you." : "Sign in to see the work assigned to you."}</div>`
-    : !b.work.length ? `<div class="empty">No work assignments yet.</div>` : show.map(k =>
+    : !b.work.length ? `<div class="empty">No work assignments yet.</div>`
+    : !list.length ? `<div class="empty">No open assignments: all ${nClosed} are completed or cancelled.</div>` : show.map(k =>
     (keys.length>1&&f==="all"?`<div class="group">${esc(k)}</div>`:"") +
     groups[k].sort((a,c)=>(order[a.wa_status]??9)-(order[c.wa_status]??9)).map(w => `<div class="item wa${state.waOpen===w.assignment_id?" open":""}" data-wa="${esc(w.assignment_id||"")}">
       <div class="t">${badge(w.wa_status)}${w.priority==="high"?badge("high"):""}${esc(w.title||w.location_name||"Work assignment")}<span class="chev">›</span></div>
@@ -640,6 +653,7 @@ function renderReq(b){
 }
 $("chkPending").onchange = () => renderRes(state.board);
 $("chkClosed").onchange = () => renderReq(state.board);
+$("chkDone").onchange = () => renderWork(state.board);
 document.querySelectorAll(".tabs [data-tab]").forEach(el => el.onclick = () => {
   state.tab = el.dataset.tab;
   document.querySelectorAll(".tabs [data-tab]").forEach(t => t.classList.toggle("active", t===el));
