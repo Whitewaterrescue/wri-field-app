@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Compare Orthos</title>
+<!--
+  Compare orthos (P17, 2026-11-05). A standalone Field App page: two drone orthos of the incident,
+  compared three ways -- Swipe, Fade (opacity slider) and Side by side (two synced maps, stacked on
+  a phone) -- with the incident map's own operational layers (boom lines, GRP sites, recon points,
+  spill trace, pilot drawings ...) drawn over both.
+
+  Built from panels/drone (the batch-8 swipe compare): same auth ladder (exb_auth, then the popup
+  sign-in), same incident pick (?incident=, then window.top.__wriIncident, then the phone's
+  wri_incident_choice), same ortho listing (portal search tags:"wri_ortho" type:"Image Service"),
+  same ArcGIS Maps SDK 4.30 over AMD (the Field App shell runs 5.0, ESM-only on the CDN).
+
+  Op period labels: each ortho is labelled with its flight date + time and the incident's op period.
+    flight time   the first "convert" request for the ortho's source id in WRI_Ortho_Requests
+                  (requested_at = when the flight was sent for processing), else the item's created
+                  date, else the date in its title (date only).
+    op periods    Op_Periods in WRI_Incident_Ops (found by NAME, never by sublayer id), tried on the
+                  field view first and then on PROD. PROD is private to cdharris1, so a crew token
+                  usually cannot read it; then the op periods are derived from Incident_Status
+                  (field view: op_period + as_of, first as_of per op period = its start). Neither ->
+                  date + time only.
+  Default picks: the newest ortho of the latest op period (B / right / top) against the newest of
+  the op period before it (A / left / bottom); otherwise the two newest.
+
+  Read-only page: it never writes to AGOL.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* WRI 2025 brand, dark (same tokens as panels/drone). No blue anywhere. */
+:root{
+  --wipeout:#171919; --black:#0d0e0e; --rapids:#3A3C3C; --rapids-hi:#4a4d4d; --line:#55595a;
+  --crimson:#EC2329; --crimson-hi:#d41f24; --text:#f0f0f0; --muted:#b8bcbc; --field:#2a2c2c;
+  --ok:#5fd08a; --warn:#f0b849; --err:#ff7a7f;
+  --font-head:'Epilogue',system-ui,-apple-system,sans-serif;
+  --font-body:'Alexandria',system-ui,-apple-system,sans-serif;
+}
+/* MUST come before any id-selector display rule (see panels/drone) */
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:15px/1.5 var(--font-body);color:var(--text);background:var(--black);-webkit-text-size-adjust:100%;
+     display:flex;flex-direction:column;overflow:hidden}
+header{background:var(--rapids);padding:8px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex:none}
+header .t{flex:1;min-width:0}
+h1{font:600 16px/1.2 var(--font-head);margin:0;color:#fff;letter-spacing:.01em}
+header .sub{color:var(--muted);font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button{font:700 12px/1 var(--font-head);letter-spacing:.06em;text-transform:uppercase;padding:12px 16px;min-height:44px;
+       border-radius:999px;border:1px solid var(--crimson);background:var(--crimson);color:#fff;cursor:pointer;
+       display:inline-flex;align-items:center;justify-content:center;gap:0;white-space:nowrap}
+button:active{background:var(--crimson-hi)}
+button.secondary{background:transparent;color:#fff;border-color:var(--line)}
+button[disabled]{opacity:.5;cursor:default}
+@keyframes spin{to{transform:rotate(360deg)}}
+.spin{display:inline-block;width:14px;height:14px;flex:none;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;
+      border-radius:50%;animation:spin .8s linear infinite;vertical-align:-2px;margin-right:7px}
+.note{font-size:12.5px;color:var(--muted);line-height:1.5}
+.err{color:var(--err)} .ok{color:var(--ok)} .warn{color:var(--warn)}
+.card{background:var(--rapids);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px}
+.card .row{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+select{width:100%;min-width:0;padding:8px 30px 8px 10px;min-height:44px;border:1px solid var(--line);border-radius:8px;font:15px var(--font-body);
+       background:var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23b8bcbc' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 10px center;
+       color:var(--text);-webkit-appearance:none;appearance:none;text-overflow:ellipsis}
+select:focus{outline:none;border-color:var(--crimson);box-shadow:0 0 0 2px rgba(236,35,41,.25)}
+select:disabled{opacity:1;color:var(--muted)}
+input[type=checkbox]{accent-color:var(--crimson);width:18px;height:18px;flex:none;margin:0}
+input[type=range]{accent-color:var(--crimson);width:100%;min-width:0}
+
+#viewMain{flex:1;min-height:0;display:flex;flex-direction:column}
+#bar{background:var(--rapids);border-bottom:1px solid var(--line);padding:8px 10px;display:flex;flex-direction:column;gap:8px;flex:none}
+.seg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:none}
+.seg button{flex:1;border:0;border-radius:0;background:transparent;color:var(--muted);min-height:40px;padding:8px 10px}
+.seg button + button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--crimson);color:#fff}
+.picks{display:flex;gap:8px;align-items:center;min-width:0}
+.pick{flex:1;display:flex;gap:6px;align-items:center;min-width:0}
+.tag{flex:none;font:700 11px/1 var(--font-head);width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+     background:var(--field);border:1px solid var(--line);color:#fff}
+.tag.b{background:var(--crimson);border-color:var(--crimson)}
+#btnSwap{flex:none;min-width:44px;padding:0 10px}
+#fadeRow{display:flex;gap:10px;align-items:center;font:600 12px/1 var(--font-head);color:var(--muted)}
+#fadeRow span{flex:none}
+#fadeVal{min-width:40px;text-align:right;color:#fff}
+
+#stage{flex:1;min-height:0;position:relative;display:flex;background:var(--wipeout)}
+#stage.side{flex-direction:row}
+.vhost{position:relative;flex:1;min-width:0;min-height:0}
+#stage.side .vhost + .vhost{border-left:2px solid var(--crimson)}
+.vhost > .map{position:absolute;inset:0}
+.vlab{position:absolute;top:8px;z-index:4;max-width:calc(50% - 16px);background:rgba(13,14,14,.86);border:1px solid var(--line);
+      border-radius:8px;padding:5px 8px;font:600 12px/1.3 var(--font-head);color:#fff;pointer-events:none;
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vlab.l{left:8px} .vlab.r{right:8px;text-align:right}
+.vlab.full{max-width:calc(100% - 70px)}
+.vlab i{font-style:normal;color:var(--crimson);margin-right:4px}
+#msg{position:absolute;left:10px;right:10px;top:48px;z-index:6;background:rgba(23,25,25,.94);border:1px solid var(--line);
+     border-radius:10px;padding:10px 12px;font-size:14px}
+#btnOv{position:absolute;right:10px;bottom:22px;z-index:7;box-shadow:0 4px 14px rgba(0,0,0,.5)}
+#ovSheet{position:absolute;z-index:8;right:10px;bottom:76px;width:340px;max-width:calc(100% - 20px);max-height:min(60vh,520px);
+         background:var(--rapids);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;box-shadow:0 8px 24px rgba(0,0,0,.55)}
+#ovHead{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+#ovHead b{flex:1;font:600 14px/1.2 var(--font-head)}
+#ovHead button{min-height:36px;padding:6px 12px}
+#ovList{overflow:auto;padding:4px 12px 10px;-webkit-overflow-scrolling:touch}
+.ovgrp{font:700 10px/1 var(--font-head);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px}
+.ov{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid rgba(85,89,90,.5);font-size:13.5px;cursor:pointer;min-height:40px}
+.ov .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov .nm small{color:var(--muted);font-size:11.5px}
+.ov.bad{opacity:.55;cursor:default}
+.ov .k{flex:none;font:700 9.5px/1 var(--font-head);letter-spacing:.06em;color:var(--muted);text-transform:uppercase}
+details > summary{cursor:pointer;color:var(--muted);font:600 12px/1 var(--font-head);padding:12px 0 4px;list-style-position:inside}
+
+/* phones: picks stacked, side-by-side stacked vertically, overlays as a bottom sheet */
+@media (max-width:720px){
+  .picks{display:grid;grid-template-columns:minmax(0,1fr) 44px;grid-template-areas:"a s" "b s";gap:6px 8px}
+  .picks .pick:first-child{grid-area:a}
+  .picks .pick:last-child{grid-area:b}
+  #btnSwap{grid-area:s;align-self:center}
+  #stage.side{flex-direction:column}
+  #stage.side .vhost + .vhost{border-left:0;border-top:2px solid var(--crimson)}
+  #ovSheet{left:0;right:0;bottom:0;width:auto;max-width:none;border-radius:14px 14px 0 0;max-height:58%}
+}
+#toast{position:fixed;left:12px;right:12px;bottom:16px;background:var(--rapids);border:1px solid var(--line);
+       color:#fff;padding:12px 14px;border-radius:10px;font-size:14px;z-index:40;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.diag{font-size:11px;color:var(--muted);margin-top:12px;word-break:break-word;opacity:.75}
+/* the ArcGIS zoom widget sits under the label chips */
+.esri-ui-top-left{top:40px!important}
+/* the SDK's focus ring is blue: brand it */
+.esri-view .esri-view-surface:focus::after,.esri-view .esri-view-surface--inset-outline:focus::after{outline-color:var(--crimson)!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="t">
+    <h1>Compare orthos</h1>
+    <div class="sub" id="incLine">Finding the incident…</div>
+  </div>
+  <button id="btnReload" class="secondary" style="flex:none;min-height:36px;padding:6px 12px">Reload</button>
+</header>
+
+<div class="view" id="viewAuth" hidden>
+  <div class="card">
+    <b>ArcGIS sign-in needed</b>
+    <div id="authEmbedded" class="note">Your WRI sign-in has run out on this phone. Tap <b>Sign in</b> to sign in again.</div>
+    <div id="authStandalone" class="note" hidden>Sign in with your WRI ArcGIS account.</div>
+    <div class="row">
+      <button id="btnAuthRetry" class="secondary">Check again</button>
+      <button id="btnSignIn">Sign in</button>
+    </div>
+    <div id="authErr" class="note err" hidden></div>
+    <div id="authDiag" class="diag"></div>
+  </div>
+</div>
+
+<div class="view" id="viewPick" hidden>
+  <div class="card">
+    <b id="pickTitle">Which incident?</b>
+    <div class="note" id="pickText">No incident is picked on this phone yet. Pick one here (it also moves the map's incident chip).</div>
+    <select id="incSel" style="margin-top:10px" aria-label="Incident"></select>
+    <div class="row"><button id="btnPickGo">Compare its orthos</button></div>
+  </div>
+</div>
+
+<div class="view" id="viewEmpty" hidden>
+  <div class="card">
+    <b id="emptyTitle">Not enough orthos yet</b>
+    <div class="note" id="emptyText"></div>
+  </div>
+</div>
+
+<div class="view" id="viewMain" hidden>
+  <div id="bar">
+    <div class="seg" role="group" aria-label="Compare mode">
+      <button type="button" data-mode="swipe" aria-pressed="true">Swipe</button>
+      <button type="button" data-mode="fade" aria-pressed="false">Fade</button>
+      <button type="button" data-mode="side" aria-pressed="false">Side by side</button>
+    </div>
+    <div class="picks">
+      <div class="pick"><span class="tag" title="Left / bottom / map A">A</span><select id="selA" aria-label="Ortho A (left, bottom)"></select></div>
+      <button type="button" id="btnSwap" class="secondary" title="Swap A and B" aria-label="Swap A and B">⇄</button>
+      <div class="pick"><span class="tag b" title="Right / top / map B">B</span><select id="selB" aria-label="Ortho B (right, top)"></select></div>
+    </div>
+    <div id="fadeRow" hidden>
+      <span>A</span><input type="range" id="fade" min="0" max="100" value="50" aria-label="Opacity of B over A"><span>B</span><span id="fadeVal">50%</span>
+    </div>
+  </div>
+  <div id="stage">
+    <div id="msg"><span class="spin"></span>Loading…</div>
+    <button type="button" id="btnOv" class="secondary" style="background:var(--rapids)">Overlays</button>
+    <div id="ovSheet" hidden>
+      <div id="ovHead"><b>Incident overlays</b><button type="button" id="btnOvClose" class="secondary">Done</button></div>
+      <div id="ovList"><div class="note" style="padding:10px 0">Loading the incident map…</div></div>
+    </div>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+/* ============================================================ Config */
+const PORTAL       = "https://wrienviro.maps.arcgis.com";
+const ORG_ID       = "Ji79lWGR5B33LhY7";
+const OAUTH_CLIENT = "zXmBr5FFTyHWfh24";
+const CALLBACK_URL = "https://whitewaterrescue.github.io/wri-respond/oauth-callback-201.html";
+const SESSION_KEY  = "wri_orthos_auth";
+const REQUESTS_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Ortho_Requests/FeatureServer/0";
+// WRI_Incident_Ops: the crew-readable field view (5133f0ee) and PROD (7142f3fe, private to cdharris1).
+// Tables are found by NAME from the service root, never by sublayer id.
+const FIELD_SVC    = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Incident_Ops_field_view/FeatureServer";
+const PROD_SVC     = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Incident_Ops/FeatureServer";
+const OPEN_STATUSES = ["activating","active","standby"];
+// each client's stable incident map (wri-incident-setup/clients.json), as panels/drone
+const CLIENT_MAPS={bnsf:"5e30a96b8bcc4d6f981ce7b7435c61c0",up:"ecff87d286874a8d864c2a9935811ea6",
+                   mtwy:"e6406c338b7c4e8598503d4e15cb9f62",wri:"373f7625cfc74c87a8523fbaf7ad9691"};
+const CLIENT_LABEL={bnsf:"BNSF",up:"UP",mtwy:"MT/WY Coop",wri:"WRI"};
+const JSAPI="https://js.arcgis.com/4.30/";
+const QUERY_TIMEOUT_MS=30000;
+const params=new URLSearchParams(location.search);
+const EMBEDDED=window.top!==window;
+const DEBUG=/[?&]debug\b/.test(location.search);
+const $=id=>document.getElementById(id);
+const state={username:"",badToken:null,incident:null,incidents:[],mapId:null,mapData:null,
+             orthos:[],requests:{},periods:[],periodSrc:"",rows:[],ov:[],mode:"swipe",a:null,b:null,fade:50};
+
+/* ============================================================ UI helpers */
+function showView(id){ for(const v of document.querySelectorAll(".view")) v.hidden=v.id!==id; }
+let toastT=null;
+function toastMsg(m,ms=3400){ const t=$("toast"); t.textContent=m; t.hidden=false; clearTimeout(toastT); toastT=setTimeout(()=>t.hidden=true,ms); }
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const sq=s=>"'"+String(s).replace(/'/g,"''")+"'";
+// EVERY button: disabled + spinner until its work answers
+function setBusy(b,on,label){
+  if(!b) return;
+  b.disabled=!!on;
+  if(on){ if(b.dataset.label==null) b.dataset.label=b.innerHTML; b.innerHTML='<span class="spin"></span>'+esc(label||b.textContent||"Working…"); }
+  else if(b.dataset.label!=null){ b.innerHTML=b.dataset.label; delete b.dataset.label; }
+}
+async function busy(b,label,fn){ setBusy(b,true,label); try { return await fn(); } finally { setBusy(b,false); } }
+function msg(html){ const m=$("msg"); if(html==null){ m.hidden=true; m.innerHTML=""; return; } m.innerHTML=html; m.hidden=false; }
+
+/* ============================================================ Auth ladder (panels/drone) */
+class AuthError extends Error {}
+const diag={record:"",verify:""};
+function renderAuthDiag(){ const el=$("authDiag"); if(el) el.textContent=DEBUG?[diag.record,diag.verify].filter(Boolean).join(" "):""; }
+function readExbAuth(){
+  let raw=null, from="localStorage";
+  try { raw=localStorage.getItem("exb_auth"); if(!raw){ raw=sessionStorage.getItem("exb_auth"); from="sessionStorage"; } }
+  catch(e){ diag.record="Storage is blocked in this frame: "+(e.message||e); return null; }
+  if(!raw){ diag.record="No Field App session record in this frame yet."; return null; }
+  let a; try { a=JSON.parse(raw); } catch(e){ diag.record="The session record is not readable."; return null; }
+  if(!a||!a.token){ diag.record="The session record has no token."; return null; }
+  const exp=a.expires!=null&&a.expires!==""?new Date(a.expires).getTime():NaN;
+  const who=a.email||a.username||"";
+  diag.record=`Session in ${from}: user ${who||"?"}, ${!isFinite(exp)?"no expiry recorded":exp>Date.now()?"expires in "+Math.round((exp-Date.now())/60000)+" min":"expired"}.`;
+  if(isFinite(exp)&&exp-Date.now()<2*60000){ diag.record+=" Waiting for the app to refresh it."; return null; }
+  if(state.badToken&&a.token===state.badToken){ diag.record+=" ArcGIS rejected it; waiting for a refresh."; return null; }
+  return {token:a.token,username:who,source:"fieldapp"};
+}
+function readSession(){
+  try { const a=JSON.parse(sessionStorage.getItem(SESSION_KEY)||"null");
+    if(!a||!a.token||!(a.expiresAt-Date.now()>60000)) return null;
+    if(state.badToken&&a.token===state.badToken) return null;
+    return {token:a.token,username:a.username||"",source:"popup"}; } catch(e){ return null; }
+}
+function getAuth(){ return readExbAuth()||readSession(); }
+function dropAuth(token){ state.badToken=token||null; try{ sessionStorage.removeItem(SESSION_KEY); }catch(e){} }
+function signIn(){
+  const url=PORTAL+"/sharing/rest/oauth2/authorize?client_id="+encodeURIComponent(OAUTH_CLIENT)+"&response_type=token&expiration=720&redirect_uri="+encodeURIComponent(CALLBACK_URL);
+  const w=window.open(url,"agolAuth","width=480,height=640");   // synchronous: iOS blocks popups after an await
+  if(!w){ showAuthErr("Popup blocked. Allow popups for this site and try again."); setBusy($("btnSignIn"),false); return; }
+  $("authErr").hidden=true;
+  // busy until the popup answers (arcgis-auth message) or is closed
+  const t=setInterval(()=>{ if(w.closed){ clearInterval(t); setBusy($("btnSignIn"),false); } },800);
+}
+function showAuthErr(m){ const el=$("authErr"); el.textContent=m; el.hidden=false; }
+let authPoll=null;
+function showAuth(){
+  showView("viewAuth"); $("authEmbedded").hidden=!EMBEDDED; $("authStandalone").hidden=EMBEDDED;
+  clearInterval(authPoll); renderAuthDiag();
+  authPoll=setInterval(()=>{ const a=getAuth(); renderAuthDiag(); if(a){ clearInterval(authPoll); boot(); } },2000);
+}
+window.addEventListener("message",e=>{
+  if(e.origin!==location.origin) return;
+  const d=e.data;
+  // the map's Incident Picker / incident gate switched incident -> follow it (unless ?incident= pins one)
+  if(d&&(d.type==="wri-incident"||d.type==="wri-incident-choice")){ if(!params.get("incident")) boot(); return; }
+  if(!d||d.type!=="arcgis-auth") return;
+  setBusy($("btnSignIn"),false);
+  if(d.error||!d.token){ showAuthErr("ArcGIS sign-in failed"+(d.error?": "+d.error:"")); return; }
+  try { sessionStorage.setItem(SESSION_KEY,JSON.stringify({token:String(d.token),username:String(d.username||""),expiresAt:Date.now()+(Number(d.expires_in)||7200)*1000})); } catch(x){}
+  state.badToken=null; boot();
+});
+window.addEventListener("storage",e=>{ if(e.key==="exb_auth"&&!$("viewAuth").hidden&&getAuth()){ clearInterval(authPoll); boot(); } });
+$("btnAuthRetry").onclick=()=>busy($("btnAuthRetry"),"Checking…",async()=>{ if(getAuth()) await boot(); else { renderAuthDiag(); toastMsg("Not signed in yet. Tap Sign in."); } });
+$("btnSignIn").onclick=()=>{ setBusy($("btnSignIn"),true,"Signing in…"); signIn(); };
+
+async function rest(url,fields,opts={}){
+  const auth=getAuth(); if(!auth) throw new AuthError("Signed out");
+  const label=opts.label||"request";
+  const ac=new AbortController(); const t=setTimeout(()=>ac.abort(),opts.timeout||QUERY_TIMEOUT_MS);
+  try {
+    const p=new URLSearchParams(); for(const [k,v] of Object.entries(fields||{})) if(v!=null) p.set(k,String(v));
+    p.set("f","json"); p.set("token",auth.token);
+    const r=opts.get?await fetch(url+(url.includes("?")?"&":"?")+p.toString(),{signal:ac.signal})
+                    :await fetch(url,{method:"POST",body:p,signal:ac.signal});
+    let j; try { j=await r.json(); } catch(e){ throw new Error(label+": HTTP "+r.status+" (not JSON)"); }
+    if(j&&j.error){ const code=Number(j.error.code); if(code===498||code===499){ dropAuth(auth.token); throw new AuthError(j.error.message||"Session expired"); } throw new Error(j.error.message||(label+" error "+code)); }
+    return j;
+  } catch(e){ if(e&&e.name==="AbortError") throw new Error(label+" timed out"); throw e; } finally { clearTimeout(t); }
+}
+let verified={token:null,username:""};
+async function verifyAuth(){
+  const auth=getAuth(); if(!auth) throw new AuthError("Signed out");
+  if(verified.token===auth.token){ state.username=verified.username; return; }
+  const j=await rest(PORTAL+"/sharing/rest/portals/self",{},{label:"session check"});
+  const u=j&&j.user;
+  if(!u||!u.username){ dropAuth(auth.token); diag.verify="ArcGIS did not recognise the session."; renderAuthDiag(); throw new AuthError("no user"); }
+  const org=u.orgId||j.id;
+  if(org&&org!==ORG_ID){ dropAuth(auth.token); diag.verify=`Signed in as ${u.username}, but not in the WRI organisation.`; renderAuthDiag(); throw new AuthError("wrong org"); }
+  verified={token:auth.token,username:u.username}; state.username=u.username; diag.verify="";
+}
+function handleErr(e,where){
+  if(e instanceof AuthError){ toastMsg("Signed out of ArcGIS. Sign in again."); showAuth(); return; }
+  console.error(where,e); toastMsg((where?where+": ":"")+(e&&e.message||e),5000);
+}
+
+/* ============================================================ incident */
+/* The crew's pick, as panels/drone + panels/board: window.top.__wriIncident, then the phone's choice. */
+function pickedIncident(){
+  try { const w=window.top&&window.top.__wriIncident; if(w&&(w.incident_id||w.project_key)) return w; } catch(e){}
+  try {
+    const c=JSON.parse(localStorage.getItem("wri_incident_choice")||"null");
+    if(c&&c.id&&c.expires>Date.now()) return {incident_id:c.id,project_key:c.key,incident_name:c.name,client:c.client,webmap_id:""};
+  } catch(e){}
+  return null;
+}
+const svcCache=new Map();
+async function svcLayers(svc){
+  if(svcCache.has(svc)) return svcCache.get(svc);
+  const j=await rest(svc,{},{get:true,label:"service"});
+  const ids={}; (j.layers||[]).concat(j.tables||[]).forEach(l=>ids[l.name]=l.id);
+  svcCache.set(svc,ids); return ids;
+}
+async function queryTable(svc,name,fields,label){
+  const ids=await svcLayers(svc);
+  if(ids[name]==null) throw new Error(name+" is not in this service");
+  const j=await rest(`${svc}/${ids[name]}/query`,Object.assign({returnGeometry:"false",resultRecordCount:2000},fields),{label:label||name});
+  return (j.features||[]).map(f=>f.attributes);
+}
+async function loadIncidents(){
+  const incs=await queryTable(FIELD_SVC,"Incidents",{where:"incident_status IN ("+OPEN_STATUSES.map(sq).join(",")+")",
+    outFields:"incident_id,incident_name,client,project_key,incident_status,current_op_period,date_opened",orderByFields:"date_opened DESC"},"incidents");
+  incs.forEach(i=>i.incident_id=String(i.incident_id));
+  state.incidents=incs;
+  return incs;
+}
+/* ?incident= pins one (id, project key or name); else the crew's pick. Only OPEN incidents resolve,
+   and there is never a fall-back to the primary: no pick -> ask. */
+function resolveIncident(){
+  const m=v=>String(v||"").trim().toLowerCase();
+  const want=m(params.get("incident"));
+  if(want){ const hit=state.incidents.find(i=>m(i.incident_id)===want||m(i.project_key)===want||m(i.incident_name)===want);
+    return hit?{inc:hit}:{inc:null,why:`Incident “${params.get("incident")}” is not an open incident.`}; }
+  const p=pickedIncident();
+  if(p){ const hit=state.incidents.find(i=>(p.incident_id&&String(i.incident_id)===String(p.incident_id))||(p.project_key&&m(i.project_key)===m(p.project_key)));
+    if(hit) return {inc:Object.assign({webmap_id:p.webmap_id||""},hit)};
+    return {inc:null,why:`The incident picked on this phone (${p.project_key||p.incident_id}) is no longer open.`}; }
+  return {inc:null,why:""};
+}
+function incLine(){
+  const i=state.incident, el=$("incLine");
+  if(!i){ el.textContent="No incident"; return; }
+  const cl=String(i.client||"").toLowerCase();
+  el.innerHTML=`Incident <b>${esc(i.project_key||i.incident_id)}</b>${cl?" · "+esc(CLIENT_LABEL[cl]||cl.toUpperCase()):""}`+
+    (state.periods.length?` · ${state.periods.length} op period${state.periods.length===1?"":"s"}`:"");
+  el.title=state.mapTitle?"Web map: "+state.mapTitle:"";
+}
+
+/* ============================================================ incident map (panels/drone currentMap/loadTargetMap) */
+async function appMapId(){
+  try {
+    const idx=await (await fetch("../../index.html?ts="+Date.now(),{cache:"no-store"})).text();
+    const m=idx.match(/base href="\.\/cdn\/(\d+)\/"/); if(!m) throw new Error("no cdn base");
+    const cfg=await (await fetch(`../../cdn/${m[1]}/config.json?ts=`+Date.now(),{cache:"no-store"})).json();
+    const ds=cfg.dataSources&&cfg.dataSources.dataSource_1;
+    return (ds&&ds.itemId)||null;
+  } catch(e){ return null; }
+}
+async function loadMap(){
+  const i=state.incident||{};
+  state.mapId=params.get("map")||i.webmap_id||CLIENT_MAPS[String(i.client||"").toLowerCase()]||await appMapId();
+  state.mapData=null; state.mapTitle="";
+  if(!state.mapId) return;
+  try {
+    const [item,data]=await Promise.all([
+      rest(PORTAL+"/sharing/rest/content/items/"+state.mapId,{},{label:"map item"}).catch(()=>({})),
+      rest(PORTAL+"/sharing/rest/content/items/"+state.mapId+"/data",{},{label:"map data"})]);
+    state.mapTitle=item.title||""; state.mapData=data;
+  } catch(e){ if(e instanceof AuthError) throw e; console.warn("incident map",e); }
+}
+/* flatten the web map's layers; a layer is effectively on only when every parent group is on */
+function walk(layers,out=[],parents=[],on=true){
+  for(const l of layers||[]){
+    const vis=on&&l.visibility!==false;
+    out.push({l,parents,vis});
+    if(l.layerType==="GroupLayer") walk(l.layers,out,parents.concat(l.title||""),vis);
+  }
+  return out;
+}
+
+/* ============================================================ orthos (panels/drone loadOrthos/orthoRows) */
+async function loadOrthos(){
+  const j=await rest(PORTAL+"/sharing/rest/search",
+    {q:`tags:"wri_ortho" type:"Image Service" orgid:${ORG_ID}`,num:100,sortField:"created",sortOrder:"desc"},{label:"imagery search"});
+  state.orthos=(j.results||[]).map(r=>{
+    const tag=(r.tags||[]).find(t=>t.startsWith("wri_source_kml:"));
+    const proj=(r.tags||[]).find(t=>t.startsWith("wri_project:"));
+    const kw=(r.typeKeywords||[]).join("|");
+    return {id:r.id,title:r.title,src:tag?tag.split(":")[1]:null,project:proj?proj.split(":")[1]:null,url:r.url||"",
+            tiled:/Tiled Imagery/i.test(kw),dynamic:/Dynamic Imagery/i.test(kw),superseded:/superseded/i.test(r.title||""),created:r.created};
+  }).filter(o=>o.src&&!o.superseded);
+}
+async function loadRequests(){
+  const key=state.incident&&state.incident.project_key;
+  state.requests={};
+  if(!key) return;
+  try {
+    const j=await rest(REQUESTS_URL+"/query",{where:"project="+sq(key),outFields:"source_id,kml_item_id,mode,requested_at,nova_flight_id,name",
+      returnGeometry:false,orderByFields:"requested_at ASC",resultRecordCount:500},{label:"ortho requests"});
+    for(const f of j.features||[]){
+      const a=f.attributes, k=a.source_id||a.kml_item_id; if(!k) continue;
+      const r=state.requests[k]||(state.requests[k]={first:null,convert:null,flight:null});
+      if(a.requested_at&&(r.first==null||a.requested_at<r.first)) r.first=a.requested_at;
+      if(a.mode==="convert"&&a.requested_at&&(r.convert==null||a.requested_at<r.convert)) r.convert=a.requested_at;
+      if(a.nova_flight_id) r.flight=a.nova_flight_id;
+    }
+  } catch(e){ if(e instanceof AuthError) throw e; console.warn("ortho requests",e); }
+}
+function ymd(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function titleDay(t){ const m=String(t||"").match(/(20\d\d)-(\d\d)-(\d\d)/); return m?m[0]:""; }
+const titleKey=t=>String(t||"").toLowerCase().replace(/\s+/g," ").trim();
+/* "2611open drone mapping 2026-11-03 - 2611open (2026-11-03)" -> "2611open drone mapping 2026-11-03" */
+function shortTitle(t,proj){
+  let s=String(t||"");
+  if(proj) s=s.replace(new RegExp("\\s+-\\s+"+proj.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*\\(\\d{4}-\\d\\d-\\d\\d\\)\\s*$","i"),"");
+  return s.trim()||String(t||"");
+}
+/* One row per FLIGHT. A republish (preview -> hi-res, ..._img -> ..._img_2) keeps the source id and
+   Nova flight, so rows group by Nova flight id, else source id; copies with no request row group by
+   title as panels/drone does. Two flights flown the same day keep their own rows. The newest copy
+   wins; its URL is the one on the incident map when there is one. */
+function buildRows(){
+  const proj=state.incident&&state.incident.project_key;
+  const mapOrthos=new Map();
+  for(const {l} of walk(state.mapData&&state.mapData.operationalLayers))
+    if(typeof l.id==="string"&&l.id.startsWith("ortho_")&&l.url) mapOrthos.set(l.id.slice(6),l);
+  const list=state.orthos.filter(o=>!proj||!o.project||o.project===proj).map(o=>Object.assign({},o));
+  const seen=new Set(list.map(o=>o.src));
+  // orthos on the incident map that the search does not return (e.g. owned by another account)
+  for(const [src,l] of mapOrthos){
+    if(seen.has(src)) continue;
+    const p=(l.wriOrtho&&l.wriOrtho.project)||"";
+    const mine=proj?(p?p===proj:(!!state.requests[src]||String(l.title||"").toLowerCase().includes(proj.toLowerCase()))):true;
+    if(!mine) continue;
+    list.push({id:"map:"+src,title:l.title||"Ortho",src,project:p||proj||null,url:l.url,
+               tiled:l.layerType!=="ArcGISImageServiceLayer",dynamic:l.layerType==="ArcGISImageServiceLayer",created:null});
+  }
+  for(const o of list){ const ml=mapOrthos.get(o.src); if(ml&&ml.url) o.url=ml.url; }
+  const groups=new Map();
+  for(const o of list){
+    const r=state.requests[o.src];
+    const k=r&&r.flight?"f:"+r.flight:r?"s:"+o.src:"t:"+titleKey(o.title);
+    if(!groups.has(k)) groups.set(k,[]); groups.get(k).push(o);
+  }
+  const rows=[];
+  for(const g of groups.values()){
+    g.sort((a,b)=>(b.created||0)-(a.created||0));
+    const top=g.find(o=>o.url)||g[0];
+    if(!top.url) continue;
+    // flight time: the first convert request (when the flight was sent for processing), else created
+    let t=null, exact=true;
+    for(const o of g){ const r=state.requests[o.src]; const v=r&&(r.convert||r.first); if(v&&(t==null||v<t)) t=v; }
+    if(t==null){ const c=g.map(o=>o.created).filter(Boolean); if(c.length) t=Math.min(...c); }
+    const tday=titleDay(top.title);
+    if(t==null&&tday){ const [y,mo,d]=tday.split("-").map(Number); t=new Date(y,mo-1,d,12).getTime(); exact=false; }
+    // a title date that disagrees with the request time (the ortho was published days later): trust
+    // the title for the day, and drop the time
+    if(t!=null&&exact&&tday&&ymd(new Date(t))!==tday){ const [y,mo,d]=tday.split("-").map(Number); t=new Date(y,mo-1,d,12).getTime(); exact=false; }
+    rows.push(Object.assign({},top,{t,exact,copies:g.length,name:shortTitle(top.title,proj)}));
+  }
+  rows.sort((a,b)=>(b.t||0)-(a.t||0));
+  for(const r of rows) r.op=opFor(r.t);
+  state.rows=rows;
+  return rows;
+}
+
+/* ============================================================ op periods */
+async function loadPeriods(){
+  const inc=state.incident; state.periods=[]; state.periodSrc="";
+  if(!inc) return;
+  const where="incident_id="+sq(inc.incident_id);
+  const tidy=list=>{
+    // one row per op number (a re-activation can write a duplicate OP row): the earliest start wins
+    const by=new Map();
+    for(const a of list){ const n=Number(a.op_number!=null?a.op_number:a.op_period); if(!isFinite(n)||!a.started_at) continue;
+      const cur=by.get(n); if(!cur||a.started_at<cur.started_at) by.set(n,{n,started_at:a.started_at,ended_at:a.ended_at||null}); }
+    const ps=[...by.values()].sort((a,b)=>a.started_at-b.started_at);
+    ps.forEach((p,i)=>{ const next=ps[i+1]; p.end=p.ended_at||(next?next.started_at:Infinity); });
+    return ps;
+  };
+  for(const svc of [FIELD_SVC,PROD_SVC]){
+    try {
+      const rows=await queryTable(svc,"Op_Periods",{where,outFields:"op_number,op_period,started_at,ended_at",orderByFields:"started_at ASC"},"op periods");
+      const ps=tidy(rows);
+      if(ps.length){ state.periods=ps; state.periodSrc="Op_Periods"; return; }
+    } catch(e){ if(e instanceof AuthError) throw e; console.info("op periods via",svc,"-",e.message||e); }
+  }
+  // crew tokens cannot read PROD: derive starts from Incident_Status (first as_of per op period)
+  try {
+    const rows=await queryTable(FIELD_SVC,"Incident_Status",{where,outFields:"op_period,as_of",orderByFields:"as_of ASC"},"incident status");
+    const ps=tidy(rows.filter(a=>a.op_period!=null&&a.as_of).map(a=>({op_period:a.op_period,started_at:a.as_of})));
+    if(ps.length){ state.periods=ps; state.periodSrc="Incident_Status"; }
+  } catch(e){ if(e instanceof AuthError) throw e; console.info("incident status",e.message||e); }
+}
+function opFor(t){
+  if(t==null) return null;
+  for(const p of state.periods) if(t>=p.started_at&&t<p.end) return p;
+  return null;
+}
+function fmtWhen(r){
+  if(r.t==null) return "Date unknown";
+  const d=new Date(r.t);
+  const day=d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+  return r.exact?day+", "+d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}):day;
+}
+function rowLabel(r){ return (r.op?"OP "+r.op.n+" · ":"")+fmtWhen(r)+" · "+r.name; }
+function shortLabel(r){ return (r.op?"OP "+r.op.n+" · ":"")+fmtWhen(r); }
+
+/* Default picks: newest of the latest op period (B) vs newest of the op period before it (A);
+   else the two newest. Rows are newest-first. */
+function defaultPicks(rows){
+  const ops=[...new Set(rows.filter(r=>r.op).map(r=>r.op.n))].sort((a,b)=>b-a);
+  if(ops.length>=2){
+    const b=rows.find(r=>r.op&&r.op.n===ops[0]), a=rows.find(r=>r.op&&r.op.n===ops[1]);
+    if(a&&b) return {a:a.id,b:b.id};
+  }
+  return {a:rows[1]&&rows[1].id,b:rows[0]&&rows[0].id};
+}
+function fillPicks(){
+  const rows=state.rows;
+  for(const id of ["selA","selB"]){
+    const sel=$(id); sel.innerHTML="";
+    // grouped by op period so the crew reads the list the way the incident runs
+    let grp=null, cur=sel;
+    for(const r of rows){
+      const g=r.op?"Op period "+r.op.n:(state.periods.length?"Outside the op periods":"");
+      if(g&&g!==grp){ grp=g; cur=document.createElement("optgroup"); cur.label=g; sel.appendChild(cur); }
+      const o=document.createElement("option"); o.value=r.id; o.textContent=rowLabel(r);
+      (g?cur:sel).appendChild(o);
+    }
+  }
+  if(!rows.find(r=>r.id===state.a)||!rows.find(r=>r.id===state.b)||state.a===state.b){ const d=defaultPicks(rows); state.a=d.a; state.b=d.b; }
+  $("selA").value=state.a; $("selB").value=state.b;
+}
+
+/* ============================================================ overlays (incident map operational layers) */
+const OV_TYPES=new Set(["ArcGISFeatureLayer","ArcGISMapServiceLayer","GeoJSON","CSV","KML","ArcGISStreamLayer","OGCFeatureLayer","WFS"]);
+function symKind(sym){
+  const t=String(sym&&(sym.type||(sym.symbol&&sym.symbol.type))||"");
+  if(/SLS|CLS|LineSymbol|simple-line/i.test(t)) return "line";
+  if(/SFS|PFS|PolygonSymbol|simple-fill|picture-fill/i.test(t)) return "polygon";
+  if(/SMS|PMS|PointSymbol|simple-marker|picture-marker/i.test(t)) return "point";
+  return "";
+}
+function geomKind(g){ return /Polyline/i.test(g||"")?"line":/Polygon|Envelope/i.test(g||"")?"polygon":/Point/i.test(g||"")?"point":""; }
+function jsonKind(l){
+  const ld=l.layerDefinition||{};
+  if(ld.geometryType) return geomKind(ld.geometryType);
+  const fc=l.featureCollection&&l.featureCollection.layers&&l.featureCollection.layers[0];
+  if(fc&&fc.layerDefinition&&fc.layerDefinition.geometryType) return geomKind(fc.layerDefinition.geometryType);
+  const r=ld.drawingInfo&&ld.drawingInfo.renderer;
+  if(r){ const s=r.symbol||(r.uniqueValueInfos&&r.uniqueValueInfos[0]&&r.uniqueValueInfos[0].symbol)||r.defaultSymbol||
+               (r.classBreakInfos&&r.classBreakInfos[0]&&r.classBreakInfos[0].symbol); const k=symKind(s); if(k) return k; }
+  if(l.layerType==="ArcGISMapServiceLayer") return "map";
+  return "";
+}
+const isRecon=l=>/recon/i.test((l.title||"")+" "+(l.url||""));
+const isPilotDrawing=l=>/^wri_draw_/.test(l.id||"")||/pilot drawing/i.test(l.title||"");
+function isImagery(l){
+  return (typeof l.id==="string"&&l.id.startsWith("ortho_"))||/Image|Tile|VectorTile|WebTiled|WMS|WMTS|Raster|Elevation/i.test(l.layerType||"")
+    ||/\/(ImageServer|VectorTileServer)\b/i.test(l.url||"");
+}
+async function buildOverlays(){
+  const prev=new Map(state.ov.map(o=>[o.key,o]));
+  const list=[];
+  walk(state.mapData&&state.mapData.operationalLayers).forEach(({l,parents,vis},i)=>{
+    if(l.layerType==="GroupLayer"||isImagery(l)) return;
+    if(!OV_TYPES.has(l.layerType)&&!l.featureCollection) return;
+    if(!l.url&&!l.featureCollection) return;
+    const key=String(l.id||("ov"+i));
+    const p=prev.get(key);
+    list.push({key,i,title:l.title||"Layer",group:parents.filter(Boolean).join(" › "),mapVis:vis,kind:jsonKind(l),
+               json:l,on:p?p.on:null,failed:p?p.failed:false,layers:p?p.layers:[null,null]});
+  });
+  // a layer drawn on the incident map whose kind the web map JSON does not say: ask its service (cheap, parallel)
+  await Promise.all(list.filter(o=>!o.kind&&o.mapVis&&o.json.url&&o.json.layerType==="ArcGISFeatureLayer").map(async o=>{
+    try { const j=await rest(o.json.url,{},{get:true,label:"layer info",timeout:12000}); o.kind=geomKind(j.geometryType)||"table"; }
+    catch(e){ if(e instanceof AuthError) throw e; o.kind="?"; }
+  }));
+  for(const o of list){
+    if(o.on!=null) continue;
+    // default ON: line/polygon layers drawn on the incident map, pilot drawings, recon points
+    o.on=!o.failed&&((o.mapVis&&(o.kind==="line"||o.kind==="polygon"))||(isPilotDrawing(o.json)&&o.kind!=="point")||isRecon(o.json));
+  }
+  state.ov=list.filter(o=>o.kind!=="table");
+  renderOverlayList();
+}
+function renderOverlayList(){
+  const host=$("ovList");
+  if(!state.mapData){ host.innerHTML='<div class="note" style="padding:10px 0">Could not open the incident map, so there are no overlays.</div>'; updOvBtn(); return; }
+  if(!state.ov.length){ host.innerHTML='<div class="note" style="padding:10px 0">The incident map has no overlay layers.</div>'; updOvBtn(); return; }
+  const onMap=state.ov.filter(o=>o.mapVis), more=state.ov.filter(o=>!o.mapVis);
+  const row=o=>`<label class="ov${o.failed?" bad":""}" data-key="${esc(o.key)}">
+      <input type="checkbox"${o.on?" checked":""}${o.failed?" disabled":""}>
+      <span class="nm">${esc(o.title)}${o.group?`<br><small>${esc(o.group)}</small>`:""}${o.failed?'<br><small class="err">would not load</small>':""}</span>
+      <span class="k">${esc(o.kind==="?"?"":o.kind)}</span></label>`;
+  host.innerHTML=(onMap.length?'<div class="ovgrp">Shown on the incident map</div>'+onMap.map(row).join(""):"")+
+    (more.length?`<details><summary>More layers (${more.length})</summary>${more.map(row).join("")}</details>`:"");
+  for(const lab of host.querySelectorAll(".ov")){
+    const cb=lab.querySelector("input");
+    cb.onchange=()=>toggleOverlay(lab.dataset.key,cb.checked,lab);
+  }
+  updOvBtn();
+}
+function updOvBtn(){ const n=state.ov.filter(o=>o.on&&!o.failed).length; const b=$("btnOv"); if(b.dataset.label==null) b.textContent="Overlays"+(n?" ("+n+")":""); }
+async function toggleOverlay(key,on,lab){
+  const o=state.ov.find(x=>x.key===key); if(!o) return;
+  o.on=on; updOvBtn();
+  if(!G.views.length) return;
+  const cb=lab&&lab.querySelector("input"), k=lab&&lab.querySelector(".k");
+  if(cb) cb.disabled=true;
+  if(k&&on) k.innerHTML='<span class="spin" style="margin:0"></span>';
+  try { await Promise.all(G.views.map((v,slot)=>syncOverlays(v.map,slot))); }
+  finally {
+    if(o.failed){ renderOverlayList(); toastMsg(o.title+" would not load"); }
+    else { if(cb) cb.disabled=false; if(k) k.textContent=o.kind==="?"?"":o.kind; }
+  }
+}
+
+/* ============================================================ maps (ArcGIS Maps SDK 4.30 over AMD) */
+let jsapiP=null;
+function loadJsApi(){
+  if(jsapiP) return jsapiP;
+  jsapiP=new Promise((res,rej)=>{
+    const l=document.createElement("link"); l.rel="stylesheet"; l.href=JSAPI+"esri/themes/dark/main.css"; document.head.appendChild(l);
+    const s=document.createElement("script"); s.src=JSAPI; s.async=true;
+    s.onload=()=>window.require?res(window.require):rej(new Error("map library did not start"));
+    s.onerror=()=>{ jsapiP=null; rej(new Error("could not load the map library (no signal?)")); };
+    document.head.appendChild(s);
+  });
+  return jsapiP;
+}
+const amd=(req,mods)=>new Promise((res,rej)=>req(mods,(...m)=>res(m),rej));
+let M=null;     // the AMD modules
+async function mods(){
+  if(M) return M;
+  const req=await loadJsApi();
+  const [esriConfig,IdentityManager,EsriMap,WebMap,MapView,Basemap,TileLayer,ImageryLayer,ImageryTileLayer,Swipe,reactiveUtils]=await amd(req,
+    ["esri/config","esri/identity/IdentityManager","esri/Map","esri/WebMap","esri/views/MapView","esri/Basemap","esri/layers/TileLayer",
+     "esri/layers/ImageryLayer","esri/layers/ImageryTileLayer","esri/widgets/Swipe","esri/core/reactiveUtils"]);
+  esriConfig.portalUrl=PORTAL;
+  M={esriConfig,IdentityManager,EsriMap,WebMap,MapView,Basemap,TileLayer,ImageryLayer,ImageryTileLayer,Swipe,reactiveUtils};
+  return M;
+}
+function serverRoot(url){ const i=url.indexOf("/rest/services"); return i>0?url.slice(0,i+"/rest/services".length):url.split("/").slice(0,3).join("/"); }
+const registered=new Set();
+function registerToken(url){
+  const auth=getAuth(); if(!auth||!url) return;
+  const server=/\/sharing\/rest/.test(url)?PORTAL+"/sharing/rest":serverRoot(url);
+  // only our own org's servers get the token
+  if(!/arcgis\.com/.test(server)) return;
+  const k=server+"|"+auth.token; if(registered.has(k)) return; registered.add(k);
+  M.IdentityManager.registerToken({server,token:auth.token,userId:verified.username||auth.username||undefined,ssl:true});
+}
+const G={views:[],swipe:null,seq:0,watch:[],orthoCache:new Map()};
+const infoCache=new Map();
+async function serviceInfo(url){
+  if(infoCache.has(url)) return infoCache.get(url);
+  const j=await rest(url,{},{get:true,label:"ortho service"}); infoCache.set(url,j); return j;
+}
+/* tiled hosted imagery -> ImageryTileLayer; dynamic -> ImageryLayer; the other class is tried if the first refuses */
+async function orthoLayer(o,slot){
+  const ck=o.id+"|"+slot;
+  if(G.orthoCache.has(ck)) return G.orthoCache.get(ck);
+  const p=(async()=>{
+    registerToken(o.url);
+    let info=null; try { info=await serviceInfo(o.url); } catch(e){ if(e instanceof AuthError) throw e; }
+    const tiled=/TilesOnly/i.test((info&&info.capabilities)||"")||(o.tiled&&!o.dynamic);
+    const order=tiled?[M.ImageryTileLayer,M.ImageryLayer]:[M.ImageryLayer,M.ImageryTileLayer];
+    let first=null;
+    for(const C of order){ try { const l=new C({url:o.url,title:o.name}); await l.load(); l.__wriOrtho=true; return l; } catch(e){ console.warn("ortho layer",o.title,e); first=first||e; } }
+    throw new Error(o.name+": "+((first&&first.message)||"would not load"));
+  })();
+  G.orthoCache.set(ck,p);
+  p.catch(()=>G.orthoCache.delete(ck));
+  return p;
+}
+/* An overlay layer built from the incident web map's own JSON (renderer, filter, labels, popups as
+   the map has them): a one-layer WebMap is read and its layer taken out. One instance per map slot. */
+async function overlayLayer(o,slot){
+  if(o.layers[slot]) return o.layers[slot];
+  const p=(async()=>{
+    if(o.json.url) registerToken(o.json.url);
+    const json=Object.assign({},o.json,{visibility:true});
+    const wm=M.WebMap.fromJSON({operationalLayers:[json],baseMap:{baseMapLayers:[],title:"none"},
+                                spatialReference:{wkid:102100,latestWkid:3857},version:"2.30",authoringApp:"WRI compare"});
+    await wm.load();
+    const l=wm.layers.getItemAt(0);
+    if(!l) throw new Error("not a layer this page can draw");
+    wm.layers.remove(l);
+    await Promise.race([l.load(),sleep(20000).then(()=>{ throw new Error("timed out"); })]);
+    l.__wriOv=o.key;
+    return l;
+  })();
+  o.layers[slot]=p;
+  p.catch(()=>{ o.layers[slot]=null; o.failed=true; o.on=false; });
+  return p;
+}
+/* keep a map's overlays = the checked ones, above the orthos, in the web map's order */
+async function syncOverlays(map,slot){
+  const want=state.ov.filter(o=>o.on&&!o.failed);
+  await Promise.allSettled(want.map(o=>overlayLayer(o,slot)));
+  if(!map||map.destroyed) return;
+  const keep=new Set(state.ov.filter(o=>o.on&&!o.failed).map(o=>o.key));
+  for(const l of map.layers.toArray()) if(l.__wriOv&&!keep.has(l.__wriOv)) map.remove(l);
+  const base=map.layers.filter(l=>l.__wriOrtho).length;
+  let idx=base;
+  for(const o of state.ov){
+    if(!keep.has(o.key)) continue;
+    let l=null; try { l=await o.layers[slot]; } catch(e){ continue; }
+    if(!l||map.destroyed) continue;
+    if(map.layers.includes(l)) map.reorder(l,idx); else map.add(l,idx);
+    idx++;
+  }
+}
+function clearViews(){
+  for(const w of G.watch) try{ w.remove(); }catch(e){}
+  G.watch=[];
+  try { G.swipe&&G.swipe.destroy(); } catch(e){}
+  G.swipe=null;
+  for(const v of G.views){
+    // take the cached layers out first: destroying a view destroys its map and every layer in it
+    try { v.map&&v.map.removeAll(); } catch(e){}
+    try { v.destroy(); } catch(e){}
+  }
+  G.views=[];
+  for(const h of Array.from(document.querySelectorAll("#stage .vhost"))) h.remove();
+}
+function imageryBasemap(){
+  return new M.Basemap({baseLayers:[new M.TileLayer({url:"https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"})],title:"Imagery"});
+}
+function addHost(){
+  const h=document.createElement("div"); h.className="vhost";
+  const m=document.createElement("div"); m.className="map"; h.appendChild(m);
+  $("stage").insertBefore(h,$("msg")); return {h,m};
+}
+function chip(host,cls,html){ const c=document.createElement("div"); c.className="vlab "+cls; c.innerHTML=html; host.appendChild(c); return c; }
+function rowById(id){ return state.rows.find(r=>r.id===id); }
+let lastViewpoint=null;
+async function draw(){
+  const seq=++G.seq;
+  const A=rowById(state.a), B=rowById(state.b);
+  lastViewpoint=G.views[0]?G.views[0].viewpoint.clone():lastViewpoint;
+  clearViews();
+  $("stage").className=state.mode==="side"?"side":"";
+  $("fadeRow").hidden=state.mode!=="fade";
+  if(!A||!B){ msg('<span class="err">Pick two orthos.</span>'); return; }
+  msg('<span class="spin"></span>Loading the map…');
+  try {
+    await mods();
+    if(seq!==G.seq) return;
+    registerToken(PORTAL+"/sharing/rest");
+    const slots=state.mode==="side"?[[A],[B]]:[[A,B]];
+    const got=await Promise.allSettled(slots.flatMap((s,slot)=>s.map(o=>orthoLayer(o,slot))));
+    if(seq!==G.seq) return;
+    if(got.some(g=>g.reason instanceof AuthError)) throw new AuthError("Signed out");
+    const errs=got.filter(g=>g.status==="rejected").map(g=>String(g.reason&&g.reason.message||g.reason));
+    const lay=got.map(g=>g.status==="fulfilled"?g.value:null);
+    const views=[];
+    let li=0;
+    slots.forEach((s,slot)=>{
+      const orthos=s.map(()=>lay[li++]).filter(Boolean);
+      const {h,m}=addHost();
+      const map=new M.EsriMap({basemap:imageryBasemap(),layers:orthos});
+      const view=new M.MapView({container:m,map,constraints:{snapToZoom:false},ui:{components:["zoom"]},
+                                popup:{dockEnabled:false}});
+      view.__host=h; views.push(view);
+    });
+    G.views=views;
+    const [la,lb]=lay;      // A then B, whichever map they sit in
+    if(lb) lb.opacity=state.mode==="fade"?state.fade/100:1;
+    if(la) la.opacity=1;
+    // labels: which ortho is where
+    const v0=views[0].__host;
+    if(state.mode==="swipe"){
+      chip(v0,"l",`<i>A</i>${esc(shortLabel(A))}`); chip(v0,"r",`<i>B</i>${esc(shortLabel(B))}`);
+      // the line stands upright and is dragged left/right: Swipe calls that direction "horizontal"
+      G.swipe=new M.Swipe({view:views[0],leadingLayers:la?[la]:[],trailingLayers:lb?[lb]:[],direction:"horizontal",position:50});
+      views[0].ui.add(G.swipe);
+    } else if(state.mode==="fade"){
+      chip(v0,"l full",`<i>A</i>${esc(shortLabel(A))} &nbsp;<i>B</i>${esc(shortLabel(B))} <span id="fadeChip">${state.fade}%</span>`);
+    } else {
+      chip(v0,"l full",`<i>A</i>${esc(shortLabel(A))}`); chip(views[1].__host,"l full",`<i>B</i>${esc(shortLabel(B))}`);
+    }
+    if(views.length===2) syncViews(views[0],views[1]);
+    // overlays on every view
+    const ovP=Promise.all(views.map((v,slot)=>syncOverlays(v.map,slot))).then(()=>{ if(seq===G.seq&&state.ov.some(o=>o.failed)) renderOverlayList(); });
+    // a phone whose browser cannot start the map (no WebGL) never resolves view.when(): say so
+    await Promise.race([Promise.all(views.map(v=>v.when())),sleep(30000).then(()=>{ throw new Error("the map did not start on this device"); })]);
+    if(seq!==G.seq) return;
+    msg(errs.length?'<span class="err">Could not show '+esc(errs.join("; "))+'</span>':null);
+    const exts=[la,lb].filter(Boolean).map(l=>l.fullExtent).filter(Boolean);
+    if(lastViewpoint) views[0].viewpoint=lastViewpoint;
+    else if(exts.length) await views[0].goTo(exts).catch(()=>views[0].goTo(exts[0]).catch(()=>{}));
+    if(views[1]) views[1].viewpoint=views[0].viewpoint.clone();
+    await ovP;
+  } catch(e){
+    if(seq!==G.seq) return;
+    if(e instanceof AuthError){ handleErr(e,"compare"); return; }
+    msg('<span class="err">Compare did not load: '+esc(String(e&&e.message||e))+'</span>');
+  }
+}
+/* two views, one extent + rotation: whichever the crew is moving drives the other */
+function syncViews(a,b){
+  let active=null;
+  const follow=(src,dst)=>M.reactiveUtils.watch(()=>src.viewpoint,vp=>{
+    if(active!==src||!vp) return;
+    dst.viewpoint=vp.clone();
+  });
+  const claim=v=>M.reactiveUtils.watch(()=>v.interacting||(v.animation&&v.animation.state==="running"),on=>{ if(on) active=v; });
+  for(const v of [a,b]){
+    G.watch.push(claim(v));
+    // a tap/scroll/zoom-button on a view makes it the driver before its viewpoint moves
+    for(const ev of ["pointer-down","mouse-wheel","key-down"]) G.watch.push(v.on(ev,()=>{ active=v; }));
+    v.container.addEventListener("pointerenter",()=>{ if(!active||!active.interacting) active=v; });
+  }
+  G.watch.push(follow(a,b),follow(b,a));
+}
+
+/* ============================================================ controls */
+let drawing=false;
+async function redraw(btn,label){
+  if(drawing) return;
+  drawing=true;
+  const ctl=[...document.querySelectorAll(".seg button"),$("btnSwap"),$("selA"),$("selB")];
+  ctl.forEach(c=>{ if(c!==btn) c.disabled=true; });
+  setBusy(btn,true,label);
+  try { await draw(); }
+  finally { setBusy(btn,false); ctl.forEach(c=>c.disabled=false); drawing=false; }
+}
+function setMode(m){
+  state.mode=m;
+  for(const b of document.querySelectorAll(".seg button")) b.setAttribute("aria-pressed",String(b.dataset.mode===m));
+}
+for(const b of document.querySelectorAll(".seg button")){
+  b.onclick=()=>{ if(drawing||b.dataset.mode===state.mode) return; setMode(b.dataset.mode); redraw(b,b.textContent); };
+}
+$("selA").onchange=()=>{ state.a=$("selA").value; redraw(null); };
+$("selB").onchange=()=>{ state.b=$("selB").value; redraw(null); };
+$("btnSwap").onclick=()=>{ if(drawing) return; [state.a,state.b]=[state.b,state.a]; $("selA").value=state.a; $("selB").value=state.b; redraw($("btnSwap"),""); };
+$("fade").oninput=()=>{
+  state.fade=Number($("fade").value); $("fadeVal").textContent=state.fade+"%";
+  const c=$("fadeChip"); if(c) c.textContent=state.fade+"%";
+  const lb=G.views[0]&&G.views[0].map.layers.filter(l=>l.__wriOrtho).getItemAt(1);
+  if(lb&&state.mode==="fade") lb.opacity=state.fade/100;
+};
+$("btnOv").onclick=()=>{
+  const s=$("ovSheet");
+  if(!s.hidden){ s.hidden=true; return; }
+  if(state.ovReady){ s.hidden=false; return; }
+  // the overlay list is still being read: busy until it answers
+  busy($("btnOv"),"Overlays",async()=>{ await state.ovReady0; }).then(()=>{ $("ovSheet").hidden=false; updOvBtn(); });
+};
+$("btnOvClose").onclick=()=>{ $("ovSheet").hidden=true; };
+$("btnReload").onclick=()=>busy($("btnReload"),"Reload",()=>boot(true));
+$("btnPickGo").onclick=()=>busy($("btnPickGo"),"Opening…",async()=>{
+  const id=$("incSel").value; const inc=state.incidents.find(i=>i.incident_id===id); if(!inc) return;
+  try { window.top.postMessage({type:"wri-incident-pick",incident_id:id},location.origin); } catch(x){}
+  state.forced=inc; await boot();
+});
+
+/* ============================================================ boot */
+let booting=null;
+function boot(force){ if(booting&&!force) return booting; booting=run().finally(()=>{ booting=null; }); return booting; }
+async function run(){
+  clearInterval(authPoll);
+  if(!getAuth()){ showAuth(); return; }
+  try { await verifyAuth(); } catch(e){ showAuth(); return; }
+  try {
+    await loadIncidents();
+    const r=state.forced&&!params.get("incident")?{inc:state.incidents.find(i=>i.incident_id===state.forced.incident_id)||null,why:""}:resolveIncident();
+    const prevInc=state.incident&&state.incident.incident_id;
+    state.incident=r.inc;
+    if(!r.inc){
+      incLine();
+      $("pickTitle").textContent=r.why?"Incident not open":"Which incident?";
+      $("pickText").textContent=(r.why?r.why+" ":"No incident is picked on this phone yet. ")+(params.get("incident")?"":"Pick one here (it also moves the map's incident chip).");
+      const sel=$("incSel"); sel.innerHTML=state.incidents.map(i=>`<option value="${esc(i.incident_id)}">${esc(i.project_key||i.incident_name||i.incident_id)}${i.incident_name&&i.incident_name!==i.project_key?" — "+esc(i.incident_name):""}</option>`).join("");
+      sel.hidden=$("btnPickGo").hidden=!!params.get("incident")||!state.incidents.length;
+      showView("viewPick"); return;
+    }
+    if(prevInc!==r.inc.incident_id){ state.a=state.b=null; state.ov=[]; G.orthoCache.clear(); lastViewpoint=null; }
+    incLine();
+    const mapP=loadMap();
+    await Promise.all([loadOrthos(),loadRequests(),loadPeriods(),mapP]);
+    incLine();
+    const rows=buildRows();
+    if(rows.length<2){
+      $("emptyTitle").textContent=rows.length?"Only one ortho so far":"No orthos yet";
+      $("emptyText").innerHTML=`Compare needs two published orthos for incident <b>${esc(r.inc.project_key||r.inc.incident_id)}</b>`+
+        (rows.length?` — there is one: ${esc(rowLabel(rows[0]))}.`:".")+" Upload a flight from Drone › Upload › Drone orthos.";
+      showView("viewEmpty"); return;
+    }
+    showView("viewMain");
+    fillPicks();
+    state.ovReady=false;
+    state.ovReady0=buildOverlays().catch(e=>{ if(e instanceof AuthError) throw e; console.warn("overlays",e); state.ov=[]; renderOverlayList(); })
+      .finally(()=>{ state.ovReady=true; });
+    // the default-on overlays have to be known before the first draw so they appear straight away
+    await state.ovReady0;
+    await draw();
+  } catch(e){ handleErr(e,"compare"); }
+}
+if(DEBUG) window.__wriCompare={state,G};   // ?debug: for support and the headless check
+boot();
+})();
+</script>
+</body>
+</html>
