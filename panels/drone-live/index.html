@@ -34,13 +34,16 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%}
-  body{background:#000;color:#f0f0f0;font-family:-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;overflow:hidden}
+  /* WRI 2025 brand (same fonts as the drone pages inside, self-hosted there) */
+  @font-face{font-family:'Epilogue';font-weight:100 900;font-display:swap;src:url(https://drone.whitewaterrescue.com/fonts/epilogue-latin.woff2) format('woff2')}
+  @font-face{font-family:'Alexandria';font-weight:100 900;font-display:swap;src:url(https://drone.whitewaterrescue.com/fonts/alexandria-latin.woff2) format('woff2')}
+  body{background:#171919;color:#f0f0f0;font-family:'Alexandria',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;overflow:hidden}
   #host{height:100%}
   #host iframe{width:100%;height:100%;border:0;display:block}
   #off{height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;text-align:center}
   #off.on{display:flex}
   #off p{color:#b8bcbc;max-width:460px;font-size:15px}
-  .btn{padding:12px 20px;border-radius:10px;background:#EC2329;color:#fff;font:700 15px/1.2 inherit;border:0;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;transition:transform .08s ease,filter .08s ease}
+  .btn{padding:12px 22px;border-radius:999px;background:#EC2329;color:#fff;font:700 13px/1.2 'Epilogue',system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;border:1px solid #EC2329;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .08s ease,filter .08s ease}
   .btn:hover{background:#d41f24}
   .btn:active{transform:scale(.96);filter:brightness(.8)}
 </style>
