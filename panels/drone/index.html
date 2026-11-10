@@ -266,6 +266,7 @@ const CALLBACK_URL = "https://whitewaterrescue.github.io/wri-respond/oauth-callb
 const SESSION_KEY  = "wri_orthos_auth";
 const REQUESTS_URL = "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/WRI_Ortho_Requests/FeatureServer/0";     // WRI_Ortho_Requests, substituted at install
 const NOVA_URL     = "https://wri-nova.cody-6ec.workers.dev";         // the wri-nova Cloudflare Worker
+const DRONE_URL    = "https://drone.whitewaterrescue.com";            // WRI drone cloud: the set's photos for Recorded
 const DISPATCH_URL = "https://script.google.com/macros/s/AKfycbxfNt0qmV37WmLTsCxBsHj873kIZJWoYZQumbY40SBu5hMjkGcjr2WMoh1WPu5gZXVw/exec";
 const POLL_MS = 10000, QUERY_TIMEOUT_MS = 30000;
 const URL_BATCH = 10;      // presigned URLs expire in ~600 s: mint a few at a time, use immediately.
@@ -655,6 +656,42 @@ $("btnNewProj").onclick=async()=>{
   } catch(e){ handleErr(e,"create project"); }
 };
 
+/* Recorded copies (Tyler 2026-11-10): Nova keeps only the ortho, so the photos behind a Nova Direct ortho never
+   reached the drone pages. Each photo goes to the drone server as a 2048 px copy with the original's
+   EXIF/XMP (GPS, time, gimbal angle) spliced back in -- a fraction of the upload the originals took.
+   Two at a time, best effort: a photo that fails is skipped (the ortho is unaffected). */
+async function smallCopy(f){
+  const head=new Uint8Array(await f.slice(0,262144).arrayBuffer()), apps=[];
+  for(let i=2;i+4<head.length&&head[i]===0xFF;){
+    const mk=head[i+1], len=(head[i+2]<<8)|head[i+3];
+    if(mk===0xDA||mk===0xD9) break;
+    if(mk===0xE1) apps.push(head.slice(i,i+2+len));        // EXIF + XMP
+    i+=2+len;
+  }
+  const bmp=await createImageBitmap(f), k=Math.min(1,2048/Math.max(bmp.width,bmp.height));
+  const c=document.createElement("canvas"); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
+  c.getContext("2d").drawImage(bmp,0,0,c.width,c.height); if(bmp.close) bmp.close();
+  const small=new Uint8Array(await (await new Promise(r=>c.toBlob(r,"image/jpeg",0.85))).arrayBuffer());
+  return new Blob([small.slice(0,2)].concat(apps,[small.slice(2)]),{type:"image/jpeg"});   // SOI, original APP1s, the rest
+}
+async function sendCopies(files,set){
+  const auth=getAuth(), proj=currentProject(); if(!auth||!proj||!files.length) return 0;
+  let i=0, ok=0;
+  async function one(){
+    while(i<files.length){
+      const f=files[i++];
+      try {
+        const body=await smallCopy(f);
+        const q=`?project=${encodeURIComponent(proj)}&name=${encodeURIComponent(f.name)}&set=${encodeURIComponent(set)}&reduced=1&via=nova`
+               +`&tz=${new Date().getTimezoneOffset()}&modified=${f.lastModified||0}`;
+        const r=await fetch(DRONE_URL+"/api/photos/upload"+q,{method:"PUT",headers:{"Content-Type":"image/jpeg","X-AGOL-Token":auth.token},body});
+        if(r.ok) ok++;
+      } catch(e){ /* best effort */ }
+    }
+  }
+  await Promise.all([one(),one()]);
+  return ok;
+}
 function step(k,cls){ const li=$("runSteps").querySelector(`[data-k="${k}"]`); if(li) li.className=cls; }
 function runMsg(t){ $("runMsg").textContent=t; }
 function runBar(f){ $("runBar").style.width=Math.max(0,Math.min(100,f*100))+"%"; }
@@ -806,6 +843,9 @@ async function runUpload(opts={}){
                       + `Reopen this page to resume; the ones already sent are skipped.`);
     }
     step("upload","done");
+    // the same photos for the drone pages' Recorded tab (ortho set photos at their spots), alongside Nova's
+    // processing; never fails the ortho
+    const copies=sendCopies(files,"nova-"+String(flightId).toLowerCase().replace(/[^a-z0-9-]/g,""));
 
     /* ---- 3. wait for the epoch ------------------------------------- */
     step("process","now"); runMsg("Nova is building the orthomosaic…"); runBar(0.65);
@@ -852,6 +892,8 @@ async function runUpload(opts={}){
     }
     $("runTitle").textContent=name+" — done";
     toastMsg("Ortho is on the incident map.",6000);
+    const nCopies=await copies;
+    if(nCopies) runMsg(`On the incident map. ${nCopies} of ${files.length} photos are in the drone pages' Recorded tab (ortho set photos).`);
     try { navigator.vibrate && navigator.vibrate([120,60,120]); } catch(e){}
     await refreshAll();
   } catch(e){
