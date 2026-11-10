@@ -25,7 +25,8 @@
   2026-11-05 (Tyler, Field App "Drone" menu): ?page=live|recorded|upload|missions picks which of the drone
   page's tabs show (Livestream / Recorded / Upload / Mission Planner); no ?page= = every tab (the response
   viewers' Drone Video button). Upload and Mission Planner are never unloaded when hidden (a video upload or a
-  half-built mission would be lost); live video and recorded playback are.
+  half-built mission would be lost); live video is. Recorded stays loaded too (2026-11-10): leaving it pauses
+  any playing video (postMessage 'wri-live-pause') instead of reloading the page.
 
   Video stops 3 s after the page is hidden (same rule as the Live Stream panel) so a parked panel
   doesn't keep pulling video over a phone connection, except while the Upload tab is sending a
@@ -58,7 +59,10 @@
   var host = document.getElementById('host'), off = document.getElementById('off');
   var frame = null, hiddenSince = null, uploading = false;
   var PAGE = (function () { var p = new URLSearchParams(location.search).get('page') || ''; return /^(live|recorded|upload|missions)$/.test(p) ? p : ''; })();
-  var KEEP = PAGE === 'upload' || PAGE === 'missions';   // typing / sending: never torn down
+  // typing / sending: never torn down. Recorded too (Tyler 2026-11-10: the "video stopped" reload is for
+  // Livestream only): it stays loaded and is only asked to pause a playing video when hidden.
+  var KEEP = PAGE === 'upload' || PAGE === 'missions' || PAGE === 'recorded';
+  var paused = false;
 
   function exbToken() {
     var raw = null;
@@ -150,6 +154,11 @@
     return window.innerWidth === 0 || window.innerHeight === 0;
   }
   function check() {
+    if (frame && PAGE === 'recorded') {
+      var h = isHidden();
+      if (h && !paused) { try { frame.contentWindow.postMessage({ type: 'wri-live-pause' }, SERVER); } catch (e) {} }
+      paused = h;
+    }
     if (!frame || uploading || KEEP) return;
     if (isHidden()) {
       if (hiddenSince === null) hiddenSince = Date.now();
