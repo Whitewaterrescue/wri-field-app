@@ -34,7 +34,7 @@
 <style>
   html, body { margin: 0; height: 100%; background: #171919; overflow: hidden; }
   iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
-  #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  #msg { position: fixed; inset: 0; z-index: 2; background: #171919; display: flex; align-items: center; justify-content: center;
     color: #ccc; font: 15px/1.4 Arial, sans-serif; text-align: center; padding: 24px; }
   #msg a { color: #EC2329; }
 </style>
@@ -69,18 +69,40 @@
     if (id) params.set('incident', id);
   }
 
+  // D1 2026-11-12: each Ops page names its own tab (ICS 201 opened in a new tab still read "WRI Ops Dashboard")
+  var OPS_TITLES = { 'v2-ics201': 'ICS 201', 'v2-resl': 'RESL', 'v2-request': 'Requirements', 'v2-assignments': 'Work Assignments' };
+  function pageTitle() {
+    var t = key === 'ops' && OPS_TITLES[params.get('page') || ''];
+    return t ? t + ' \u2014 WRI Ops' : app.title;
+  }
+
   var frame = document.createElement('iframe');
   frame.title = app.title;
   frame.setAttribute('allow', 'geolocation; camera; microphone; clipboard-read; clipboard-write; fullscreen; web-share; autoplay');
   frame.setAttribute('allowfullscreen', '');
   frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
-  frame.addEventListener('load', function () { msg.style.display = 'none'; });
+  var readyTimer = null;
+  function showLoading() {
+    msg.textContent = 'Loading ' + pageTitle() + '\u2026';
+    msg.style.display = 'flex';
+    clearTimeout(readyTimer);
+    readyTimer = setTimeout(function () { msg.style.display = 'none'; }, 25000);   // never stuck behind it
+  }
+  frame.addEventListener('load', function () { if (key !== 'ops') msg.style.display = 'none'; });
+  window.addEventListener('message', function (e) {
+    if (!e.data || e.data.type !== 'wri-apps-ready') return;
+    var ok = false;
+    try { ok = /\.googleusercontent\.com$/.test(new URL(e.origin).hostname); } catch (x) {}
+    if (ok) { clearTimeout(readyTimer); msg.style.display = 'none'; }
+  });
 
   function load() {
     var q = new URLSearchParams(params);
     q.set('wrap', 'wri-apps');
     frame.src = app.url + '?' + q.toString();
-    document.title = app.title;
+    document.title = pageTitle();
+    frame.title = pageTitle();
+    if (key === 'ops') showLoading();
     var shown = new URLSearchParams(params);
     shown.set('app', key);
     history.replaceState(null, '', '?' + shown.toString());
@@ -111,6 +133,16 @@
       e.source.postMessage({ type: 'wri-agol-token', token: a.token, username: a.email || '',
         expiresAt: new Date(a.expires).getTime() || Date.now() + 1200000 }, e.origin);
     } catch (x) {}
+  });
+
+  // D1 2026-11-12: Present / Present Briefing on an Ops page hides the LOG 214 button while the slides show.
+  window.addEventListener('message', function (e) {
+    if (!e.data || e.data.type !== 'wri-apps-present') return;
+    var ok = false;
+    try { ok = /\.googleusercontent\.com$/.test(new URL(e.origin).hostname); } catch (x) {}
+    if (!ok) return;
+    var on = !!e.data.on;
+    document.querySelectorAll('.wri-214-fab').forEach(function (b) { b.style.visibility = on ? 'hidden' : ''; });
   });
 
   // Ops nav inside the wrapper (V2Scripts wireWrapperNav_): switch the framed page.
