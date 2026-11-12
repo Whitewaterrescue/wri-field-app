@@ -81,8 +81,11 @@
   .section-title{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-dim);
     margin:18px 2px 8px;display:flex;align-items:center;gap:8px}
   .section-title .count{background:var(--surface-alt);border-radius:10px;padding:1px 8px;font-size:11px;letter-spacing:0}
+  /* r1 2026-11-12: changing the unit filter shrank the list, the page scrolled and this button slid under the thumb:
+     it now stays put at the top of the pane (sticky under the top bar) and the lists keep their height while they redraw */
   .btn-log{display:block;text-align:center;background:var(--accent);color:#fff;font-weight:700;text-decoration:none;
-    border-radius:10px;padding:12px;margin:4px 0 6px;font-size:15px}
+    border-radius:10px;padding:12px;margin:4px 0 6px;font-size:15px;position:sticky;top:var(--topbar-h,59px);z-index:5;
+    box-shadow:0 0 0 6px var(--bg)}
   .section-title select{margin-left:auto;background:var(--surface);color:var(--text);border:1px solid var(--border);
     border-radius:8px;padding:4px 8px;font-size:13px;text-transform:none;letter-spacing:0}
   .msg{white-space:pre-wrap;line-height:1.45;font-size:14px}
@@ -455,9 +458,24 @@ function renderPicker(list, inc, pinned){
     sel.hidden=true; chip.hidden=!inc; chip.textContent = inc ? (inc.incident_name||inc.incident_id) : "";
   }
 }
-$("incPick").onchange = e => { state.pick = e.target.value; lsSet(LS_PICK, state.pick); state.prevSig=null; tellMap(state.pick); load(true); };
+$("incPick").onchange = e => { releaseHeights(); state.pick = e.target.value; lsSet(LS_PICK, state.pick); state.prevSig=null; tellMap(state.pick); load(true); };
 
-const fmtTime = ms => ms ? new Date(ms).toLocaleString([], {month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit"}) : "";
+/* r1 2026-11-12: no "ETA 1/1, 12:00 AM" for an empty / zero / nonsense date (the publisher sends year-1500 ETAs for
+   a Logistics ETA typed as "1500"), and the year when it isn't this year (a 214 dated 12/13 was 12/13/2025). */
+const realMs = v => { if (v==null || v==="") return NaN; const t = typeof v==="number" ? v : Date.parse(v);
+  return isFinite(t) && t > Date.UTC(2000,0,1) && t < Date.UTC(2100,0,1) ? t : NaN; };
+const fmtTime = ms => { const t = realMs(ms); if (!isFinite(t)) return ""; const d = new Date(t);
+  const o = {month:"numeric", day:"numeric", hour:"2-digit", minute:"2-digit"};
+  if (d.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
+  return d.toLocaleString([], o); };
+/* "2026-11-05T12:30" / "2026-11-05 12:30" / "2026-11-05" typed into a request: format like the other dates */
+function fmtLoose(s){
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{1,2}):(\d{2}))?$/.exec(String(s||"").trim());
+  if (!m) return String(s||"");
+  const d = new Date(+m[1], +m[2]-1, +m[3], m[4]!=null ? +m[4] : 0, m[5]!=null ? +m[5] : 0);
+  if (m[4]==null) return d.toLocaleDateString([], d.getFullYear()!==new Date().getFullYear() ? {month:"numeric", day:"numeric", year:"numeric"} : {month:"numeric", day:"numeric"});
+  return fmtTime(d.getTime());
+}
 const label = s => String(s||"").replace(/_/g," ");
 function badge(v){ return v ? `<span class="badge ${esc(String(v).toLowerCase().replace(/\s+/g,"_"))}">${esc(label(v))}</span>` : ""; }
 function dirLink(g){ return g ? `<a target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${g.y.toFixed(6)},${g.x.toFixed(6)}">Directions</a>` : ""; }
@@ -465,11 +483,14 @@ function telLink(p){ const d=String(p||"").replace(/[^0-9+]/g,""); return d ? `<
 
 function render(){
   const b = state.board; if (!b) return;
+  // r1 2026-11-12: "as of" is when the ops COP publisher last wrote the board (about every 3 min), not when this
+  // phone looked; a Refresh in between found nothing newer and looked broken. Both times are shown now.
   const s = b.status || {};
   show("viewMain");
   banner("bnDrill", /^(exercise|drill)$/i.test(b.incident.incident_type||"") ? "EXERCISE / DRILL - THIS IS NOT A REAL INCIDENT" : "");
   const asOf = s.as_of || 0;
-  $("asof").textContent = (asOf ? "Board as of "+fmtTime(asOf) : "Board not published yet") +
+  $("asof").textContent = (asOf ? "Board published "+fmtTime(asOf) : "Board not published yet") +
+    (b.fetchedAt ? " · checked "+hhmm(b.fetchedAt) : "") +
     (b.cached ? " · saved copy" : "") + (b.incident.current_op_period ? " · Op period "+b.incident.current_op_period : "");
   banner("bnStale", asOf && Date.now()-asOf > STALE_MS && !b.cached ? "Board data is more than "+Math.round((Date.now()-asOf)/60000)+" min old. The publisher may be paused." : "");
 
@@ -544,11 +565,20 @@ function renderLog(b){
   $("secPick").value = SECTIONS[sec] ? sec : "operations";
   const unit = rows.filter(r => r.section===$("secPick").value && r.on_unit_log==="yes");
   $("lnkLog").href = FORMS_URL + "?incident=" + encodeURIComponent(b.incident.incident_id) + "#214";
+  holdHeight($("listMine")); holdHeight($("listUnit")); state.logShiftAt = Date.now();
   $("listMine").innerHTML = mine.length ? mine.slice(0,100).map(r => logItem(r,false)).join("")
     : `<div class="empty">${me ? "No 214 entries from you on this incident yet." : "Sign in to see your own log."}</div>`;
   $("listUnit").innerHTML = unit.length ? unit.slice(0,150).map(r => logItem(r,true)).join("")
     : `<div class="empty">Nothing on the ${esc(SECTIONS[$("secPick").value])} unit log yet.</div>`;
 }
+/* keep a list's current height while it redraws (released on a tab or incident change), so the page doesn't
+   shrink and scroll under the thumb */
+function holdHeight(el){ if (el && el.offsetHeight) el.style.minHeight = Math.max(el.offsetHeight, parseFloat(el.style.minHeight)||0) + "px"; }
+function releaseHeights(){ ["listMine","listUnit"].forEach(id => { const el=$(id); if (el) el.style.minHeight=""; }); }
+/* a tap that lands on "+ Log a 214 entry" right after the log moved under it was meant for something else */
+$("lnkLog").addEventListener("click", ev => { if (Date.now() - (state.logShiftAt||0) < 700) { ev.preventDefault(); ev.stopImmediatePropagation(); } }, true);
+function setTopbarH(){ const t=document.querySelector(".topbar"); if (t) document.documentElement.style.setProperty("--topbar-h", t.offsetHeight+"px"); }
+setTopbarH(); window.addEventListener("resize", setTopbarH);
 $("secPick").onchange = e => { state.secPick = e.target.value; lsSet(LS_SEC, state.secPick); if (state.board) renderLog(state.board); };
 
 // a drone mission's assignment (WRI Drone Cloud) carries a signed link to its mission page
@@ -632,7 +662,7 @@ function renderRes(b){
       const caps = [r.boom_ft?r.boom_ft+" ft boom":"", r.recovery_edrc?r.recovery_edrc+" bbl/d EDRC":"", r.liquid_storage?r.liquid_storage+" bbl storage":"",
         r.quantity?"qty "+r.quantity:""].filter(Boolean);
       return `<div class="item"><div class="t">${badge(r.status)}${esc(r.identification||r.resource_kind||"Resource")}</div>
-        <div class="m">${[r.resource_kind, r.specification, r.organization_code, caps.join(", "), r.eta?"ETA "+fmtTime(r.eta):"",
+        <div class="m">${[r.resource_kind, r.specification, r.organization_code, caps.join(", "), fmtTime(r.eta)?"ETA "+fmtTime(r.eta):"",
           String(r.review_status||"").toLowerCase()==="pending"?"in RM review":""].filter(Boolean).map(esc).join(" · ")}</div></div>`;
     }).join("")).join("");
 }
@@ -647,7 +677,7 @@ function renderReq(b){
   $("cntReq").textContent = rows.length ? "("+rows.length+")" : "";
   $("listReq").innerHTML = !rows.length ? `<div class="empty">No open 213-RR requests. A new request shows here within about 5 minutes of being sent.</div>` : rows.map(r => `<div class="item">
       <div class="t">${badge(r.request_status)}${r.priority==="high"?badge("high"):""}${esc((r.quantity?r.quantity+" "+(r.uom||"")+" ":"")+(r.item||"Request"))}</div>
-      <div class="m">${[r.request_id, r.lsc_number, r.deliver_to?"to "+r.deliver_to:"", neededBy(r)?"needed by "+neededBy(r):"", r.eta?"ETA "+fmtTime(r.eta):"", r.supplier, r.requested_by?"by "+r.requested_by:""]
+      <div class="m">${[r.request_id, r.lsc_number, r.deliver_to?"to "+r.deliver_to:"", neededBy(r)?"needed by "+fmtLoose(neededBy(r)):"", fmtTime(r.eta)?"ETA "+fmtTime(r.eta):"", r.supplier, r.requested_by?"by "+r.requested_by:""]
         .filter(Boolean).map(esc).join(" · ")}</div>
     </div>`).join("");
 }
@@ -655,7 +685,7 @@ $("chkPending").onchange = () => renderRes(state.board);
 $("chkClosed").onchange = () => renderReq(state.board);
 $("chkDone").onchange = () => renderWork(state.board);
 document.querySelectorAll(".tabs [data-tab]").forEach(el => el.onclick = () => {
-  state.tab = el.dataset.tab;
+  state.tab = el.dataset.tab; releaseHeights();
   document.querySelectorAll(".tabs [data-tab]").forEach(t => t.classList.toggle("active", t===el));
   document.querySelectorAll("[data-pane]").forEach(p => p.hidden = p.dataset.pane!==state.tab);
 });
@@ -677,8 +707,10 @@ function notifyChanges(b){
 }
 
 async function load(manual){
-  if (state.busy) return;
-  state.busy = true;
+  // a Refresh tap while a background poll is running used to be dropped: run it once the poll is done
+  if (state.busy) { if (manual) state.again = true; return; }
+  state.busy = true; state.again = false;
+  const prevAsOf = state.board && state.board.status ? state.board.status.as_of : null;
   const btn=$("btnRefresh"); btn.disabled=true; btn.innerHTML='<span class="spin"></span>';
   try {
     if (!getAuth()) { renderAuthDiag(); if (!restoreCache()) showAuth(); return; }
@@ -689,6 +721,11 @@ async function load(manual){
     saveCache(b);
     notifyChanges(b);
     render();
+    if (manual) {
+      const a = b.status && b.status.as_of;
+      toast(a && a === prevAsOf ? "Checked "+hhmm(b.fetchedAt)+": nothing newer yet. The board is published about every 3 minutes."
+                                : "Board updated "+hhmm(b.fetchedAt)+".", 3500);
+    }
   } catch(e) {
     if (e instanceof AuthError) { if (!restoreCache()) showAuth(); else toast("Signed out of ArcGIS. Open the Incident Map tab to sign in."); return; }
     const offline = !navigator.onLine || /fetch|network|timed out/i.test(e.message||"");
@@ -696,6 +733,7 @@ async function load(manual){
     else { banner("bnErr", "Couldn't load the board: "+(e.message||e)); if (!state.board && !restoreCache()) show("viewLoading"); }
   } finally {
     state.busy = false; btn.disabled=false; btn.innerHTML="&#x21bb;";
+    if (state.again) { state.again = false; setTimeout(() => load(true), 0); }
   }
 }
 function cacheMap(){ try { return JSON.parse(lsGet(LS_CACHE)||"null") || {}; } catch(e){ return {}; } }

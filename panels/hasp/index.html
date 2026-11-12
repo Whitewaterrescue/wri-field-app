@@ -50,6 +50,13 @@
     overflow:hidden;background:#fff;
   }
   .preview iframe{width:100%;height:100%;min-height:420px;border:none}
+  /* r1 2026-11-12: the Google Docs preview lays the plan out at its page width (~820 px) and doesn't reflow, so at
+     390 px the right side was cut off. Narrower than the page, the frame is drawn at page width and scaled to fit
+     the box (fitPreview); "Read the full plan (PDF)" is there to read it full size. */
+  .preview{position:relative}
+  .preview.fit{height:var(--pv-h,420px);min-height:0;flex:none}
+  .preview.fit iframe{position:absolute;left:0;top:0;min-height:0;transform-origin:0 0;
+    width:var(--pv-w);height:var(--pv-fh);transform:scale(var(--pv-s))}
   .empty,.loading{color:var(--text-muted);text-align:center;padding:40px 20px;font-size:14px}
   .spin{
     width:26px;height:26px;margin:0 auto 12px;border-radius:50%;
@@ -233,6 +240,20 @@
     return h + '</div>';
   }
 
+  var PREVIEW_W = 840;   // the Docs preview's page width + its margins, in CSS px
+  function fitPreview() {
+    var box = document.querySelector('.preview');
+    if (!box) return;
+    var w = box.clientWidth;
+    if (!w || w >= PREVIEW_W) { box.classList.remove('fit'); return; }
+    var s = w / PREVIEW_W, h = Math.max(420, Math.round(window.innerHeight * 0.6));
+    box.style.setProperty('--pv-s', String(s));
+    box.style.setProperty('--pv-w', PREVIEW_W + 'px');
+    box.style.setProperty('--pv-h', h + 'px');
+    box.style.setProperty('--pv-fh', Math.round(h / s) + 'px');
+    box.classList.add('fit');
+  }
+  window.addEventListener('resize', fitPreview);
   function render(d) {
     var h = d.hasp, sm = d.summary || null;
     var html =
@@ -257,6 +278,7 @@
       (haspIdOf(h) ? '<div class="ack-card" id="ackCard"></div>' : '') +
       (d.haspUrl ? '<a class="full-link" href="' + esc(d.haspUrl) + '" target="_blank" rel="noopener">Open full HASP app (create / edit plans)</a>' : '');
     document.getElementById('content').innerHTML = html;
+    fitPreview();
     ACK.hasp = h; ACK.id = haspIdOf(h);
     renderAck();
     sendInBackground();

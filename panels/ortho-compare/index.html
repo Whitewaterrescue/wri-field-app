@@ -682,6 +682,8 @@ async function mods(){
 }
 function serverRoot(url){ const i=url.indexOf("/rest/services"); return i>0?url.slice(0,i+"/rest/services".length):url.split("/").slice(0,3).join("/"); }
 const registered=new Set();
+/* registerToken needs the IdentityManager module: wait for it without holding anything else */
+function registerTokenLater(url){ if(M) registerToken(url); else mods().then(()=>registerToken(url)).catch(()=>{}); }
 function registerToken(url){
   const auth=getAuth(); if(!auth||!url) return;
   const server=/\/sharing\/rest/.test(url)?PORTAL+"/sharing/rest":serverRoot(url);
@@ -692,9 +694,12 @@ function registerToken(url){
 }
 const G={views:[],swipe:null,seq:0,watch:[],orthoCache:new Map()};
 const infoCache=new Map();
-async function serviceInfo(url){
+/* the promise is cached (r1 2026-11-12: boot prefetches the picked orthos' info while the map library loads) */
+function serviceInfo(url){
   if(infoCache.has(url)) return infoCache.get(url);
-  const j=await rest(url,{},{get:true,label:"ortho service"}); infoCache.set(url,j); return j;
+  const p=rest(url,{},{get:true,label:"ortho service"});
+  infoCache.set(url,p); p.catch(()=>infoCache.delete(url));
+  return p;
 }
 /* tiled hosted imagery -> ImageryTileLayer; dynamic -> ImageryLayer; the other class is tried if the first refuses */
 async function orthoLayer(o,slot){
@@ -903,6 +908,9 @@ function boot(force){ if(booting&&!force) return booting; booting=run().finally(
 async function run(){
   clearInterval(authPoll);
   if(!getAuth()){ showAuth(); return; }
+  // r1 2026-11-12 (10-15 s to open on a phone): the ~1 MB map library used to start loading only after the
+  // sign-in check, the incident, the web map, the ortho list AND every overlay's layer info. Start it now, alongside them.
+  mods().catch(e=>console.warn("map library",e));
   try { await verifyAuth(); } catch(e){ showAuth(); return; }
   try {
     await loadIncidents();
@@ -931,12 +939,21 @@ async function run(){
     }
     showView("viewMain");
     fillPicks();
+    // the two picked orthos' service info, while the map library finishes loading
+    for(const id of [state.a,state.b]){ const o=rowById(id); if(o&&o.url){ registerTokenLater(o.url); serviceInfo(o.url).catch(()=>{}); } }
     state.ovReady=false;
     state.ovReady0=buildOverlays().catch(e=>{ if(e instanceof AuthError) throw e; console.warn("overlays",e); state.ov=[]; renderOverlayList(); })
       .finally(()=>{ state.ovReady=true; });
-    // the default-on overlays have to be known before the first draw so they appear straight away
-    await state.ovReady0;
-    await draw();
+    // r1 2026-11-12: the orthos draw first; the overlays (each feature layer's info could take up to 12 s) are
+    // added to the drawn maps when their list is ready, instead of holding back the first draw
+    const drawP=draw();
+    state.ovReady0.then(async()=>{
+      await drawP;
+      if(!G.views.length||!state.ov.some(o=>o.on&&!o.failed)) return;
+      await Promise.all(G.views.map((v,slot)=>syncOverlays(v.map,slot)));
+      if(state.ov.some(o=>o.failed)) renderOverlayList();
+    }).catch(e=>{ if(e instanceof AuthError) handleErr(e,"compare"); else console.warn("overlays",e); });
+    await drawP;
   } catch(e){ handleErr(e,"compare"); }
 }
 if(DEBUG) window.__wriCompare={state,G};   // ?debug: for support and the headless check
