@@ -23,6 +23,10 @@
   sign-in saved on this origin (exb_auth), the Field App root's bridge verbatim;
   silence means the map falls back to its own sign-in.
 
+  Ops also gets the floating LOG 214 button (wri-recon/js/fab214-host.js, the
+  Field App's 214 panel). Ops leaves its own old 214 card off when wrap=wri-apps.
+  The button stays away inside a frame or with from=fieldapp.
+
   The frame has NO sandbox on purpose: the apps use window.open (print, PDFs,
   ArcGIS sign-in popup), confirm/prompt, file pickers and downloads. `allow`
   passes through location (RM unit locate), camera and clipboard.
@@ -83,6 +87,14 @@
   }
   load();
   document.body.appendChild(frame);
+
+  // Ops: the new 214 (Field Forms ?embed=214 in a panel; same origin, so it shares the outbox, name and PIN).
+  if (key === 'ops') {
+    window.WRI_214_HOST = { incident: function () { return params.get('incident') || ''; }, section: 'operations' };
+    var s214 = document.createElement('script');
+    s214.src = '/wri-recon/js/fab214-host.js?v=2026-11-12-3';
+    document.body.appendChild(s214);
+  }
 
   // ArcGIS token bridge (same as the Field App root index.html).
   window.addEventListener('message', function (e) {
