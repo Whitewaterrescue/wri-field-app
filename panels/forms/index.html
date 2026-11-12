@@ -198,7 +198,7 @@
     frame.setAttribute('allow', 'geolocation; camera; microphone');
     frame.setAttribute('allowfullscreen', '');
     frame.onload = function () { document.getElementById('ovLoading').style.display = 'none'; };
-    frame.src = url;
+    frame.src = inFieldApp(url);
     document.getElementById('ovTitle').textContent = name || '';
     document.getElementById('ovNewTab').href = url;
     document.getElementById('ovLoading').style.display = '';
@@ -266,6 +266,18 @@
       openOverlay(a.href, a.getAttribute('data-name') || a.textContent);
     }
   });
+
+  // Pages shown in this overlay are told so (from=fieldapp): the Ops, Safety and Logistics dashboards
+  // then leave their own 214 button off, because the Field App's LOG 214 already floats on top.
+  // Only the overlay frame gets it; "open in a new tab" keeps the plain link.
+  function inFieldApp(u) {
+    try {
+      var x = new URL(u, location.href);
+      if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(x.href) && x.origin !== location.origin) return u;
+      x.searchParams.set('from', 'fieldapp');
+      return x.toString();
+    } catch (e) { return u; }
+  }
 
   // P3: the GAS apps (Recon, HASP, Vessel, JSA, SSP, dashboards ...) take ?incident=.
   // Open them on the phone's incident choice (incident gate / map chip, shared on this origin).
