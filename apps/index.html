@@ -23,7 +23,7 @@
   sign-in saved on this origin (exb_auth), the Field App root's bridge verbatim;
   silence means the map falls back to its own sign-in.
 
-  Ops also gets the floating LOG 214 button (wri-recon/js/fab214-host.js, the
+  Ops and RM also get the floating LOG 214 button (wri-recon/js/fab214-host.js, the
   Field App's 214 panel). Ops leaves its own old 214 card off when wrap=wri-apps.
   The button stays away inside a frame or with from=fieldapp.
 
@@ -110,11 +110,12 @@
   load();
   document.body.appendChild(frame);
 
-  // Ops: the new 214 (Field Forms ?embed=214 in a panel; same origin, so it shares the outbox, name and PIN).
-  if (key === 'ops') {
-    window.WRI_214_HOST = { incident: function () { return params.get('incident') || ''; }, section: 'operations' };
+  // Ops + RM: the new 214 (Field Forms ?embed=214 in a panel; same origin, so it shares the outbox, name and PIN).
+  // Both leave their own old 214 card off when wrap=wri-apps (Ops #45; RM 2026-11-12, Planning as its card had).
+  if (key === 'ops' || key === 'rm') {
+    window.WRI_214_HOST = { incident: function () { return params.get('incident') || ''; }, section: key === 'rm' ? 'planning' : 'operations' };
     var s214 = document.createElement('script');
-    s214.src = '/wri-recon/js/fab214-host.js?v=2026-11-12-3';
+    s214.src = '/wri-recon/js/fab214-host.js?v=2026-11-12-4';
     document.body.appendChild(s214);
   }
 
