@@ -59,6 +59,8 @@
   var host = document.getElementById('host'), off = document.getElementById('off');
   var frame = null, hiddenSince = null, uploading = false;
   var PAGE = (function () { var p = new URLSearchParams(location.search).get('page') || ''; return /^(live|recorded|upload|missions)$/.test(p) ? p : ''; })();
+  // Upload opened for one kind (the Upload page's Drone photos / Videos sections): the uploader words itself for it
+  var FOR = (function () { var p = new URLSearchParams(location.search).get('for') || ''; return /^(photos|videos)$/.test(p) ? p : ''; })();
   // typing / sending: never torn down. Recorded too (Tyler 2026-11-10: the "video stopped" reload is for
   // Livestream only): it stays loaded and is only asked to pause a playing video when hidden.
   var KEEP = PAGE === 'upload' || PAGE === 'missions' || PAGE === 'recorded';
@@ -127,7 +129,7 @@
     var f = frame, inc = incident();
     savedPin(inc).then(function (pin) {
       if (frame !== f) return;   // closed meanwhile
-      f.src = SERVER + '/live?embed=1' + (PAGE ? '&page=' + PAGE : '') + (pin ? '#pin=' + encodeURIComponent(pin) + '&inc=' + encodeURIComponent(inc) : '');
+      f.src = SERVER + '/live?embed=1' + (PAGE ? '&page=' + PAGE : '') + (FOR ? '&for=' + FOR : '') + (pin ? '#pin=' + encodeURIComponent(pin) + '&inc=' + encodeURIComponent(inc) : '');
     });
     off.classList.remove('on'); host.style.display = '';
   }

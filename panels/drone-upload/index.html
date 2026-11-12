@@ -10,8 +10,10 @@
   does the job, unchanged, in a frame:
     Drone orthos   ../drone/                    (photos -> Nova -> ortho on the map; orthos on the map)
     Drone panos    ../panos/                    (360 panoramas -> the incident pano viewer)
-    Videos         ../drone-live/?page=upload   (SD-card video + .SRT -> Dropbox, linked to the map)
-    Drone photos   /wri-recon/#drone            (Field Forms Drone tab: photos -> recon points)
+    Videos         ../drone-live/?page=upload&for=videos   (SD-card video + .SRT -> Dropbox, linked to the map)
+    Drone photos   ../drone-live/?page=upload&for=photos   (SD-card photos -> the incident's media: Search, Edit, Drone Photos)
+  2026-11-12 (Tyler): Drone photos used to frame the Field Forms recon tool (/wri-recon/#drone), so photos uploaded
+  there never reached Search. It now opens the same uploader as Videos; the recon tool stays under Offline apps.
   All same origin as the Field App, so each keeps the phone's ArcGIS sign-in, incident choice and saved PIN.
   A section loads the first time it's opened and stays loaded after it closes (an upload keeps going); one
   section is open at a time and fills the screen below the headers. The Field App never unloads this page
@@ -57,8 +59,8 @@ body{background:var(--wipeout);color:var(--text);font-family:var(--font-body);di
   var SECTIONS = [
     { id: 'orthos', title: 'Drone orthos', sub: 'Mapping photos to an ortho on the incident map', src: '../drone/' },
     { id: 'panos', title: 'Drone panos', sub: '360 panoramas to the incident pano viewer', src: '../panos/' },
-    { id: 'videos', title: 'Videos', sub: 'Drone video (and its .SRT) to Dropbox, linked to the map', src: '../drone-live/?page=upload' },
-    { id: 'photos', title: 'Drone photos', sub: 'Single photos to recon points', src: '/wri-recon/#drone' }
+    { id: 'videos', title: 'Videos', sub: 'Drone video (and its .SRT) to Dropbox, linked to the map', src: '../drone-live/?page=upload&for=videos' },
+    { id: 'photos', title: 'Drone photos', sub: 'SD-card photos into Search and Edit with the rest of the incident media', src: '../drone-live/?page=upload&for=photos' }
   ];
   var CHEV = '<svg class="chev" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 7.5l5 5 5-5"/></svg>';
   var els = {};
