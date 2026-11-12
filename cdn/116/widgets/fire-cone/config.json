@@ -1,0 +1,13 @@
+{
+  "maxHours": 24,
+  "isochroneHours": [1, 3, 6, 12, 24],
+  "maxRadiusKm": 30,
+  "bearings": 24,
+  "stepM": 500,
+  "assetLayers": [
+    {"url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_Tunnels_with_Wildfire_Strategy/FeatureServer/0",
+     "nameField": "Tunnel_Name", "extraFields": ["Subdivision", "Milepost", "Overall_Risk_Classification"]},
+    {"url": "https://services6.arcgis.com/Ji79lWGR5B33LhY7/arcgis/rest/services/BNSF_Infrastructure_with_Wildfire_Strategy/FeatureServer/1",
+     "nameField": "Descriptio", "extraFields": ["Subdivisio", "Milepost", "Overall__1"]}
+  ]
+}

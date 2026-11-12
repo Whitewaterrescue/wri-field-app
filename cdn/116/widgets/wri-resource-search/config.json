@@ -1,0 +1,7 @@
+{
+ "defaultRadiusMi": 100,
+ "radiusPresets": [25, 50, 100, 250],
+ "speedMph": 35,
+ "maxResults": 200,
+ "detourFactor": 1.3
+}

@@ -1,0 +1,25 @@
+{
+  "name": "wri-map-guard",
+  "label": "WRI Map Guard",
+  "type": "widget",
+  "version": "1.0.0",
+  "exbVersion": "1.20.0",
+  "author": "Whitewater Rescue Institute",
+  "description": "Invisible map companion for phones. (1) If the map's WebGL context is lost and ExB's own recovery has not brought it back within 8 s, shows a one-tap 'restore' button that reloads onto the same page. (2) Optionally (releaseOnHide) destroys the MapView that ExB parks in memory when a reference-map page is hidden, so only the current map holds a WebGL context; the next visit rebuilds the map fresh.",
+  "copyright": "WRI",
+  "license": "",
+  "properties": {
+    "hasConfig": false,
+    "hasSettingPage": false
+  },
+  "dependency": [
+    "jimu-arcgis"
+  ],
+  "translatedLocales": [
+    "en"
+  ],
+  "defaultSize": {
+    "width": 1,
+    "height": 1
+  }
+}
