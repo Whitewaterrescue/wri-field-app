@@ -400,7 +400,7 @@
     },
     "page_25": {
       "id": "page_25",
-      "label": "Drone Photos",
+      "label": "Photos → Recon points",
       "type": "NORMAL",
       "mode": "FIT_WINDOW",
       "layout": {
@@ -408,7 +408,7 @@
         "MEDIUM": "layout_drone_photos",
         "SMALL": "layout_drone_photos"
       },
-      "isVisible": false,
+      "isVisible": true,
       "isDefault": false,
       "header": true,
       "footer": false
@@ -3264,10 +3264,10 @@
       "id": "widget_50",
       "uri": "widgets/common/embed/",
       "version": "1.20.0",
-      "label": "Drone Photos",
+      "label": "Photos → Recon points",
       "config": {
         "embedType": "url",
-        "expression": "<p>https://whitewaterrescue.github.io/wri-recon/#drone</p>",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-recon/?view=drone</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
