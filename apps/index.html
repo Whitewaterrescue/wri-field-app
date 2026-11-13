@@ -70,7 +70,7 @@
   }
 
   // D1 2026-11-12: each Ops page names its own tab (ICS 201 opened in a new tab still read "WRI Ops Dashboard")
-  var OPS_TITLES = { 'v2-ics201': 'ICS 201', 'v2-resl': 'RESL', 'v2-request': 'Requirements', 'v2-assignments': 'Work Assignments' };
+  var OPS_TITLES = { 'v2-ics201': 'ICS 201', 'v2-resl': 'RESL', 'v2-assignments': 'Work Assignments' };
   function pageTitle() {
     var t = key === 'ops' && OPS_TITLES[params.get('page') || ''];
     return t ? t + ' \u2014 WRI Ops' : app.title;
@@ -97,6 +97,12 @@
   });
 
   function load() {
+    // 2026-11-13 (Cody): the offline Field Forms Request replaces the Ops request page everywhere (same site, so it
+    // shares the phone's outbox, PIN and incident). Viewer buttons still ask for ?app=ops&page=v2-request.
+    if (key === 'ops' && /^(v2-)?request$/.test(params.get('page') || '')) {
+      location.replace('/wri-recon/?view=rr' + (params.get('incident') ? '&incident=' + encodeURIComponent(params.get('incident')) : ''));
+      return;
+    }
     var q = new URLSearchParams(params);
     q.set('wrap', 'wri-apps');
     frame.src = app.url + '?' + q.toString();

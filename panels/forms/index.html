@@ -284,7 +284,9 @@
   function withIncident(u) {
     var key = '';
     try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) key = c.key || c.id; } catch (e) {}
-    if (!key || !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(u)) return u;
+    // 2026-11-13: Field Forms one-app pages (RECON, Resource Request, Drill Eval: /wri-recon/?view=) read ?incident= too
+    var ff = /^https:\/\/whitewaterrescue\.github\.io\/wri-recon\//.test(u);
+    if (!key || (!ff && !/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec/.test(u))) return u;
     try { var x = new URL(u); x.searchParams.set('incident', key); return x.toString(); } catch (e) { return u; }
   }
   // the choice can change while this page is open (gate / map chip): redraw the links
