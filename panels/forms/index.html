@@ -412,7 +412,8 @@
   function safetyUrl(type) {
     var id = '';
     try { var c = JSON.parse(localStorage.getItem('wri_incident_choice') || 'null'); if (c && c.id && c.expires > Date.now()) id = c.id; } catch (e) {}
-    return 'https://whitewaterrescue.github.io/wri-recon/' + (id ? '?incident=' + encodeURIComponent(id) : '') + '#recon?type=' + type;
+    // 2026-11-15: ?view=recon = the one-form Recon page (no tab bar), same as the RECON button
+    return 'https://whitewaterrescue.github.io/wri-recon/?view=recon' + (id ? '&incident=' + encodeURIComponent(id) : '') + '#recon?type=' + type;
   }
   function safetyRow() {
     return '<div class="safety-hint">Report a safety event (saves a recon point at your location)</div><div class="safety-row">' +
