@@ -487,6 +487,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_31": {
+      "id": "page_31",
+      "label": "Radios",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_crew_radios",
+        "MEDIUM": "layout_crew_radios",
+        "SMALL": "layout_crew_radios"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -543,7 +558,8 @@
     {
       "page_22": [
         "page_9",
-        "page_24"
+        "page_24",
+        "page_31"
       ]
     }
   ],
@@ -1825,6 +1841,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_56",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_crew_radios": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_57",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -3348,6 +3397,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/ortho-compare/</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_57": {
+      "id": "widget_57",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Radios",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://drone.whitewaterrescue.com/radios</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
