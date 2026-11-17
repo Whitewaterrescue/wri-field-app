@@ -166,6 +166,10 @@
         <div class="section-title">Meetings (ICS 230)</div>
         <div class="card" id="meetCard"></div>
       </div>
+      <div id="actWrap" hidden>
+        <div class="section-title">Open actions (ICS 233)</div>
+        <div class="card" id="actCard"></div>
+      </div>
       <div class="section-title">ICS 208 safety message</div>
       <div class="card"><div id="msg208" class="msg"></div></div>
       <div class="section-title">Comms &amp; medical</div>
@@ -363,7 +367,8 @@ async function fetchBoard(){
   const hasIap = (await layerIds()).IAP_Items != null;
   const nowMs = Date.now();
   const meetW = w + " AND item_kind = 'meeting' AND (deleted IS NULL OR deleted <> 'yes') AND (item_status IS NULL OR item_status <> 'cancelled')";
-  const [status, work, res, req, log, , meet] = await Promise.all([
+  const actW = w + " AND item_kind = 'action' AND (deleted IS NULL OR deleted <> 'yes') AND item_status = 'active'";
+  const [status, work, res, req, log, , meet, acts] = await Promise.all([
     query("Incident_Status", w, {orderByFields:"op_period DESC, as_of DESC", resultRecordCount:1}),
     query("Work_Assignments", w, {returnGeometry:"true", outSR:"4326"}),
     query("Incident_Resources", w, {outFields:"resource_id,organization_code,resource_kind,resource_type,identification,specification,status,branch,division,tf_unit_id,quantity,eta,boom_ft,recovery_edrc,liquid_storage,review_status"}),
@@ -372,9 +377,10 @@ async function fetchBoard(){
     whoAmI(),
     hasIap ? query("IAP_Items", meetW, {outFields:"item_text,item_due,item_tag,item_location,item_owner,op_period", orderByFields:"item_due ASC"})
                .then(rows => rows.filter(m => m.item_due && m.item_due > nowMs - 2*3600e3 && m.item_due < nowMs + 36*3600e3))
-               .catch(() => []) : []
+               .catch(() => []) : [],
+    hasIap ? query("IAP_Items", actW, {outFields:"item_text,item_owner,item_due,created_date", orderByFields:"item_due ASC"}).catch(() => []) : []
   ]);
-  return { incident: inc, status: status[0] || null, work, res, req, log, meet, fetchedAt: Date.now() };
+  return { incident: inc, status: status[0] || null, work, res, req, log, meet, acts, fetchedAt: Date.now() };
 }
 
 /* ============================================================ Render */
@@ -426,7 +432,20 @@ function render(){
   $("kvOrgs").innerHTML = ok.length ? ok.map(([o,n]) => `<div class="kv"><span>${esc(o)}</span><span>${n}</span></div>`).join("")
     : `<div class="empty">Nobody checked in.</div>`;
 
-  renderMeet(b); renderWork(b); renderRes(b); renderReq(b); renderLog(b);
+  renderMeet(b); renderActs(b); renderWork(b); renderRes(b); renderReq(b); renderLog(b);
+}
+
+/* ICS 233 open actions: open ones, overdue first (Planning keeps the list; everyone reads it here) */
+function renderActs(b){
+  const now = Date.now();
+  const rows = (b.acts || []).slice().sort((x,y) => (x.item_due||9e15) - (y.item_due||9e15));
+  $("actWrap").hidden = !rows.length;
+  if (!rows.length) return;
+  $("actCard").innerHTML = rows.map(a => {
+    const late = a.item_due && a.item_due < now;
+    return `<div class="kv" style="align-items:flex-start"><span>${esc(a.item_text||"")}${a.item_owner?`<br><small style="color:var(--text-dim)">${esc(a.item_owner)}</small>`:""}</span>` +
+      `<span style="text-align:right;white-space:nowrap${late?";color:var(--danger);font-weight:700":""}">${a.item_due?esc(fmtTime(a.item_due))+(late?"<br>overdue":""):""}</span></div>`;
+  }).join("");
 }
 
 /* ICS 230 meetings: the next one large, the rest of the window below (times on this phone's clock) */
