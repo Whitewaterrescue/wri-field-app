@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 <script src="pano-annot.js?v=9af68d128524"></script>
+<script src="pano-export.js?v=bdc2d11f62d0"></script>
 <style>
   /* WRI 360 Annotator -- Field App panel. Draw points, lines and areas with labels ON a sphere;
      everyone who opens that sphere from the map sees them.
@@ -101,6 +102,15 @@
   .footer{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--bg);border-top:1px solid var(--border)}
   .sw{display:flex;align-items:center;gap:8px;flex:1;font-size:12.5px;color:var(--text-dim);cursor:pointer;line-height:1.25}
   .sw input{width:20px;height:20px;accent-color:var(--accent);flex:none}
+  /* export spheres as 360 photos with their labels (Tyler 2026-11-17) */
+  .card.pick{position:relative;padding-left:46px}
+  .card.pick::before{content:"";position:absolute;left:13px;top:50%;width:22px;height:22px;margin-top:-11px;border-radius:6px;border:2px solid var(--border);background:var(--bg)}
+  .card.pick.sel{border-color:var(--accent)}
+  .card.pick.sel::before{background:var(--accent);border-color:var(--accent)}
+  .card.pick.sel::after{content:"\2713";position:absolute;left:18px;top:50%;margin-top:-11px;color:#fff;font:700 15px/22px var(--font)}
+  #exportBar{display:flex;gap:8px;align-items:center;padding:10px 12px;background:var(--bg);border-top:1px solid var(--border)}
+  #exportBar[hidden]{display:none}
+  #exportBar .msg{flex:1;font-size:12.5px;color:var(--text-dim);min-width:0;line-height:1.35}
 </style>
 </head>
 <body>
@@ -128,12 +138,18 @@
   <section class="view" id="viewPick" hidden>
     <div class="topbar">
       <h1>360 Annotator<span class="sub" id="whoLine"></span></h1>
+      <button class="chip" id="btnExportMode">Export</button>
       <button class="chip" id="btnReload">Reload</button>
     </div>
     <div class="mapline" id="mapline">Finding the incident map…</div>
     <div style="padding:10px 12px 0"><input type="search" id="search" placeholder="Search spheres" autocomplete="off"></div>
     <div id="srcRow" style="display:flex;gap:6px;padding:10px 12px 0;overflow-x:auto"></div>
     <div class="scroll" id="panoList"></div>
+    <div id="exportBar" hidden>
+      <span class="msg" id="exportMsg"></span>
+      <button class="btn ghost" id="btnExportCancel">Cancel</button>
+      <button class="btn primary" id="btnExportGo" disabled>Export</button>
+    </div>
   </section>
 
   <!-- ================= draw ================= -->
@@ -141,6 +157,7 @@
     <div class="topbar">
       <button class="chip" id="btnBack">Spheres</button>
       <h1 id="drawTitle">Sphere<span class="sub" id="drawSub"></span></h1>
+      <button class="chip" id="btnExportOne">Export</button>
       <button class="btn primary" id="btnSave" disabled>Save</button>
     </div>
 
@@ -252,7 +269,8 @@ const state = {
   sources: [], sourceKey: "incident", panos: [], filter: "",
   pano: null, key: null, oid: null, publicOk: false,
   shapes: [], sel: null, tool: "select", draft: null, dirty: false, color: "yellow",
-  viewer: null, overlay: null, saving: false
+  viewer: null, overlay: null, saving: false,
+  exportMode: false, picked: new Set(), annots: new Map(), busyExport: false
 };
 
 /* ============================================================ UI helpers */
@@ -480,6 +498,7 @@ function renderSources(){
 }
 
 function renderPanos(annots){
+  state.annots = annots || new Map();
   const list = $("panoList"); list.innerHTML = "";
   const q = state.filter.trim().toLowerCase();
   const rows = state.panos.filter(p => !q ||
@@ -498,7 +517,15 @@ function renderPanos(annots){
       (a ? `<span class="badge green">${a.shape_count || 0} label${a.shape_count === 1 ? "" : "s"}</span>` : "") +
       (a && Number(a.public_ok) === 1 ? `<span class="badge blue">public</span>` : "") + `</div>` +
       `<div class="meta">${esc(p.site_label || "")}${p.captured_date ? " · " + esc(p.captured_date) : ""}</div>`;
-    card.onclick = () => openPano(p);
+    if (state.exportMode) {
+      card.classList.add("pick");
+      if (state.picked.has(p.pano_url)) card.classList.add("sel");
+      card.onclick = () => {
+        if (state.busyExport) return;
+        if (state.picked.has(p.pano_url)) state.picked.delete(p.pano_url); else state.picked.add(p.pano_url);
+        card.classList.toggle("sel", state.picked.has(p.pano_url)); updateExportBar();
+      };
+    } else card.onclick = () => openPano(p);
     list.appendChild(card);
   }
 }
@@ -971,6 +998,89 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden && state.viewer && !state.dirty) teardownViewer();
   else if (!document.hidden && state.pano && !state.viewer) mountViewer(state.pano).then(redraw).catch(e => handleErr(e, "sphere"));
 });
+
+/* ============================================================ Export (Tyler 2026-11-17)
+   A sphere downloads as a full 360 photo with its labels and drawings on it (pano-export.js): one sphere
+   as a JPEG, several in one ZIP. The photo keeps its 360 tag, so other apps open it as a sphere. */
+const X = window.WRIPanoExport;
+// a phone (and every iPad / iPhone) caps a canvas near 16.7 million pixels: 5760 x 2880 there, 8192 x 4096 elsewhere
+const PHONE_EXPORT = COARSE || /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function exportMsg(t){ $("exportMsg").textContent = t; }
+function updateExportBar(){
+  const n = state.picked.size, b = $("btnExportGo");
+  b.disabled = !n || state.busyExport;
+  if (state.busyExport) return;
+  b.textContent = n > 1 ? `Export ${n}` : "Export";
+  exportMsg(n ? `${n} sphere${n === 1 ? "" : "s"} ticked. ${n === 1 ? "It downloads" : "They download in one ZIP"} as 360 photo${n === 1 ? "" : "s"} with the labels and drawings.`
+    : "Tick the spheres to download as 360 photos with their labels and drawings.");
+}
+function setExportMode(on){
+  if (state.busyExport) return;
+  state.exportMode = on; state.picked.clear();
+  $("exportBar").hidden = !on; $("btnExportMode").classList.toggle("on", on);
+  updateExportBar(); renderPanos(state.annots);
+}
+/** pano_key -> its saved shapes, for the spheres being exported from the list. */
+async function shapesFor(keys){
+  const out = new Map();
+  if (!keys.length) return out;
+  const j = await rest(ANNOT_URL + "/query", {
+    where: `pano_key IN (${keys.map(k => A.sqlQuote(k)).join(",")})`, outFields: "pano_key,annot_json", returnGeometry: "false"
+  }, {label: "labels"});
+  for (const f of j.features || []) {
+    try { out.set(f.attributes.pano_key, (JSON.parse(f.attributes.annot_json || "{}").shapes || []).filter(A.validShape)); } catch (e) {}
+  }
+  return out;
+}
+/** items [{p, shapes}] -> files handed to the user. Returns how many. */
+async function runExport(items, say){
+  if (!X) throw new Error("pano-export.js did not load; reload the page");
+  const files = [], used = new Set();
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i], pre = items.length > 1 ? `Sphere ${i + 1} of ${items.length}: ` : "";
+    const r = await X.exportSphere(it.p, it.shapes, A, {phone: PHONE_EXPORT, progress: (f, w) => say(`${pre}${w}… ${Math.round(f * 100)}%`)});
+    let name = r.name, k = 2;
+    while (used.has(name)) name = r.name.replace(/\.jpg$/, ` (${k++}).jpg`);
+    used.add(name);
+    files.push({name, data: r.bytes, blob: r.blob});
+  }
+  say("Downloading…");
+  if (files.length === 1) X.deliver(files[0].blob, files[0].name);
+  else X.deliver(new Blob([X.zip(files.map(f => ({name: f.name, data: f.data})))], {type: "application/zip"}), `360 spheres with labels (${files.length}).zip`);
+  return files.length;
+}
+$("btnExportMode").onclick = () => setExportMode(!state.exportMode);
+$("btnExportCancel").onclick = () => setExportMode(false);
+$("btnExportGo").onclick = async () => {
+  const b = $("btnExportGo");
+  if (b.disabled || state.busyExport) return;
+  const ps = state.panos.filter(p => state.picked.has(p.pano_url));
+  if (!ps.length) return;
+  state.busyExport = true; b.disabled = true; $("btnExportCancel").disabled = true;
+  b.innerHTML = '<span class="spin"></span>Exporting';
+  try {
+    const m = await shapesFor(ps.map(p => A.panoKey(p.pano_url)).filter(Boolean));
+    const n = await runExport(ps.map(p => ({p, shapes: m.get(A.panoKey(p.pano_url)) || []})), exportMsg);
+    toastMsg(n === 1 ? "360 photo downloaded with its labels" : `${n} 360 photos downloaded in one ZIP`);
+    state.busyExport = false; setExportMode(false);
+  } catch (e) {
+    exportMsg("Export failed: " + (e && e.message || e) + ". Try again, or fewer spheres at once.");
+  } finally {
+    state.busyExport = false; b.textContent = "Export"; $("btnExportCancel").disabled = false;
+    if (state.exportMode) updateExportBar();
+  }
+};
+$("btnExportOne").onclick = async () => {
+  const b = $("btnExportOne");
+  if (b.disabled || !state.pano) return;
+  b.disabled = true; b.innerHTML = '<span class="spin"></span>Exporting';
+  try {
+    const shapes = state.shapes.filter(s => s.pts.length >= MIN_PTS[s.kind]);
+    await runExport([{p: state.pano, shapes}], t => toastMsg(t, 60000));
+    toastMsg("360 photo downloaded with its labels" + (state.dirty ? " (your unsaved changes are on it too)" : ""));
+  } catch (e) { toastMsg("Export failed: " + (e && e.message || e), 6000); }
+  finally { b.disabled = false; b.textContent = "Export"; }
+};
 
 async function boot(){
   clearInterval(authPoll);
