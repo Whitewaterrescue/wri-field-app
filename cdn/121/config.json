@@ -502,6 +502,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_32": {
+      "id": "page_32",
+      "label": "3D Site Models",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_maps_3d",
+        "MEDIUM": "layout_maps_3d",
+        "SMALL": "layout_maps_3d"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -527,7 +542,8 @@
       "page_18": [
         "page_2",
         "page_6",
-        "page_7"
+        "page_7",
+        "page_32"
       ]
     },
     {
@@ -1874,6 +1890,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_57",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_maps_3d": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_58",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -3410,6 +3459,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://drone.whitewaterrescue.com/radios</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_58": {
+      "id": "widget_58",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "3D Site Models",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://drone.whitewaterrescue.com/3d</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
