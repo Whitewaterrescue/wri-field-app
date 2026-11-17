@@ -408,7 +408,7 @@
         "MEDIUM": "layout_drone_photos",
         "SMALL": "layout_drone_photos"
       },
-      "isVisible": true,
+      "isVisible": false,
       "isDefault": false,
       "header": true,
       "footer": false
