@@ -45,6 +45,14 @@ select{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);b
 .spin{display:inline-block;width:11px;height:11px;border:2px solid #fff;border-top-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-1px;margin-right:6px}
 @keyframes sp{to{transform:rotate(360deg)}}
 @media print{body{background:#fff}main>*:not(.qrwrap){display:none}.qrwrap{border:0}}
+/* ?embed=1: the response viewers' Incident QR panel (replaced the Mission Hub PIN card 2026-11-17) */
+body.embed main{padding:10px 12px 12px;max-width:none}
+body.embed h1,body.embed .sub{display:none}
+body.embed label{margin-top:0}
+body.embed .qrwrap{padding:12px;margin-top:10px}
+body.embed .qrwrap svg{max-width:240px}
+body.embed .qrname{font-size:20px}
+body.embed .row button{padding:10px}
 </style>
 </head>
 <body>
@@ -90,11 +98,34 @@ const LABELS = { bnsf: "BNSF", up: "UP", mtwy: "MT/WY Coop", wri: "WRI" };
 const $ = id => document.getElementById(id);
 // #respond opens on the Responders tab (the old Gateway QR page now lands here)
 let list = [], tab = /^#respond/.test(location.hash) ? "respond" : "app";
+/* ?embed=1 = inside a response viewer's panel (same origin, so the viewer's sign-in and incident
+   pick are readable). The embed frame has no allow-modals, so Print/Share/prompt() are swapped
+   for "Open full page". */
+const QS = new URLSearchParams(location.search);
+const EMBED = QS.get("embed") === "1";
+if (EMBED) document.body.classList.add("embed");
 
 function choiceId(){
   try { const c = JSON.parse(localStorage.getItem("wri_incident_choice") || "null"); if (c && c.id && c.expires > Date.now()) return String(c.id); } catch (e) {}
   return "";
 }
+const norm = s => String(s || "").trim().toLowerCase();
+function findInc(want){
+  const w = norm(want); if (!w) return null;
+  return list.find(r => norm(r.incident_id) === w || norm(r.project_key) === w || norm(r.incident_name) === w) || null;
+}
+// the incident the page should open on: ?incident=, then the viewer shown around it, then the phone's pick
+function startInc(){
+  let r = findInc(QS.get("incident"));
+  if (!r) { try { const t = window.top.__wriIncident; if (t) r = findInc(t.incident_id) || findInc(t.project_key); } catch (e) {} }
+  return r || findInc(choiceId());
+}
+// the viewer's incident chip changed -> follow it (incident-scope posts this to every iframe)
+window.addEventListener("message", e => {
+  if (e.origin !== location.origin || !e.data || e.data.type !== "wri-incident" || !e.data.incident || !list.length) return;
+  const r = findInc(e.data.incident.incident_id) || findInc(e.data.incident.project_key);
+  if (r && r.incident_id !== $("inc").value) { $("inc").value = r.incident_id; render(); }
+});
 function svgFor(text){
   const qr = window.qrcodegen.QrCode.encodeText(text, window.qrcodegen.QrCode.Ecc.MEDIUM);
   const n = qr.size, b = 4, parts = [];
@@ -184,9 +215,21 @@ function busy(btn, on){ btn.disabled = on; btn.classList.toggle("busy", on); }
 $("btnCopy").onclick = async e => {
   const b = e.currentTarget; busy(b, true);
   try { await navigator.clipboard.writeText(link()); b.textContent = "Copied"; setTimeout(() => b.textContent = "Copy link", 1500); }
-  catch (x) { prompt("Copy this link", link()); }
+  catch (x) {
+    if (EMBED) { b.textContent = "Copy blocked here"; setTimeout(() => b.textContent = "Copy link", 2000); }
+    else prompt("Copy this link", link());
+  }
   busy(b, false);
 };
+if (EMBED) {
+  // Share and Print need a full tab here; the full page keeps the incident and the tab
+  $("btnShare").textContent = "Open full page";
+  $("btnPrint").hidden = true;
+  $("btnShare").onclick = () => {
+    const r = current();
+    window.open(location.pathname + (r ? "?incident=" + encodeURIComponent(r.project_key || r.incident_id) : "") + (tab === "respond" ? "#respond" : ""), "_blank", "noopener");
+  };
+} else
 $("btnShare").onclick = async e => {
   const b = e.currentTarget, r = current(); busy(b, true);
   try {
@@ -205,7 +248,7 @@ fetch(API + "?api=openincidents&ts=" + Date.now(), { redirect: "follow" })
     if (!j || !j.ok) throw new Error((j && j.error && j.error.message) || "bad response");
     list = (j.data && j.data.incidents) || [];
     if (!list.length) { $("state").textContent = "No incident is open."; return; }
-    const pick = choiceId();
+    const pick = (startInc() || {}).incident_id;
     $("inc").innerHTML = list.map(r => `<option value="${r.incident_id}">${(r.project_key || r.incident_name).replace(/</g, "&lt;")}` +
       `${r.client ? " · " + (LABELS[String(r.client).toLowerCase()] || r.client) : ""}${r.is_primary ? " (primary)" : ""}</option>`).join("");
     $("inc").value = list.some(r => r.incident_id === pick) ? pick : list[0].incident_id;
