@@ -54,6 +54,7 @@
      390 px the right side was cut off. Narrower than the page, the frame is drawn at page width and scaled to fit
      the box (fitPreview); "Read the full plan (PDF)" is there to read it full size. */
   .preview{position:relative}
+  .btn.busy{opacity:.6;pointer-events:none}
   .preview.fit{height:var(--pv-h,420px);min-height:0;flex:none}
   .preview.fit iframe{position:absolute;left:0;top:0;min-height:0;transform-origin:0 0;
     width:var(--pv-w);height:var(--pv-fh);transform:scale(var(--pv-s))}
@@ -150,6 +151,60 @@
   var PICK = haspPick();
   var HASP_API = API + '?api=hasp' + (PICK.id ? '&incident=' + encodeURIComponent(PICK.id) : '');
 
+  // 2026-11-18: the HASP Doc is a private Drive file now. The Gateway hands it over as a PDF to an
+  // ArcGIS sign-in that can open this incident's map (the Field App session, exb_auth, same origin),
+  // so crew without a Google account can read it. Kept in memory as a blob: URL, never as a Drive link.
+  var GATEWAY = 'https://script.google.com/macros/s/AKfycbx7p4-A8F6G_VedgHsw3RDJgwJK1GKVAFcvSah1JdjIdG5g7PAcvXhHRKHk_ULIhdL0KA/exec';
+  var DOC = { id: '', url: '', name: '', p: null, err: '' };
+  function fieldToken() {
+    try { var a = JSON.parse(localStorage.getItem('exb_auth') || sessionStorage.getItem('exb_auth') || 'null'); return (a && a.token) || ''; }
+    catch (e) { return ''; }
+  }
+  function docIdFromUrl(u) { var m = /(?:\/d\/|[?&]id=)([A-Za-z0-9_-]{20,})/.exec(String(u || '')); return m ? m[1] : ''; }
+  function loadDoc(id) {
+    if (DOC.id === id && DOC.url) return Promise.resolve(DOC);
+    if (DOC.id === id && DOC.p) return DOC.p;
+    DOC = { id: id, url: '', name: '', p: null, err: '' };
+    var t = fieldToken();
+    if (!t) { DOC.err = 'Sign in to the Field App to read the full plan.'; return Promise.reject(new Error(DOC.err)); }
+    DOC.p = fetch(GATEWAY, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, redirect: 'follow',
+      body: JSON.stringify({ action: 'doc', incident_id: PICK.id, id: id, token: t }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) throw new Error((j && j.error && j.error.message) || 'Could not open the plan.');
+        var bin = atob(j.data.b64), a = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+        DOC.url = URL.createObjectURL(new Blob([a], { type: j.data.mime || 'application/pdf' }));
+        DOC.name = j.data.name || 'HASP.pdf';
+        DOC.p = null;
+        return DOC;
+      }, function (e) { DOC.p = null; DOC.err = (e && e.message) || 'No signal: the plan could not be loaded.'; throw e; });
+    return DOC.p;
+  }
+  function showDocInPreview(id) {
+    var f = document.querySelector('iframe[data-doc-frame]');
+    if (!f) return;
+    loadDoc(id).then(function (d) { f.setAttribute('src', d.url); }, function (e) {
+      var box = f.parentNode;
+      box.outerHTML = '<div class="empty" style="padding:16px">' + esc((e && e.message) || DOC.err || 'Preview not available.') + '</div>';
+    });
+  }
+  // "Read the full plan": open a tab during the tap (popup blockers allow that), then show the PDF in it.
+  document.addEventListener('click', function (ev) {
+    var a = ev.target && ev.target.closest && ev.target.closest('[data-doc-open]');
+    if (!a) return;
+    ev.preventDefault();
+    var tab = null;
+    try { tab = window.open('', '_blank'); } catch (e) { tab = null; }
+    a.classList.add('busy'); a.setAttribute('aria-busy', 'true');
+    loadDoc(a.getAttribute('data-doc-open')).then(function (d) {
+      if (tab) tab.location.href = d.url; else location.href = d.url;
+    }, function (e) {
+      if (tab) { try { tab.close(); } catch (e2) {} }
+      alert((e && e.message) || 'Could not open the plan.');
+    }).then(function () { a.classList.remove('busy'); a.removeAttribute('aria-busy'); });
+  });
+
   function loadCache() {
     try {
       var c = JSON.parse(localStorage.getItem(CACHE_KEY));
@@ -243,7 +298,7 @@
   var PREVIEW_W = 840;   // the Docs preview's page width + its margins, in CSS px
   function fitPreview() {
     var box = document.querySelector('.preview');
-    if (!box) return;
+    if (!box || box.querySelector('iframe[data-doc-frame]')) return;   // a PDF preview fits its own width
     var w = box.clientWidth;
     if (!w || w >= PREVIEW_W) { box.classList.remove('fit'); return; }
     var s = w / PREVIEW_W, h = Math.max(420, Math.round(window.innerHeight * 0.6));
@@ -256,6 +311,7 @@
   window.addEventListener('resize', fitPreview);
   function render(d) {
     var h = d.hasp, sm = d.summary || null;
+    var planId = docIdFromUrl(h.docUrl || h.pdfUrl || h.previewUrl);
     var html =
       '<div class="card">' +
         '<h2>Safety Plan (HASP)</h2>' +
@@ -270,15 +326,16 @@
       (sm ? summaryHtml(sm) : '') +
       // the full plan sits above Acknowledge, so the crew reads before they sign
       '<div class="step-h">Read the full plan</div>' +
-      '<div class="btn-row">' +
-        (h.pdfUrl ? '<a class="btn pdf" id="readPlan" href="' + esc(h.pdfUrl) + '" target="_blank" rel="noopener">Read the full plan (PDF)</a>' : '') +
-        (h.docUrl ? '<a class="btn view" href="' + esc(h.docUrl) + '" target="_blank" rel="noopener">Open Doc</a>' : '') +
+      (planId ? '<div class="btn-row">' +
+        '<a class="btn pdf" id="readPlan" href="#" data-doc-open="' + esc(planId) + '">Read the full plan (PDF)</a>' +
       '</div>' +
-      (h.previewUrl ? '<div class="preview" style="margin-top:12px"><iframe src="' + esc(h.previewUrl) + '" title="HASP preview"></iframe></div>' : '') +
+      (fieldToken()
+        ? '<div class="preview" style="margin-top:12px"><iframe data-doc-frame="' + esc(planId) + '" title="HASP preview"></iframe></div>'
+        : '<div class="empty" style="padding:16px">Sign in to the Field App to read the full plan.</div>') : '') +
       (haspIdOf(h) ? '<div class="ack-card" id="ackCard"></div>' : '') +
       (d.haspUrl ? '<a class="full-link" href="' + esc(d.haspUrl) + '" target="_blank" rel="noopener">Open full HASP app (create / edit plans)</a>' : '');
     document.getElementById('content').innerHTML = html;
-    fitPreview();
+    if (planId && fieldToken()) showDocInPreview(planId);
     ACK.hasp = h; ACK.id = haspIdOf(h);
     renderAck();
     sendInBackground();
