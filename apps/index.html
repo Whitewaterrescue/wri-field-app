@@ -12,6 +12,10 @@
 
     ?app=ops  Ops Dashboard     (default ?page=v2)
     ?app=rm   Resource Manager  (default ?role=wri_icp)
+    ?app=planning  WRI Planning
+
+  Inside a response viewer these open in the viewer's own panel (pano-inapp.js), which relays the
+  apps' window.top messages down to this page (see 'wri-apps-relay' at the bottom).
 
   Every other query parameter (page, role, incident, ...) is passed to the app
   unchanged. With no ?incident=, the incident the viewer picked on this device
@@ -48,14 +52,17 @@
     ops: { title: 'WRI Ops Dashboard', defaults: { page: 'v2' },
       url: 'https://script.google.com/macros/s/AKfycbytFBip-cbr-ohGpVGFoFBQ3spMLCswlbP26B4Syw0rrDs_x2hO4FqpdFzR6Mb3h9Ke/exec' },
     rm: { title: 'WRI Resource Manager', defaults: { role: 'wri_icp' },
-      url: 'https://script.google.com/macros/s/AKfycbzsxpfqbV7di4yTHRiTr7bg-RwojLuesrLhPoaFVM8foedbzhxMMyC-lPcBPPyLtjtm/exec' }
+      url: 'https://script.google.com/macros/s/AKfycbzsxpfqbV7di4yTHRiTr7bg-RwojLuesrLhPoaFVM8foedbzhxMMyC-lPcBPPyLtjtm/exec' },
+    // 2026-11-17 (Cody): the viewers' Planning Dashboard button comes here too, so it has no Google bar
+    planning: { title: 'WRI Planning', defaults: {},
+      url: 'https://script.google.com/macros/s/AKfycbx1GJXj2PUZFP9--SjS0mPaMAqBj92FBTpYl86a1pD9KFeAXjBwbklFJP6G-6If0VexNg/exec' }
   };
   var msg = document.getElementById('msg');
   var params = new URLSearchParams(location.search);
   var key = (params.get('app') || '').toLowerCase();
   var app = APPS[key];
   if (!app) {
-    msg.innerHTML = 'Unknown app. Use <code>?app=ops</code> or <code>?app=rm</code>.';
+    msg.innerHTML = 'Unknown app. Use <code>?app=ops</code>, <code>?app=rm</code> or <code>?app=planning</code>.';
     return;
   }
   params.delete('app');
@@ -161,6 +168,19 @@
     if (!ok || !/^v2(-[a-z0-9]+)?$/.test(String(d.page || ''))) return;
     params.set('page', d.page);
     load();
+  });
+
+  // 2026-11-17: opened inside a response viewer's panel (pano-inapp.js), the apps' window.top messages
+  // (wri-apps-ready / -nav / -present) land on the viewer, which hands them down here. Only our own parent page
+  // (same github.io origin) may relay; the message is replayed to the handlers above with its original origin.
+  window.addEventListener('message', function (e) {
+    var d = e.data;
+    if (!d || d.type !== 'wri-apps-relay' || e.source !== window.parent || window.parent === window) return;
+    if (e.origin !== location.origin || !d.data || !/^wri-apps-/.test(String(d.data.type || ''))) return;
+    var ok = false;
+    try { ok = /\.googleusercontent\.com$/.test(new URL(d.origin).hostname); } catch (err) {}
+    if (!ok) return;
+    window.dispatchEvent(new MessageEvent('message', { data: d.data, origin: d.origin, source: frame.contentWindow }));
   });
 })();
 </script>
