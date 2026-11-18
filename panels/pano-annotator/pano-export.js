@@ -132,25 +132,93 @@
   }
 
   /* -------------------------------------------------------------- JPEG XMP (GPano) */
-  function gpanoXmp(W, H) {
+  /** heading: compass bearing of the picture's centre (the sphere's cam_heading), so 360 viewers face north right. */
+  function gpanoXmp(W, H, heading) {
+    var hd = isFinite(heading) && heading !== null ? ((Math.round(Number(heading) * 10) / 10) % 360 + 360) % 360 : 0;
     return '<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">' +
       '<rdf:Description rdf:about="" xmlns:GPano="http://ns.google.com/photos/1.0/panorama/" GPano:ProjectionType="equirectangular" ' +
       'GPano:UsePanoramaViewer="True" GPano:FullPanoWidthPixels="' + W + '" GPano:FullPanoHeightPixels="' + H + '" ' +
       'GPano:CroppedAreaImageWidthPixels="' + W + '" GPano:CroppedAreaImageHeightPixels="' + H + '" ' +
-      'GPano:CroppedAreaLeftPixels="0" GPano:CroppedAreaTopPixels="0" GPano:PoseHeadingDegrees="0"/>' +
+      'GPano:CroppedAreaLeftPixels="0" GPano:CroppedAreaTopPixels="0" GPano:PoseHeadingDegrees="' + hd + '"/>' +
       '</rdf:RDF></x:xmpmeta>';
   }
-  /** jpeg bytes -> the same JPEG with an XMP APP1 (after the JFIF APP0 when there is one). */
-  function withXmp(jpeg, xmp) {
-    var ns = 'http://ns.adobe.com/xap/1.0/\u0000', body = ns + xmp, len = body.length + 2;
-    var seg = new Uint8Array(2 + len);
-    seg[0] = 0xFF; seg[1] = 0xE1; seg[2] = (len >> 8) & 255; seg[3] = len & 255;
-    for (var i = 0; i < body.length; i++) seg[4 + i] = body.charCodeAt(i) & 255;
-    var at = 2;                                                   // after SOI
-    if (jpeg[2] === 0xFF && jpeg[3] === 0xE0) at = 4 + ((jpeg[4] << 8) | jpeg[5]);   // after APP0
+  /** A JPEG marker segment put right after SOI (after the JFIF APP0 when there is one). */
+  function insertSeg(jpeg, seg) {
+    var at = 2;
+    if (jpeg[2] === 0xFF && jpeg[3] === 0xE0) at = 4 + ((jpeg[4] << 8) | jpeg[5]);
     var out = new Uint8Array(jpeg.length + seg.length);
     out.set(jpeg.subarray(0, at), 0); out.set(seg, at); out.set(jpeg.subarray(at), at + seg.length);
     return out;
+  }
+  function app1(bytes) {
+    var len = bytes.length + 2, seg = new Uint8Array(2 + len);
+    seg[0] = 0xFF; seg[1] = 0xE1; seg[2] = (len >> 8) & 255; seg[3] = len & 255; seg.set(bytes, 4);
+    return seg;
+  }
+  /** jpeg bytes -> the same JPEG with an XMP APP1. */
+  function withXmp(jpeg, xmp) {
+    var body = 'http://ns.adobe.com/xap/1.0/\u0000' + xmp, b = new Uint8Array(body.length);
+    for (var i = 0; i < body.length; i++) b[i] = body.charCodeAt(i) & 255;
+    return insertSeg(jpeg, app1(b));
+  }
+
+  /* -------------------------------------------------------------- EXIF: where and when (Cody 2026-11-18) */
+  /**
+   * The Exif APP1 a camera writes, with only what the sphere record holds: GPS latitude / longitude,
+   * the image direction (true north, the picture's centre) and the capture time. Big-endian TIFF.
+   * geo = {lat, lon, heading, taken: 'YYYY-MM-DD HH:MM:SS'}; null when there is no position.
+   */
+  function exifBytes(geo) {
+    if (!geo || !isFinite(geo.lat) || !isFinite(geo.lon) || geo.lat === null || geo.lon === null) return null;
+    var BYTE = 1, ASCII = 2, SHORT = 3, LONG = 4, RATIONAL = 5;
+    var rat = function (pairs) { var b = new Uint8Array(pairs.length * 8), v = new DataView(b.buffer); pairs.forEach(function (p, i) { v.setUint32(i * 8, p[0]); v.setUint32(i * 8 + 4, p[1]); }); return b; };
+    var asc = function (s) { var b = new Uint8Array(s.length + 1); for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 127; return b; };
+    var dms = function (x) { x = Math.abs(x); var d = Math.floor(x), mf = (x - d) * 60, m = Math.floor(mf), s = Math.round((mf - m) * 60 * 10000); if (s >= 600000) { s -= 600000; m++; } if (m >= 60) { m -= 60; d++; } return rat([[d, 1], [m, 1], [s, 10000]]); };
+    var gps = [
+      { tag: 0x0000, type: BYTE, n: 4, data: new Uint8Array([2, 3, 0, 0]) },
+      { tag: 0x0001, type: ASCII, n: 2, data: asc(geo.lat >= 0 ? 'N' : 'S') },
+      { tag: 0x0002, type: RATIONAL, n: 3, data: dms(geo.lat) },
+      { tag: 0x0003, type: ASCII, n: 2, data: asc(geo.lon >= 0 ? 'E' : 'W') },
+      { tag: 0x0004, type: RATIONAL, n: 3, data: dms(geo.lon) }
+    ];
+    if (isFinite(geo.heading) && geo.heading !== null && geo.heading !== '') {
+      var h = ((Number(geo.heading) % 360) + 360) % 360;
+      gps.push({ tag: 0x0010, type: ASCII, n: 2, data: asc('T') }, { tag: 0x0011, type: RATIONAL, n: 1, data: rat([[Math.round(h * 100), 100]]) });
+    }
+    var when = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(String(geo.taken || ''));
+    var exif = when ? [{ tag: 0x9003, type: ASCII, n: 20, data: asc(when[1] + ':' + when[2] + ':' + when[3] + ' ' + when[4] + ':' + when[5] + ':' + when[6]) }] : [];
+    // layout: header(8) | IFD0 | [Exif IFD + data] | GPS IFD + data
+    var ifdLen = function (es) { return 2 + es.length * 12 + 4 + es.reduce(function (s, e) { return s + (e.data.length > 4 ? e.data.length + (e.data.length & 1) : 0); }, 0); };
+    var ifd0 = [{ tag: 0x8825, type: LONG, n: 1, data: null }];
+    if (exif.length) ifd0.unshift({ tag: 0x8769, type: LONG, n: 1, data: null });
+    var at0 = 8, atExif = at0 + ifdLen(ifd0.map(function () { return { data: new Uint8Array(4) }; })), atGps = atExif + (exif.length ? ifdLen(exif) : 0);
+    ifd0.forEach(function (e) { var b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, e.tag === 0x8825 ? atGps : atExif); e.data = b; });
+    var total = atGps + ifdLen(gps), out = new Uint8Array(6 + total), v = new DataView(out.buffer, 6);
+    out.set([0x45, 0x78, 0x69, 0x66, 0, 0], 0);                                 // "Exif\0\0"
+    v.setUint16(0, 0x4D4D); v.setUint16(2, 42); v.setUint32(4, 8);
+    var write = function (es, at) {
+      v.setUint16(at, es.length);
+      var extra = at + 2 + es.length * 12 + 4;
+      es.forEach(function (e, i) {
+        var o = at + 2 + i * 12;
+        v.setUint16(o, e.tag); v.setUint16(o + 2, e.type); v.setUint32(o + 4, e.n);
+        if (e.data.length <= 4) out.set(e.data, 6 + o + 8);
+        else { v.setUint32(o + 8, extra); out.set(e.data, 6 + extra); extra += e.data.length + (e.data.length & 1); }
+      });
+      v.setUint32(at + 2 + es.length * 12, 0);
+    };
+    write(ifd0, at0);
+    if (exif.length) write(exif, atExif);
+    write(gps, atGps);
+    return out;
+  }
+  /** jpeg -> the same JPEG with the Exif APP1 first (camera order: Exif before XMP). */
+  function withExif(jpeg, geo) { var b = exifBytes(geo); return b ? insertSeg(jpeg, app1(b)) : jpeg; }
+  /** Where and when a sphere record says it was taken: the feature's point (loaded with the list),
+   *  else latitude / longitude fields; cam_heading; captured_date. */
+  function geoOf(p) {
+    var lat = p._lat != null ? p._lat : p.latitude, lon = p._lon != null ? p._lon : p.longitude;
+    return lat == null || lon == null ? null : { lat: Number(lat), lon: Number(lon), heading: p.cam_heading == null ? null : Number(p.cam_heading), taken: p.captured_date || '' };
   }
 
   /* -------------------------------------------------------------- ZIP (stored) */
@@ -246,7 +314,8 @@
     say(0.92, 'Saving');
     var blob = await new Promise(function (res, rej) { c.toBlob(function (b) { b ? res(b) : rej(new Error('The picture could not be saved.')); }, 'image/jpeg', 0.9); });
     c.width = c.height = 0;
-    var bytes = withXmp(new Uint8Array(await blob.arrayBuffer()), gpanoXmp(W, H));
+    var geo = geoOf(p);
+    var bytes = withExif(withXmp(new Uint8Array(await blob.arrayBuffer()), gpanoXmp(W, H, geo ? geo.heading : null)), geo);
     var base = String(p.pano_name || p.site_label || 'sphere').replace(/[\u0000-\u001f\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'sphere';
     return { name: base + '_360_labeled.jpg', blob: new Blob([bytes], { type: 'image/jpeg' }), bytes: bytes };
   }
@@ -269,7 +338,7 @@
   }
 
   var API = { FACES: FACES, sizeFor: sizeFor, faceOf: faceOf, cubeToEquirect: cubeToEquirect, toXY: toXY, unwrapped: unwrapped,
-    drawShapes: drawShapes, gpanoXmp: gpanoXmp, withXmp: withXmp, crc32: crc32, zip: zip, sourceOf: sourceOf,
+    drawShapes: drawShapes, gpanoXmp: gpanoXmp, withXmp: withXmp, exifBytes: exifBytes, withExif: withExif, geoOf: geoOf, crc32: crc32, zip: zip, sourceOf: sourceOf,
     loadFaces: loadFaces, exportSphere: exportSphere, deliver: deliver };
   if (typeof module !== 'undefined' && module.exports) module.exports = API; else global.WRIPanoExport = API;
 })(typeof window !== 'undefined' ? window : this);

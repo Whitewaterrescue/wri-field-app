@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 <script src="pano-annot.js?v=9af68d128524"></script>
-<script src="pano-export.js?v=bdc2d11f62d0"></script>
+<script src="pano-export.js?v=b8d4a378ec2b"></script>
 <style>
   /* WRI 360 Annotator -- Field App panel. Draw points, lines and areas with labels ON a sphere;
      everyone who opens that sphere from the map sees them.
@@ -466,9 +466,10 @@ async function loadPanos(){
   const src = state.sources.find(s => s.key === state.sourceKey);
   if (!src) { state.panos = []; return; }
   const j = await rest(src.url + "/query", {
-    where: src.where, outFields: "*", returnGeometry: "false", resultRecordCount: 500
+    where: src.where, outFields: "*", returnGeometry: "true", outSR: "4326", resultRecordCount: 500
   }, {label: "spheres"});
-  state.panos = (j.features || []).map(f => f.attributes)
+  // the point too: an exported 360 photo keeps where it was taken (EXIF GPS, Cody 2026-11-18)
+  state.panos = (j.features || []).map(f => Object.assign({}, f.attributes, f.geometry && isFinite(f.geometry.x) && isFinite(f.geometry.y) ? {_lon: f.geometry.x, _lat: f.geometry.y} : {}))
     .filter(a => a.pano_url)
     .sort((a, b) => String(b.captured_date || "").localeCompare(String(a.captured_date || "")));
 }
