@@ -506,6 +506,12 @@ function detail(w){
   const d = String(w.description||"").trim(), t = String(w.title||"").trim();
   return d.indexOf(t)===0 ? d.slice(t.length).trim() : d;
 }
+// 2026-11-19 (Cody): the supervisor reports In Progress / Complete (+ what was recovered) on Field Forms' Work
+// progress page, opened in this frame (same site: the incident pick and the outbox are shared) with the assignment picked.
+function progressLink(w){
+  if (!w.assignment_id || w.wa_status === "complete" || w.wa_status === "cancelled") return "";
+  return `<a href="/wri-recon/?view=progress&wa=${encodeURIComponent(w.assignment_id)}" target="_self" class="prog">Report progress</a>`;
+}
 function renderWork(b){
   const order = {in_progress:0, assigned:1, planned:2, complete:3, cancelled:4};
   const groups = {};
@@ -523,7 +529,7 @@ function renderWork(b){
       <div class="m">${[w.location_name, w.branch&&w.division?w.branch+" / "+w.division:(w.branch||""), w.assigned_to,
         w.start_time?fmtTime(w.start_time)+(w.end_time?" – "+new Date(w.end_time).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"}):""):""].filter(Boolean).map(esc).join(" · ")}</div>
       ${detail(w) ? `<div class="d">${esc(detail(w))}</div>` : ""}
-      ${w._g ? `<div class="acts">${dirLink(w._g)}</div>` : ""}
+      ${(w._g || progressLink(w)) ? `<div class="acts">${w._g ? dirLink(w._g) : ""}${progressLink(w)}</div>` : ""}
     </div>`).join("")).join("");
   document.querySelectorAll("[data-wf]").forEach(el => el.onclick = () => { state.workFilter = el.dataset.wf; renderWork(state.board); });
 }
