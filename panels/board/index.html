@@ -371,7 +371,8 @@ async function fetchBoard(){
   const [status, work, res, req, log, , meet, acts] = await Promise.all([
     query("Incident_Status", w, {orderByFields:"op_period DESC, as_of DESC", resultRecordCount:1}),
     query("Work_Assignments", w, {returnGeometry:"true", outSR:"4326"}),
-    query("Incident_Resources", w, {outFields:"resource_id,organization_code,resource_kind,resource_type,identification,specification,status,branch,division,tf_unit_id,quantity,eta,boom_ft,recovery_edrc,liquid_storage,review_status"}),
+    // P5 Resources (2026-11-21): PROD keeps Demobilized resources (the full record); the board shows the incident's live ones
+    query("Incident_Resources", w + " AND (status IS NULL OR status <> 'Demobilized')", {outFields:"resource_id,organization_code,resource_kind,resource_type,identification,specification,status,branch,division,tf_unit_id,quantity,eta,boom_ft,recovery_edrc,liquid_storage,review_status"}),
     query("Resource_Requests", w),
     has214 ? query("ICS214_Log", w, {outFields:"entry_id,section,person_name,person_email,position,entry_time,activity,on_unit_log,entry_source", orderByFields:"entry_time DESC"}) : [],
     whoAmI(),
