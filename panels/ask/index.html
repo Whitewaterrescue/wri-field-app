@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Ask WRI</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@400;500;600;700&family=Alexandria:wght@300;400;500;600&display=swap" rel="stylesheet">
+<!--
+  Ask WRI (beta, 2026-11-25). Help agent for the crew: "where do I go / how do I do X".
+  Server: wri-appscript "Initial Response Apps/wri-ask" (GAS, Claude Opus 5.5). Read-only, no
+  incident data sent: only app / screen / role + the question. Same-origin panel: it reads the
+  Field App's own ArcGIS session (exb_auth); standalone it signs in with the same popup as the
+  Incident Board. Field App links switch the shell's page (no reload); other links open a new tab.
+-->
+<style>
+  :root{
+    --bg:#171919;--surface:#2a2c2c;--surface-alt:#3A3C3C;
+    --accent:#EC2329;
+    --text:#f0f0f0;--text-dim:#b8bcbc;--text-muted:#9a9e9e;
+    --border:#4a4d4d;--success:#22c55e;--warning:#f59e0b;
+    --font:'Alexandria',-apple-system,system-ui,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;min-height:100vh}
+  .topbar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--bg);border-bottom:1px solid var(--border)}
+  .topbar h1{margin:0;font-size:17px;font-weight:700;flex:1;font-family:'Epilogue','Alexandria',system-ui,sans-serif}
+  .beta{font-size:11px;font-weight:700;letter-spacing:.06em;color:#111;background:var(--warning);border-radius:6px;padding:2px 7px}
+  .chip{font-size:13px;padding:6px 10px;border-radius:999px;background:var(--surface-alt);color:var(--text-dim);border:1px solid var(--border);cursor:pointer;font-family:var(--font)}
+  main{padding:12px 14px 150px;max-width:720px;margin:0 auto}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin:10px 0}
+  .note{color:var(--text-dim);font-size:13.5px;line-height:1.45}
+  .err{color:#ff8a80}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 16px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:15px;font-family:var(--font);cursor:pointer}
+  .btn.secondary{background:var(--surface-alt);color:var(--text);border:1px solid var(--border)}
+  .btn:disabled{opacity:.55;cursor:default}
+  .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+  .intro h2{margin:2px 0 6px;font-size:16px}
+  .sugs{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .msg{margin:12px 0;display:flex}
+  .msg.q{justify-content:flex-end}
+  .bubble{max-width:88%;padding:10px 13px;border-radius:14px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}
+  .q .bubble{background:#3b1517;border:1px solid #6b2226}
+  .a .bubble{background:var(--surface);border:1px solid var(--border)}
+  .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .lnk{display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:8px 12px;border-radius:10px;background:var(--surface-alt);border:1px solid var(--accent);color:var(--text);text-decoration:none;font-weight:600;font-size:14px}
+  .rate{display:flex;gap:6px;margin-top:8px;align-items:center;color:var(--text-muted);font-size:12.5px}
+  .rate button{min-width:44px;min-height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;font-size:16px}
+  .rate button.on{border-color:var(--success);color:var(--success)}
+  .rate button.on.down{border-color:#ff8a80;color:#ff8a80}
+  .thinking{display:inline-flex;align-items:center;gap:8px;color:var(--text-dim)}
+  .composer{position:fixed;left:0;right:0;bottom:0;z-index:3;background:var(--bg);border-top:1px solid var(--border);padding:10px 14px calc(10px + env(safe-area-inset-bottom))}
+  .composer .inner{max-width:720px;margin:0 auto;display:flex;gap:8px;align-items:flex-end}
+  textarea{flex:1;resize:none;min-height:46px;max-height:140px;padding:11px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:var(--font);font-size:16px;line-height:1.35}
+  .fine{max-width:720px;margin:6px auto 0;color:var(--text-muted);font-size:11.5px}
+  .rolebar{display:flex;align-items:center;gap:8px;margin:4px 0 8px;color:var(--text-dim);font-size:13px}
+  select{background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:8px;min-height:36px;padding:4px 8px;font-family:var(--font);font-size:14px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Ask WRI</h1>
+  <span class="beta">BETA</span>
+  <button class="chip" id="btnNew" title="Start over">New</button>
+</div>
+
+<main>
+  <div id="viewAuth" class="card" hidden>
+    <b>ArcGIS sign-in needed</b>
+    <div id="authEmbedded" class="note">Open the <b>Incident Map</b> tab and sign in, then come back.</div>
+    <div id="authStandalone" class="note" hidden>Sign in with your WRI ArcGIS account.</div>
+    <div class="row" style="margin-top:10px">
+      <button id="btnAuthRetry" class="btn secondary">Check again</button>
+      <button id="btnSignIn" class="btn">Sign in</button>
+    </div>
+    <div id="authErr" class="note err" hidden></div>
+  </div>
+
+  <div id="viewChat">
+    <div class="rolebar">
+      <span>I'm</span>
+      <select id="role" aria-label="Your role">
+        <option value="">— pick your role —</option>
+        <option value="field">Field crew</option>
+        <option value="supervisor">Supervisor / TF leader</option>
+        <option value="boat">Boat operator</option>
+        <option value="water_safety">Water safety</option>
+        <option value="drone">Drone pilot</option>
+        <option value="tech_manager">Tech manager</option>
+        <option value="scat">SCAT team</option>
+        <option value="safety">Safety officer</option>
+        <option value="pm">Project manager / Ops</option>
+        <option value="planning">Planning (PSC)</option>
+        <option value="resl">Resources (RESL)</option>
+        <option value="docl">Documentation (DOCL)</option>
+        <option value="logistics">Logistics</option>
+        <option value="finance">Finance</option>
+        <option value="admin_sitl">Admin / SITL</option>
+      </select>
+    </div>
+    <div class="card intro" id="intro">
+      <h2>Where do I go for…?</h2>
+      <div class="note">Ask how to do something in the Field App or the dashboards. I point you to the right screen. I can't see incident data, so for your assignment I'll send you to the Incident Board.</div>
+      <div class="sugs" id="sugs"></div>
+    </div>
+    <div id="thread"></div>
+  </div>
+</main>
+
+<div class="composer" id="composer">
+  <div class="inner">
+    <textarea id="q" rows="1" maxlength="1000" placeholder="Ask a question…" aria-label="Your question"></textarea>
+    <button class="btn" id="btnSend" aria-label="Send"><span id="sendLabel">Ask</span></button>
+  </div>
+  <div class="fine">Beta. Injury or emergency? Tell your supervisor or Safety now: don't wait on an app.</div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var API = 'https://script.google.com/macros/s/AKfycbz59cIpzhiH-16quJcpY6fgZ4DI-uj7hR8F9LugzPBzaqdgwGrmDcemhC9m85oHmsRohQ/exec';
+  var PORTAL = 'https://wrienviro.maps.arcgis.com';
+  var OAUTH_CLIENT = 'zXmBr5FFTyHWfh24';
+  var CALLBACK_URL = 'https://whitewaterrescue.github.io/wri-respond/oauth-callback-201.html';
+  var SESSION_KEY = 'wri_ask_auth';
+  var HIST_KEY = 'wri_ask_thread';
+  var PAGE_NAMES = { page_1: 'Checklist', page_2: 'Incident Map', page_3: 'Forms', page_4: 'HASP', page_5: 'Sit Stat', page_8: 'Trailer Inspections',
+    page_10: 'Check In', page_13: 'Livestream', page_18: 'Maps', page_19: 'Drone', page_22: 'Ops', page_23: 'Incident Board', page_24: 'Incident QR',
+    page_26: 'Recorded', page_27: 'Upload', page_31: 'Radios', page_32: '3D Site Models' };
+  var SUGGEST = ['How do I check in?', "Where's my assignment?", 'How do I log my 214?', 'I need more supplies', 'I checked in to the wrong incident', 'Where do I put my hours?'];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var embedded = window.top !== window;
+  var badToken = null, busy = false;
+  var thread = [];   // [{id, q, a, links, rating}]
+
+  // ---------------------------------------------------------------- auth (Incident Board pattern)
+  function readExbAuth() {
+    var raw = null;
+    try { raw = localStorage.getItem('exb_auth') || sessionStorage.getItem('exb_auth'); } catch (e) { return null; }
+    if (!raw) return null;
+    var a; try { a = JSON.parse(raw); } catch (e) { return null; }
+    if (!a || !a.token) return null;
+    var exp = a.expires != null && a.expires !== '' ? new Date(a.expires).getTime() : NaN;
+    if (isFinite(exp) && exp - Date.now() < 2 * 60000) return null;
+    if (badToken && a.token === badToken) return null;
+    return a.token;
+  }
+  function readSession() {
+    try {
+      var a = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+      if (!a || !a.token || !(a.expiresAt - Date.now() > 60000) || a.token === badToken) return null;
+      return a.token;
+    } catch (e) { return null; }
+  }
+  function getToken() { return readExbAuth() || readSession(); }
+  function showAuth(msg) {
+    $('viewAuth').hidden = false;
+    $('authEmbedded').hidden = !embedded; $('authStandalone').hidden = embedded;
+    if (msg) { $('authErr').textContent = msg; $('authErr').hidden = false; }
+  }
+  function hideAuth() { $('viewAuth').hidden = true; $('authErr').hidden = true; }
+  $('btnSignIn').onclick = function () {
+    var url = PORTAL + '/sharing/rest/oauth2/authorize?client_id=' + encodeURIComponent(OAUTH_CLIENT) +
+      '&response_type=token&expiration=720&redirect_uri=' + encodeURIComponent(CALLBACK_URL);
+    var w = window.open(url, 'agolAuth', 'width=480,height=640');
+    if (!w) showAuth('Popup blocked. Allow popups for this site and try again.');
+  };
+  $('btnAuthRetry').onclick = function () { if (getToken()) hideAuth(); else showAuth('Still no sign-in found.'); };
+  window.addEventListener('message', function (e) {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'arcgis-auth') return;
+    if (e.data.error || !e.data.token) { showAuth('ArcGIS sign-in failed.'); return; }
+    try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ token: String(e.data.token), expiresAt: Date.now() + (Number(e.data.expires_in) || 7200) * 1000 })); } catch (x) {}
+    badToken = null; hideAuth();
+  });
+  window.addEventListener('storage', function (e) { if (e.key === 'exb_auth' && getToken()) hideAuth(); });
+
+  // ---------------------------------------------------------------- context
+  function currentScreen() {
+    try { var p = new URLSearchParams(window.top.location.search).get('page'); return PAGE_NAMES[p] || p || ''; } catch (e) { return ''; }
+  }
+  function role() { return $('role').value || ''; }
+  try { var r0 = localStorage.getItem('wri_role') || ''; if (r0 && $('role').querySelector('option[value="' + r0 + '"]')) $('role').value = r0; } catch (e) {}
+  $('role').onchange = function () { try { localStorage.setItem('wri_role', role()); } catch (e) {} };
+
+  // ---------------------------------------------------------------- rendering (textContent only)
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function render() {
+    var t = $('thread'); t.innerHTML = '';
+    $('intro').hidden = thread.length > 0;
+    thread.forEach(function (m) {
+      var q = el('div', 'msg q'); q.appendChild(el('div', 'bubble', m.q)); t.appendChild(q);
+      var a = el('div', 'msg a'); var b = el('div', 'bubble');
+      if (m.pending) {
+        var th = el('span', 'thinking'); th.appendChild(el('span', 'spin')); th.appendChild(el('span', null, 'Looking that up…')); b.appendChild(th);
+      } else {
+        b.appendChild(el('div', m.error ? 'err' : null, m.a));
+        if (m.links && m.links.length) {
+          var ls = el('div', 'links');
+          m.links.forEach(function (l) { ls.appendChild(linkEl(l)); });
+          b.appendChild(ls);
+        }
+        if (!m.error) b.appendChild(rateEl(m));
+        if (m.error && m.retry) {
+          var rb = el('button', 'btn secondary', 'Try again'); rb.style.marginTop = '8px';
+          rb.onclick = function () { send(m.q, m); };
+          b.appendChild(rb);
+        }
+      }
+      a.appendChild(b); t.appendChild(a);
+    });
+    window.scrollTo(0, document.body.scrollHeight);
+  }
+  function linkEl(l) {
+    var a = el('a', 'lnk', (l.kind === 'page' ? '→ ' : '↗ ') + l.label);
+    a.href = l.url;
+    if (l.kind === 'page') {
+      a.onclick = function (ev) {
+        if (!embedded) return;   // standalone: a normal link to the Field App page
+        ev.preventDefault();
+        try {
+          var top = window.top, q = new URLSearchParams(top.location.search);
+          q.set('page', l.page);
+          top.history.pushState(null, '', top.location.pathname + '?' + q.toString());
+          top.dispatchEvent(new top.PopStateEvent('popstate', { state: null }));
+        } catch (e) { window.open(l.url, '_top'); }
+      };
+    } else { a.target = '_blank'; a.rel = 'noopener'; }
+    return a;
+  }
+  function rateEl(m) {
+    var r = el('div', 'rate'); r.appendChild(el('span', null, 'Helpful?'));
+    [['up', '👍'], ['down', '👎']].forEach(function (p) {
+      var b = el('button', (m.rating === p[0] ? 'on ' : '') + p[0], p[1]);
+      b.setAttribute('aria-label', p[0] === 'up' ? 'Helpful' : 'Not helpful');
+      b.onclick = function () {
+        if (m.rating === p[0]) return;
+        m.rating = p[0]; save(); render();
+        post({ action: 'rate', token: getToken(), id: m.id, rating: p[0] }).catch(function () {});
+      };
+      r.appendChild(b);
+    });
+    return r;
+  }
+  function save() { try { sessionStorage.setItem(HIST_KEY, JSON.stringify(thread.filter(function (m) { return !m.pending; }).slice(-20))); } catch (e) {} }
+  try { thread = JSON.parse(sessionStorage.getItem(HIST_KEY) || '[]') || []; } catch (e) { thread = []; }
+
+  // ---------------------------------------------------------------- talking to the server
+  function post(body) {
+    return fetch(API, { method: 'POST', redirect: 'follow', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json(); });
+  }
+  function newId() {
+    var a = new Uint8Array(12); (window.crypto || {}).getRandomValues ? crypto.getRandomValues(a) : a.forEach(function (_, i) { a[i] = Math.random() * 256; });
+    return 'q' + Array.prototype.map.call(a, function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  }
+  function setBusy(on) {
+    busy = on;
+    $('btnSend').disabled = on; $('q').disabled = on;
+    $('sendLabel').textContent = on ? '' : 'Ask';
+    var s = $('btnSend').querySelector('.spin');
+    if (on && !s) $('btnSend').appendChild(el('span', 'spin')); else if (!on && s) s.remove();
+  }
+  function send(text, retryOf) {
+    text = String(text || '').trim();
+    if (!text || busy) return;
+    if (navigator.onLine === false) { alertInline('No signal. Ask WRI needs signal; the Field App screens still work offline.'); return; }
+    var token = getToken();
+    if (!token) { showAuth(); return; }
+    var m = retryOf || { id: newId(), q: text };
+    m.pending = true; m.error = false; m.retry = false;
+    if (!retryOf) thread.push(m);
+    $('q').value = ''; autoGrow();
+    setBusy(true); render();
+    var history = thread.filter(function (x) { return x !== m && !x.pending && !x.error && x.a; }).slice(-6).map(function (x) { return { q: x.q, a: x.a }; });
+    var body = { action: 'ask', token: token, id: m.id, question: text, history: history,
+      context: { app: 'fieldapp', screen: currentScreen(), role: role() } };
+    var attempt = 0;
+    (function go() {
+      attempt++;
+      post(body).then(function (d) {
+        m.pending = false;
+        if (d && d.ok) { m.a = d.answer; m.links = d.links || []; }
+        else if (d && d.error === 'auth') { badToken = token; m.error = true; m.retry = true; m.a = 'Your sign-in expired. Sign in again, then tap Try again.'; showAuth(); }
+        else { m.error = true; m.retry = true; m.a = (d && d.message) || 'Something went wrong. Try again.'; }
+        finish();
+      }, function () {
+        if (attempt < 2) { setTimeout(go, 1500); return; }   // same id: the server answers a retry from its cache
+        m.pending = false; m.error = true; m.retry = true; m.a = 'Could not reach Ask WRI. Check your signal and try again.'; finish();
+      });
+    })();
+    function finish() { setBusy(false); save(); render(); }
+  }
+  function alertInline(msg) { thread.push({ id: newId(), q: '(no signal)', a: msg, error: true }); render(); }
+
+  // ---------------------------------------------------------------- composer
+  function autoGrow() { var t = $('q'); t.style.height = 'auto'; t.style.height = Math.min(t.scrollHeight, 140) + 'px'; }
+  $('q').addEventListener('input', autoGrow);
+  $('q').addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send($('q').value); } });
+  $('btnSend').onclick = function () { send($('q').value); };
+  $('btnNew').onclick = function () { if (busy) return; thread = []; save(); render(); $('q').focus(); };
+  SUGGEST.forEach(function (s) { var c = el('button', 'chip', s); c.onclick = function () { send(s); }; $('sugs').appendChild(c); });
+
+  if (!getToken()) showAuth();
+  render();
+})();
+</script>
+</body>
+</html>
