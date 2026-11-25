@@ -181,7 +181,8 @@
 
   // ---------------------------------------------------------------- context
   function currentScreen() {
-    try { var p = new URLSearchParams(window.top.location.search).get('page'); return PAGE_NAMES[p] || p || ''; } catch (e) { return ''; }
+    // page_33 / "Ask WRI" is this panel's own menu page: no useful screen context there
+    try { var p = new URLSearchParams(window.top.location.search).get('page'); if (!p || p === 'page_33' || /^ask/i.test(p)) return ''; return PAGE_NAMES[p] || p; } catch (e) { return ''; }
   }
   function role() { return $('role').value || ''; }
   try { var r0 = localStorage.getItem('wri_role') || ''; if (r0 && $('role').querySelector('option[value="' + r0 + '"]')) $('role').value = r0; } catch (e) {}

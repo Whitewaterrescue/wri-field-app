@@ -517,6 +517,21 @@
       "isDefault": false,
       "header": true,
       "footer": false
+    },
+    "page_33": {
+      "id": "page_33",
+      "label": "Ask WRI",
+      "type": "NORMAL",
+      "mode": "FIT_WINDOW",
+      "layout": {
+        "LARGE": "layout_ask",
+        "MEDIUM": "layout_ask",
+        "SMALL": "layout_ask"
+      },
+      "isVisible": true,
+      "isDefault": false,
+      "header": true,
+      "footer": false
     }
   },
   "pageStructure": [
@@ -537,6 +552,9 @@
     },
     {
       "page_1": []
+    },
+    {
+      "page_33": []
     },
     {
       "page_18": [
@@ -1923,6 +1941,39 @@
         "0": {
           "type": "WIDGET",
           "widgetId": "widget_58",
+          "bbox": {
+            "left": "0px",
+            "right": "0px",
+            "top": "0px",
+            "bottom": "0px",
+            "width": "100%",
+            "height": "100%"
+          },
+          "setting": {
+            "autoProps": {
+              "left": false,
+              "right": false,
+              "top": false,
+              "bottom": false,
+              "width": "STRETCH",
+              "height": "STRETCH"
+            },
+            "vCenter": false,
+            "hCenter": false
+          },
+          "isPending": false
+        }
+      }
+    },
+    "layout_ask": {
+      "type": "FIXED",
+      "order": [
+        "0"
+      ],
+      "content": {
+        "0": {
+          "type": "WIDGET",
+          "widgetId": "widget_59",
           "bbox": {
             "left": "0px",
             "right": "0px",
@@ -3472,6 +3523,19 @@
       "config": {
         "embedType": "url",
         "expression": "<p>https://drone.whitewaterrescue.com/3d</p>",
+        "enableLabel": false
+      },
+      "useDataSourcesEnabled": false,
+      "useDataSources": []
+    },
+    "widget_59": {
+      "id": "widget_59",
+      "uri": "widgets/common/embed/",
+      "version": "1.20.0",
+      "label": "Ask WRI",
+      "config": {
+        "embedType": "url",
+        "expression": "<p>https://whitewaterrescue.github.io/wri-field-app/panels/ask/</p>",
         "enableLabel": false
       },
       "useDataSourcesEnabled": false,
