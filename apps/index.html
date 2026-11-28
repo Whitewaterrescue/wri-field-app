@@ -30,7 +30,8 @@
 
   Ops and RM also get the floating LOG 214 button (wri-recon/js/fab214-host.js, the
   Field App's 214 panel). Ops leaves its own old 214 card off when wrap=wri-apps.
-  The button stays away inside a frame or with from=fieldapp.
+  Inside a frame (a response viewer's panel) fab214-host.js stays away, so this page floats a plain red
+  LOG 214 link instead that opens Field Forms' 214 in its own tab (2026-11-28). None with from=fieldapp.
 
   The frame has NO sandbox on purpose: the apps use window.open (print, PDFs,
   ArcGIS sign-in popup), confirm/prompt, file pickers and downloads. `allow`
@@ -130,10 +131,33 @@
   // Ops + RM: the new 214 (Field Forms ?embed=214 in a panel; same origin, so it shares the outbox, name and PIN).
   // Both leave their own old 214 card off when wrap=wri-apps (Ops #45; RM 2026-11-12, Planning as its card had).
   if (key === 'ops' || key === 'rm') {
-    window.WRI_214_HOST = { incident: function () { return params.get('incident') || ''; }, section: key === 'rm' ? 'planning' : 'operations' };
-    var s214 = document.createElement('script');
-    s214.src = '/wri-recon/js/fab214-host.js?v=2026-11-12-4';
-    document.body.appendChild(s214);
+    var sec214 = key === 'rm' ? 'planning' : 'operations';
+    var framed214 = true;
+    try { framed214 = window.top !== window; } catch (eTop) {}
+    if (!framed214) {
+      window.WRI_214_HOST = { incident: function () { return params.get('incident') || ''; }, section: sec214 };
+      var s214 = document.createElement('script');
+      s214.src = '/wri-recon/js/fab214-host.js?v=2026-11-12-4';
+      document.body.appendChild(s214);
+    } else if (params.get('from') !== 'fieldapp') {   // the Field App overlay floats its own LOG 214
+      // 2026-11-28 (Cody: "the log 214 button is not on the live ops board"): inside a response viewer this page is
+      // itself framed (the viewer's panel), so fab214-host.js stays away and the app leaves its own button off
+      // (wrap=wri-apps): nothing showed. Here the page gets the same red LOG 214 link the apps float on their own
+      // links, opening Field Forms' 214 in its own tab (its saved name / PIN / outbox are top-level github.io storage).
+      var a214 = document.createElement('a');
+      a214.className = 'wri-214-fab';
+      a214.textContent = 'LOG 214';
+      a214.title = 'Log an ICS 214 entry (Field Forms)';
+      a214.target = '_blank';
+      a214.rel = 'noopener';
+      a214.href = '/wri-recon/?embed=214' + (params.get('incident') ? '&incident=' + encodeURIComponent(params.get('incident')) : '') +
+        '&section=' + sec214 + '#214';
+      a214.style.cssText = 'position:fixed;right:14px;bottom:14px;z-index:9400;min-width:54px;height:44px;border-radius:22px;' +
+        'border:2px solid #fff;background:#EC2329;color:#fff;font:800 14px/1 system-ui,sans-serif;letter-spacing:.3px;' +
+        'box-shadow:0 3px 10px rgba(0,0,0,.45);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 14px;' +
+        'text-decoration:none;box-sizing:border-box';
+      document.body.appendChild(a214);
+    }
   }
 
   // ArcGIS token bridge (same as the Field App root index.html).
