@@ -30,8 +30,8 @@
 
   Ops, RM, Planning and Finance also get the floating LOG 214 button (wri-recon/js/fab214-host.js, the
   Field App's 214 panel). Ops leaves its own old 214 card off when wrap=wri-apps.
-  Inside a frame (a response viewer's panel) fab214-host.js stays away, so this page floats a plain red
-  LOG 214 link instead that opens Field Forms' 214 in its own tab (2026-11-28). None with from=fieldapp.
+  Inside a response viewer's panel (same origin) the panel opens here too (fab214-host.js 2026-11-28); only a
+  frame on another site gets a plain red LOG 214 link to Field Forms' 214 in its own tab. None with from=fieldapp.
 
   The frame has NO sandbox on purpose: the apps use window.open (print, PDFs,
   ArcGIS sign-in popup), confirm/prompt, file pickers and downloads. `allow`
@@ -134,12 +134,15 @@
   var SEC214 = { ops: 'operations', rm: 'planning', planning: 'planning', finance: 'finance' };
   if (SEC214[key]) {
     var sec214 = SEC214[key];
-    var framed214 = true;
-    try { framed214 = window.top !== window; } catch (eTop) {}
-    if (!framed214) {
+    // 2026-11-28 (Cody): inside a response viewer the 214 opens in its panel here too. fab214-host.js now runs in a
+    // frame when every page above is this origin (the viewers are whitewaterrescue.github.io), so only a frame on
+    // another site still gets the plain new-tab link below.
+    var foreign214 = false;
+    try { foreign214 = window.top !== window && window.top.location.origin !== location.origin; } catch (eTop) { foreign214 = true; }
+    if (!foreign214) {
       window.WRI_214_HOST = { incident: function () { return params.get('incident') || ''; }, section: sec214 };
       var s214 = document.createElement('script');
-      s214.src = '/wri-recon/js/fab214-host.js?v=2026-11-12-4';
+      s214.src = '/wri-recon/js/fab214-host.js?v=2026-11-28-1';
       document.body.appendChild(s214);
     } else if (params.get('from') !== 'fieldapp') {   // the Field App overlay floats its own LOG 214
       // 2026-11-28 (Cody: "the log 214 button is not on the live ops board"): inside a response viewer this page is
