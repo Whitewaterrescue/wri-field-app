@@ -28,7 +28,7 @@
   sign-in saved on this origin (exb_auth), the Field App root's bridge verbatim;
   silence means the map falls back to its own sign-in.
 
-  Ops and RM also get the floating LOG 214 button (wri-recon/js/fab214-host.js, the
+  Ops, RM, Planning and Finance also get the floating LOG 214 button (wri-recon/js/fab214-host.js, the
   Field App's 214 panel). Ops leaves its own old 214 card off when wrap=wri-apps.
   Inside a frame (a response viewer's panel) fab214-host.js stays away, so this page floats a plain red
   LOG 214 link instead that opens Field Forms' 214 in its own tab (2026-11-28). None with from=fieldapp.
@@ -130,8 +130,10 @@
 
   // Ops + RM: the new 214 (Field Forms ?embed=214 in a panel; same origin, so it shares the outbox, name and PIN).
   // Both leave their own old 214 card off when wrap=wri-apps (Ops #45; RM 2026-11-12, Planning as its card had).
-  if (key === 'ops' || key === 'rm') {
-    var sec214 = key === 'rm' ? 'planning' : 'operations';
+  // 2026-11-28 (Cody): Planning and Finance get it too (they leave their own LOG 214 off when wrap=wri-apps)
+  var SEC214 = { ops: 'operations', rm: 'planning', planning: 'planning', finance: 'finance' };
+  if (SEC214[key]) {
+    var sec214 = SEC214[key];
     var framed214 = true;
     try { framed214 = window.top !== window; } catch (eTop) {}
     if (!framed214) {
